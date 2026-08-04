@@ -1,0 +1,6 @@
+{
+  "name": "Digital Logic Simulator",
+  "description": "Interactive web-based digital logic circuit simulator with real-time signal propagation, custom gate nodes, and canvas controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [""]
+}
