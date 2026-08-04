@@ -18,7 +18,7 @@ export const PropertyRow: React.FC<PropertyRowProps> = ({
 }) => {
   return (
     <div
-      className={`flex items-${align === 'top' ? 'start' : 'center'} justify-between gap-3 text-xs font-mono ${className}`}
+      className={`flex ${align === 'top' ? 'items-start' : 'items-center'} justify-between gap-3 text-xs font-mono ${className}`}
     >
       <div className="flex items-center gap-1.5 shrink-0 max-w-[130px]">
         <span className="text-slate-400 font-medium truncate">{label}</span>

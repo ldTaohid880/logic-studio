@@ -43,16 +43,15 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
 }) => {
   const [isTruthTableOpen, setIsTruthTableOpen] = useState(false);
 
-  const toggleEncoderInputPin = useCircuitStore((s) => s.toggleEncoderInputPin);
-  const setAllEncoderInputs = useCircuitStore((s) => s.setAllEncoderInputs);
-  const invertAllEncoderInputs = useCircuitStore((s) => s.invertAllEncoderInputs);
-
   const evaluated = evaluateEncoder(currentInputs, config);
   const liveState = state || evaluated.state;
   const explanation = getEncoderExplanation(config, liveState);
 
   const isInputActiveHigh = (config.inputActiveMode ?? config.activeMode ?? 'high') === 'high';
   const isOutputActiveHigh = (config.outputActiveMode ?? config.activeMode ?? 'high') === 'high';
+
+  const rawDataInputs = config.showEnableInput ? currentInputs.slice(1) : currentInputs;
+  const eiVal = config.showEnableInput ? currentInputs[0] : null;
 
   return (
     <div className="space-y-4 text-xs font-sans text-slate-200">
@@ -120,52 +119,7 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
         </PropertyRow>
       </InspectorSection>
 
-      <InspectorSection title={`Manual Input Controls (${config.inputs} Inputs)`} icon={<Sliders className="w-4 h-4" />}>
-        <div className="flex gap-1 font-mono justify-end mb-2">
-          <Button variant="ghost" size="xs" onClick={() => setAllEncoderInputs(nodeId, 1)}>
-            All 1s
-          </Button>
-          <Button variant="ghost" size="xs" onClick={() => setAllEncoderInputs(nodeId, 0)}>
-            All 0s
-          </Button>
-          <Button variant="ghost" size="xs" onClick={() => invertAllEncoderInputs(nodeId)}>
-            Invert
-          </Button>
-        </div>
 
-        <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1">
-          {Array.from({ length: config.inputs }, (_, i) => {
-            const val = currentInputs[i] ?? -1;
-            const isActive = isInputActiveHigh ? val === 1 : val === 0;
-            return (
-              <button
-                key={`input-ctl-${i}`}
-                onClick={() => toggleEncoderInputPin(nodeId, i)}
-                className={`py-1.5 px-2 rounded-lg border font-mono text-[10px] flex items-center justify-between transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-emerald-950/60 border-emerald-500/80 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
-                    : val === 1
-                    ? 'bg-slate-800 border-slate-700 text-slate-200'
-                    : 'bg-slate-900 border-slate-800 text-slate-500'
-                }`}
-              >
-                <span className="font-bold">D{i}</span>
-                <span
-                  className={`px-1 rounded text-[9px] font-bold ${
-                    val === 1
-                      ? 'bg-emerald-500 text-slate-950'
-                      : val === 0
-                      ? 'bg-slate-700 text-slate-300'
-                      : 'bg-amber-600 text-white'
-                  }`}
-                >
-                  {val === -1 ? '?' : val}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </InspectorSection>
 
       <InspectorSection title="Live Encoder Analysis" icon={<Cpu className="w-4 h-4" />}>
         <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2 font-mono text-[11px]">
@@ -233,6 +187,19 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
             />
           </PropertyRow>
         )}
+
+        <PropertyRow label="EI Active Mode">
+          <SegmentedControl
+            options={[
+              { value: 'high', label: 'Active HIGH' },
+              { value: 'low', label: 'Active LOW' },
+            ]}
+            value={config.enableInputActiveMode || 'low'}
+            onChange={(val) => onUpdateConfig({ enableInputActiveMode: val as EncoderActiveMode })}
+            size="xs"
+            className="w-36"
+          />
+        </PropertyRow>
 
         <PropertyRow label="Valid Output (V)">
           <Switch

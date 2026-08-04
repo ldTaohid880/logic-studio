@@ -176,7 +176,8 @@ export function generateEncoderTruthTable(
 
   // Append dynamic live canvas state row if error in live simulation
   if (simulatedError && !config.priority) {
-    const liveInputsRev = currentInputs ? [...currentInputs.slice(0, numInputs)].reverse() : [];
+    const liveInputs = currentInputs ? currentInputs.slice(1) : [];
+    const liveInputsRev = [...liveInputs.slice(0, numInputs)].reverse();
     rows.push({
       id: 'row-live-sim-error',
       label: '⚡ Current Live Canvas State (Error)',

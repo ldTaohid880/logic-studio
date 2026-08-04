@@ -129,7 +129,12 @@ export const EncoderTruthTableModal: React.FC<EncoderTruthTableModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 sm:p-6 animate-fadeIn">
-      <div className="bg-[#0f141c] border border-white/10 rounded-2xl w-[94vw] max-w-[1400px] h-[88vh] flex flex-col shadow-2xl overflow-hidden text-slate-100 font-sans">
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${nodeLabel} Truth Table`}
+        className="bg-[#0f141c] border border-white/10 rounded-2xl w-[94vw] max-w-[1400px] h-[88vh] flex flex-col shadow-2xl overflow-hidden text-slate-100 font-sans"
+      >
         
         {/* ================= HEADER ================= */}
         <div className="px-6 py-4 border-b border-white/10 bg-slate-900/80 backdrop-blur-lg flex flex-col gap-3">
@@ -216,6 +221,7 @@ export const EncoderTruthTableModal: React.FC<EncoderTruthTableModalProps> = ({
 
               <button
                 onClick={onClose}
+                aria-label="Close dialog"
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-1"
                 title="Close Dialog"
               >

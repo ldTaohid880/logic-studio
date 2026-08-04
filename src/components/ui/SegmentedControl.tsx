@@ -52,7 +52,7 @@ export function SegmentedControl<T extends string | number>({
             } ${
               isSelected
                 ? 'bg-emerald-500 text-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.3)] border border-emerald-400/50'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
             }`}
           >
             {option.label}

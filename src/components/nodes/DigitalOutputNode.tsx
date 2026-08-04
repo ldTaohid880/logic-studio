@@ -2,7 +2,7 @@ import React from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 
-export const DigitalOutputNode: React.FC<NodeProps> = ({ data, selected }) => {
+export const DigitalOutputNode = React.memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, value = -1 } = nodeData;
 
@@ -69,4 +69,6 @@ export const DigitalOutputNode: React.FC<NodeProps> = ({ data, selected }) => {
       </div>
     </div>
   );
-};
+});
+
+DigitalOutputNode.displayName = 'DigitalOutputNode';

@@ -8,12 +8,11 @@ import {
   DEFAULT_CLOCK_STATE,
 } from '../../types/clock';
 import { useCircuitStore } from '../../store/useCircuitStore';
-import { OscilloscopeWaveform } from './OscilloscopeWaveform';
 import { Play, Pause, SkipForward, RotateCcw, Clock } from 'lucide-react';
 
 const STANDARD_FREQS = [1, 2, 5, 10];
 
-export const ClockNode: React.FC<NodeProps> = ({ id, data, selected }) => {
+export const ClockNode = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, value = 0 } = nodeData;
   const config: ClockConfig = nodeData.clockConfig || DEFAULT_CLOCK_CONFIG;
@@ -25,6 +24,7 @@ export const ClockNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const singleTickClockNode = useCircuitStore((s) => s.singleTickClockNode);
   const tickClockNode = useCircuitStore((s) => s.tickClockNode);
   const updateClockConfig = useCircuitStore((s) => s.updateClockConfig);
+  const isDragging = useCircuitStore((s) => s.isDragging);
 
   const { status } = state;
   const { frequencyHz, startState, isCustomFreq } = config;
@@ -34,7 +34,7 @@ export const ClockNode: React.FC<NodeProps> = ({ id, data, selected }) => {
 
   // Independent event-driven timer for this Clock node
   useEffect(() => {
-    if (status !== 'running') return;
+    if (status !== 'running' || isDragging) return;
 
     // Interval T = 1000 / frequencyHz (clamped between 10ms and 10000ms)
     const intervalMs = Math.max(10, Math.round(1000 / Math.max(0.1, frequencyHz)));
@@ -44,7 +44,7 @@ export const ClockNode: React.FC<NodeProps> = ({ id, data, selected }) => {
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [id, status, frequencyHz, tickClockNode]);
+  }, [id, status, frequencyHz, tickClockNode, isDragging]);
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -124,33 +124,25 @@ export const ClockNode: React.FC<NodeProps> = ({ id, data, selected }) => {
         </span>
       </div>
 
-      {/* 2. Oscilloscope Waveform Preview & LED Indicator */}
-      <div className="relative mb-2.5 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden p-2">
-        {/* Scope Header with LED Indicator */}
-        <div className="flex items-center justify-between mb-1.5 text-[10px] font-mono">
-          <span className="text-slate-500 uppercase tracking-wider text-[9px]">Waveform</span>
-          
-          {/* Output LED Indicator: Green = HIGH, Gray = LOW */}
-          <div className="flex items-center gap-1.5">
-            <div
-              className={`w-2.5 h-2.5 rounded-full transition-all duration-150 ${
-                isHigh
-                  ? 'bg-emerald-500 shadow-[0_0_8px_#22c55e]'
-                  : 'bg-slate-600 border border-slate-500/50'
-              }`}
-            />
-            <span
-              className={`font-bold text-[9px] ${
-                isHigh ? 'text-emerald-400' : 'text-slate-400'
-              }`}
-            >
-              {isHigh ? 'HIGH' : 'LOW'}
-            </span>
-          </div>
+      {/* Output LED Status Indicator */}
+      <div className="flex items-center justify-between mb-2.5 px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] font-mono">
+        <span className="text-slate-400 font-medium">Output Signal</span>
+        <div className="flex items-center gap-1.5">
+          <div
+            className={`w-2.5 h-2.5 rounded-full transition-all duration-150 ${
+              isHigh
+                ? 'bg-emerald-500 shadow-[0_0_8px_#22c55e]'
+                : 'bg-slate-600 border border-slate-500/50'
+            }`}
+          />
+          <span
+            className={`font-bold text-[9px] ${
+              isHigh ? 'text-emerald-400' : 'text-slate-400'
+            }`}
+          >
+            {isHigh ? 'HIGH (1)' : 'LOW (0)'}
+          </span>
         </div>
-
-        {/* Real Live Oscilloscope Screen Canvas */}
-        <OscilloscopeWaveform value={value} status={status} frequencyHz={frequencyHz} />
       </div>
 
       {/* 3. Settings: Frequency */}
@@ -315,4 +307,6 @@ export const ClockNode: React.FC<NodeProps> = ({ id, data, selected }) => {
       />
     </div>
   );
-};
+});
+
+ClockNode.displayName = 'ClockNode';

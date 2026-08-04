@@ -65,6 +65,27 @@ export function evaluateGate(
       return -1;
     }
 
+    case 'BUFFER': {
+      return inputs[0] ?? -1;
+    }
+
+    case 'TRI_STATE_BUFFER': {
+      const dataIn = inputs[0] ?? -1;
+      const enable = inputs[1] ?? 1; // Default to active high enable if unconnected
+      if (enable === 1) return dataIn;
+      return -1; // Floating / High Impedance Z
+    }
+
+    case 'PUSH_BUTTON':
+    case 'CONST_HIGH':
+      return 1;
+
+    case 'CONST_LOW':
+      return 0;
+
+    case 'LOGIC_PROBE':
+      return inputs[0] ?? -1;
+
     default:
       return -1;
   }

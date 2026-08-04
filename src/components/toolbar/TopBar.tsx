@@ -10,9 +10,6 @@ import {
   FolderOpen,
   Keyboard,
   Cpu,
-  Sun,
-  Moon,
-  Table,
 } from 'lucide-react';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { Button } from '../ui/Button';
@@ -23,14 +20,12 @@ import { toPng } from 'html-to-image';
 interface TopBarProps {
   onOpenPresets: () => void;
   onOpenShortcuts: () => void;
-  onOpenCircuitTruthTable: () => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   onOpenPresets,
   onOpenShortcuts,
-  onOpenCircuitTruthTable,
   canvasRef,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -225,6 +220,15 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <div className="w-[1px] h-4 bg-slate-800 my-auto mx-1" />
 
+        <Button
+          variant="ghost"
+          size="xs"
+          leftIcon={<Undo className="w-3.5 h-3.5 text-amber-400" />}
+          onClick={() => useCircuitStore.getState().resetAllInputs()}
+        >
+          Reset Inputs
+        </Button>
+
         <IconButton
           icon={<Trash2 className="w-3.5 h-3.5 text-rose-400" />}
           tooltip="Clear Canvas"
@@ -237,16 +241,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         />
       </div>
 
-      {/* Right Controls: Theme Switch & Shortcuts */}
+      {/* Right Controls: Shortcuts */}
       <div className="flex items-center gap-2">
-        <IconButton
-          icon={theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-cyan-400" />}
-          tooltip={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Theme`}
-          variant="secondary"
-          size="sm"
-          onClick={toggleTheme}
-        />
-
         <Button
           variant="secondary"
           size="xs"

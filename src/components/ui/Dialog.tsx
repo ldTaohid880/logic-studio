@@ -55,6 +55,9 @@ export const Dialog: React.FC<DialogProps> = ({
 
       {/* Modal Card */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : 'dialog'}
         className={`relative w-full ${widthClasses[maxWidth]} bg-slate-900/95 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden z-10 animate-popIn`}
       >
         {/* Header */}
@@ -76,6 +79,7 @@ export const Dialog: React.FC<DialogProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
           >
             <X className="w-4 h-4" />
