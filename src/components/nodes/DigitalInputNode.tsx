@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 
-export const DigitalInputNode: React.FC<NodeProps> = ({ id, data, selected }) => {
+export const DigitalInputNode = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, value = 0 } = nodeData;
   const toggleInputValue = useCircuitStore((state) => state.toggleInputValue);
@@ -80,4 +80,6 @@ export const DigitalInputNode: React.FC<NodeProps> = ({ id, data, selected }) =>
       />
     </div>
   );
-};
+});
+
+DigitalInputNode.displayName = 'DigitalInputNode';

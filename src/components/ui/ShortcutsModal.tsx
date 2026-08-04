@@ -10,6 +10,10 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
   if (!isOpen) return null;
 
   const shortcuts = [
+    { key: 'Ctrl + C / Cmd + C', action: 'Copy selected component' },
+    { key: 'Ctrl + X / Cmd + X', action: 'Cut selected component' },
+    { key: 'Ctrl + V / Cmd + V', action: 'Paste component from clipboard' },
+    { key: 'Ctrl + D / Cmd + D', action: 'Duplicate selected component' },
     { key: 'Delete / Backspace', action: 'Delete selected node or wire' },
     { key: 'Ctrl + Z / Cmd + Z', action: 'Undo last action' },
     { key: 'Ctrl + Y / Cmd + Shift + Z', action: 'Redo action' },
@@ -22,9 +26,14 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Keyboard & Controls Guide"
+        className="w-full max-w-lg max-h-[85vh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+      >
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50 shrink-0">
           <div className="flex items-center gap-2">
             <Keyboard className="w-5 h-5 text-cyan-400" />
             <h2 className="text-sm font-bold text-slate-100 font-mono tracking-wide uppercase">
@@ -33,6 +42,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
           </div>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -40,7 +50,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
         </div>
 
         {/* Shortcuts list */}
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-2 overflow-y-auto flex-1 max-h-[calc(85vh-4rem)]">
           {shortcuts.map((item, idx) => (
             <div
               key={idx}

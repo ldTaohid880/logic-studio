@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { TopBar } from './components/toolbar/TopBar';
-import { SimulationBar } from './components/toolbar/SimulationBar';
 import { LeftToolbox } from './components/toolbar/LeftToolbox';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas';
 import { InspectorPanel } from './components/inspector/InspectorPanel';
@@ -16,35 +15,22 @@ export default function App() {
   const [isCircuitTruthTableOpen, setIsCircuitTruthTableOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  const theme = useCircuitStore((state) => state.theme);
-
   useEffect(() => {
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
-    } else {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
-    }
-  }, [theme]);
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+  }, []);
 
   return (
-    <div className={`w-screen h-screen flex flex-col font-sans overflow-hidden select-none transition-colors duration-200 ${
-      theme === 'light' ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'
-    }`}>
-      {/* Top Main Navigation Bar */}
+    <div className="w-screen h-screen flex flex-col font-sans overflow-hidden select-none transition-colors duration-200 bg-slate-950 text-slate-100">
+      {/* Top Navigation Bar */}
       <TopBar
         onOpenPresets={() => setIsPresetsOpen(true)}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        onOpenCircuitTruthTable={() => setIsCircuitTruthTableOpen(true)}
         canvasRef={canvasRef}
       />
 
       {/* Interactive Main Workspace Area */}
       <div className="flex-1 flex relative overflow-hidden">
-        {/* Floating Simulation Control Bar */}
-        <SimulationBar onOpenCircuitTruthTable={() => setIsCircuitTruthTableOpen(true)} />
-
         {/* Left Toolbox Palette */}
         <LeftToolbox />
 

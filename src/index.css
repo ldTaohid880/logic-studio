@@ -128,12 +128,16 @@
 
 /* React Flow Custom Node Overrides */
 .react-flow__node {
+  background: transparent !important;
+  border-color: transparent !important;
   border-radius: 12px;
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  transition: box-shadow 0.2s ease;
 }
 
 .react-flow__node.selected {
   outline: none !important;
+  background: transparent !important;
+  border-color: transparent !important;
 }
 
 .react-flow__handle {
@@ -141,11 +145,11 @@
   height: 10px !important;
   border-radius: 9999px !important;
   border: 2px solid #0f172a !important;
-  transition: all 0.15s ease;
+  transition: box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
 .react-flow__handle:hover {
-  transform: scale(1.3);
+  box-shadow: 0 0 6px 2.5px rgba(16, 185, 129, 0.6) !important;
 }
 
 /* Monospace font for circuit logic values */
@@ -153,4 +157,5 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-feature-settings: "zero" 1, "tnum" 1;
 }
+
 

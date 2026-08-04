@@ -5,7 +5,7 @@ import { MultiInputConfig, DEFAULT_MULTI_INPUT_CONFIG } from '../../types/multiI
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { Layers, Dices, ArrowUpCircle, ArrowDownCircle, RefreshCw, Plus } from 'lucide-react';
 
-export const MultiInputNode: React.FC<NodeProps> = ({ id, data, selected }) => {
+export const MultiInputNode = React.memo(({ id, data, selected }: NodeProps) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const nodeData = data as unknown as NodeData;
   const { label } = nodeData;
@@ -24,17 +24,21 @@ export const MultiInputNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   }, [id, inputCount, values, updateNodeInternals]);
 
   // Compute Decimal, Binary, Hex values
-  let decimalVal = 0;
-  values.forEach((v, idx) => {
-    if (v === 1) decimalVal += Math.pow(2, idx);
-  });
+  const { decimalVal, binaryString, hexString } = React.useMemo(() => {
+    let dec = 0;
+    values.forEach((v, idx) => {
+      if (v === 1) dec += Math.pow(2, idx);
+    });
 
-  const binaryString = [...values]
-    .reverse()
-    .map((v) => (v === 1 ? '1' : '0'))
-    .join('');
+    const bin = [...values]
+      .reverse()
+      .map((v) => (v === 1 ? '1' : '0'))
+      .join('');
 
-  const hexString = '0x' + decimalVal.toString(16).toUpperCase().padStart(Math.ceil(inputCount / 4), '0');
+    const hex = '0x' + dec.toString(16).toUpperCase().padStart(Math.ceil(inputCount / 4), '0');
+
+    return { decimalVal: dec, binaryString: bin, hexString: hex };
+  }, [values, inputCount]);
 
   return (
     <div
@@ -167,7 +171,7 @@ export const MultiInputNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 className={`w-10 h-5 rounded-full p-0.5 transition-all duration-200 flex items-center border cursor-pointer shrink-0 ${
                   isHigh
                     ? 'bg-emerald-950 border-emerald-500/80'
-                    : 'bg-slate-800 border-slate-600'
+                    : 'bg-slate-800'
                 }`}
               >
                 <div
@@ -211,5 +215,7 @@ export const MultiInputNode: React.FC<NodeProps> = ({ id, data, selected }) => {
       </div>
     </div>
   );
-};
+});
+
+MultiInputNode.displayName = 'MultiInputNode';
 

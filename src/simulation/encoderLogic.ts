@@ -15,23 +15,44 @@ export function evaluateEncoder(
   const isInputActiveHigh = (config.inputActiveMode ?? config.activeMode ?? 'high') === 'high';
   const isOutputActiveHigh = (config.outputActiveMode ?? config.activeMode ?? 'high') === 'high';
 
-  // 1. Determine active inputs using Input Logic
+  // Extract Enable Input (EI) value if configured
+  let dataInputs = inputs;
+  let isEnabled = true;
+  let eiValue: SignalValue = -1;
+  let isFloating = false;
+
+  eiValue = inputs[0] ?? -1;
+  dataInputs = inputs.slice(1);
+
+  const isEiActiveHigh = (config.enableInputActiveMode ?? 'low') === 'high';
+  if (eiValue === -1) {
+    isEnabled = false;
+    isFloating = true;
+  } else if (isEiActiveHigh) {
+    isEnabled = eiValue === 1;
+  } else {
+    isEnabled = eiValue === 0;
+  }
+
+  // 1. Determine active inputs using Input Logic (only if enabled)
   const activeIndices: number[] = [];
-  inputs.forEach((val, idx) => {
-    if (idx >= numInputs) return;
-    if (isInputActiveHigh) {
-      if (val === 1) activeIndices.push(idx);
-    } else {
-      // Active Low: active when signal is 0
-      if (val === 0) activeIndices.push(idx);
-    }
-  });
+  if (isEnabled) {
+    dataInputs.forEach((val, idx) => {
+      if (idx >= numInputs) return;
+      if (isInputActiveHigh) {
+        if (val === 1) activeIndices.push(idx);
+      } else {
+        // Active Low: active when signal is 0
+        if (val === 0) activeIndices.push(idx);
+      }
+    });
+  }
 
   let activeIndex: number | null = null;
   let error: string | undefined = undefined;
   let warning: string | undefined = undefined;
   let valid = false;
-  let eo = true; // Enable Output is HIGH when no active input is present
+  let eo = isEnabled; // Enable Output is inactive (0) if disabled or if there's an active input
   let gs = false; // Group Signal is HIGH when an active input is present
 
   if (config.priority) {
@@ -48,18 +69,26 @@ export function evaluateEncoder(
     } else {
       activeIndex = null;
       valid = false;
-      eo = true;
+      eo = isEnabled;
       gs = false;
-      warning = 'No active input detected.';
+      warning = isFloating
+        ? 'Enable Input (EI) is floating/unknown.'
+        : !isEnabled
+        ? 'Encoder disabled (EI is inactive).'
+        : 'No active input detected.';
     }
   } else {
     // Non-Priority Mode (Standard Encoder)
     if (activeIndices.length === 0) {
       activeIndex = null;
       valid = false;
-      eo = true;
+      eo = isEnabled;
       gs = false;
-      warning = 'No active input detected.';
+      warning = isFloating
+        ? 'Enable Input (EI) is floating/unknown.'
+        : !isEnabled
+        ? 'Encoder disabled (EI is inactive).'
+        : 'No active input detected.';
     } else if (activeIndices.length === 1) {
       activeIndex = activeIndices[0];
       valid = true;

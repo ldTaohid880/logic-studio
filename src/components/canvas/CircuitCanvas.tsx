@@ -19,6 +19,16 @@ import { ClockNode } from '../nodes/ClockNode';
 import { SevenSegmentNode } from '../nodes/SevenSegmentNode';
 import { EncoderNode } from '../nodes/EncoderNode';
 import { MultiInputNode } from '../nodes/MultiInputNode';
+import { ICComponentNode } from '../nodes/ICComponentNode';
+import { DipSwitchNode } from '../nodes/DipSwitchNode';
+import { PushButtonNode } from '../nodes/PushButtonNode';
+import { RgbLedNode } from '../nodes/RgbLedNode';
+import { LogicProbeNode } from '../nodes/LogicProbeNode';
+import { HexDisplayNode } from '../nodes/HexDisplayNode';
+import { BusMonitorNode } from '../nodes/BusMonitorNode';
+import { UtilityNode } from '../nodes/UtilityNode';
+import { OscilloscopeNode } from '../nodes/OscilloscopeNode';
+import { ConfigurableNode } from '../nodes/ConfigurableNode';
 import { SignalEdge } from '../edges/SignalEdge';
 import { GateType } from '../../types/circuit';
 
@@ -30,6 +40,16 @@ const nodeTypes = {
   sevenSegment: SevenSegmentNode,
   encoderNode: EncoderNode,
   multiInput: MultiInputNode,
+  icComponent: ICComponentNode,
+  configurableNode: ConfigurableNode,
+  dipSwitch: DipSwitchNode,
+  pushButton: PushButtonNode,
+  rgbLed: RgbLedNode,
+  logicProbe: LogicProbeNode,
+  hexDisplay: HexDisplayNode,
+  busMonitor: BusMonitorNode,
+  utility: UtilityNode,
+  oscilloscope: OscilloscopeNode,
 };
 
 const edgeTypes = {
@@ -60,11 +80,13 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({ canvasRef, 
     undo,
     redo,
     theme,
+    isDragging,
+    setIsDragging,
   } = useCircuitStore();
 
   // Continuous simulation ticker loop
   useEffect(() => {
-    if (!simulation.isRunning || simulation.isPaused || !simulation.loopMode) {
+    if (!simulation.isRunning || simulation.isPaused || !simulation.loopMode || isDragging) {
       return;
     }
 
@@ -76,7 +98,7 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({ canvasRef, 
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [simulation.isRunning, simulation.isPaused, simulation.loopMode, simulation.speed, tickSimulation]);
+  }, [simulation.isRunning, simulation.isPaused, simulation.loopMode, simulation.speed, tickSimulation, isDragging]);
 
   // Drag and drop node from toolbox onto canvas
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -101,6 +123,14 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({ canvasRef, 
     [screenToFlowPosition, addNode]
   );
 
+  const handleNodeDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, [setIsDragging]);
+
+  const handleNodeDragStop = useCallback(() => {
+    setIsDragging(false);
+  }, [setIsDragging]);
+
   // Global Keyboard shortcuts listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -111,6 +141,18 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({ canvasRef, 
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         deleteSelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        useCircuitStore.getState().copySelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        useCircuitStore.getState().cutSelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        useCircuitStore.getState().pasteClipboard();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        useCircuitStore.getState().duplicateSelected();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (e.shiftKey) {
           redo();
@@ -142,6 +184,8 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({ canvasRef, 
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStart={handleNodeDragStart}
+          onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           snapToGrid

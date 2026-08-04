@@ -8,7 +8,7 @@ import {
 } from '../../types/sevenSegment';
 import { evaluateSevenSegment } from '../../utils/sevenSegmentLogic';
 
-export const SevenSegmentNode: React.FC<NodeProps> = ({ data, selected }) => {
+export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, inputs = [] } = nodeData;
 
@@ -181,4 +181,6 @@ export const SevenSegmentNode: React.FC<NodeProps> = ({ data, selected }) => {
       </div>
     </div>
   );
-};
+});
+
+SevenSegmentNode.displayName = 'SevenSegmentNode';

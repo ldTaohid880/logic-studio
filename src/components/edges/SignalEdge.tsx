@@ -33,18 +33,6 @@ export const SignalEdge: React.FC<EdgeProps> = ({
 
   return (
     <>
-      {/* Background Glow Stroke for HIGH signals */}
-      {isHigh && (
-        <path
-          d={edgePath}
-          fill="none"
-          stroke="#22c55e"
-          strokeWidth={7}
-          strokeOpacity={0.3}
-          className="blur-[3px] transition-all duration-300"
-        />
-      )}
-
       {/* Main Connection Wire Base Path */}
       <BaseEdge
         id={id}
@@ -53,7 +41,6 @@ export const SignalEdge: React.FC<EdgeProps> = ({
           stroke: strokeColor,
           strokeWidth: selected ? 3.5 : 2.5,
           transition: 'stroke 0.2s ease, stroke-width 0.2s ease',
-          filter: selected ? 'drop-shadow(0 0 6px rgba(52, 211, 153, 0.8))' : 'none',
         }}
       />
 

@@ -25,6 +25,7 @@ export const InspectorSection: React.FC<InspectorSectionProps> = ({
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
         className="w-full px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-800/40 transition-colors select-none cursor-pointer"
       >
         <div className="flex items-center gap-2">

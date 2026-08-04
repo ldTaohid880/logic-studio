@@ -11,7 +11,6 @@ import { useCircuitStore } from '../../store/useCircuitStore';
 export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const [isTruthTableOpen, setIsTruthTableOpen] = useState(false);
-  const toggleEncoderInputPin = useCircuitStore((s) => s.toggleEncoderInputPin);
 
   const nodeData = data as unknown as NodeData;
   const { label, inputs = [], outputs = [] } = nodeData;
@@ -143,17 +142,16 @@ export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
               <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider block mb-1">
                 Inputs ({inputs.length})
               </span>
-              {inputs.map((pin, idx) => {
-                const isActive = isInputActiveHigh ? pin.value === 1 : pin.value === 0;
+              {inputs.map((pin) => {
+                const isEiPin = pin.id === 'in-EI';
+                const isActive = isEiPin
+                  ? ((config.enableInputActiveMode || 'low') === 'high' ? pin.value === 1 : pin.value === 0)
+                  : (isInputActiveHigh ? pin.value === 1 : pin.value === 0);
+
                 return (
                   <div
                     key={pin.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleEncoderInputPin(id, idx);
-                    }}
-                    className="relative flex items-center h-6 py-0.5 cursor-pointer group hover:bg-white/5 px-1 rounded transition-colors"
-                    title={`Click to toggle ${pin.name} value`}
+                    className="relative flex items-center h-6 py-0.5 px-1 rounded transition-colors"
                   >
                     {/* Left Target Handle */}
                     <Handle
@@ -162,28 +160,38 @@ export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
                       id={pin.id}
                       style={{ left: '-12px', top: '50%' }}
                       className={`!w-3 !h-3 !border-2 !border-[#151a23] !transition-all ${
-                        isActive
-                          ? '!bg-emerald-400 shadow-[0_0_8px_#4ade80]'
-                          : pin.value === -1
-                          ? '!bg-amber-500'
-                          : '!bg-slate-600'
+                        isEiPin
+                          ? (isActive
+                              ? '!bg-cyan-400 shadow-[0_0_8px_#22d3ee]'
+                              : pin.value === -1
+                              ? '!bg-amber-500'
+                              : '!bg-slate-600')
+                          : (isActive
+                              ? '!bg-emerald-400 shadow-[0_0_8px_#4ade80]'
+                              : pin.value === -1
+                              ? '!bg-amber-500'
+                              : '!bg-slate-600')
                       }`}
                     />
                     <div className="flex items-center gap-1.5 pl-1">
                       <span
                         className={`w-2 h-2 rounded-full transition-all ${
-                          isActive
-                            ? 'bg-emerald-400 shadow-[0_0_6px_#4ade80]'
-                            : 'bg-slate-700'
+                          isEiPin
+                            ? (isActive
+                                ? 'bg-cyan-400 shadow-[0_0_6px_#22d3ee]'
+                                : 'bg-slate-700')
+                            : (isActive
+                                ? 'bg-emerald-400 shadow-[0_0_6px_#4ade80]'
+                                : 'bg-slate-700')
                         }`}
                       />
-                      <span className="text-[10px] font-mono font-bold text-slate-300">
+                      <span className={`text-[10px] font-mono font-bold ${isEiPin ? 'text-cyan-400' : 'text-slate-300'}`}>
                         {pin.name}
                       </span>
                       <span
                         className={`text-[8px] font-mono font-bold px-1 rounded ${
                           pin.value === 1
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            ? (isEiPin ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30')
                             : pin.value === 0
                             ? 'bg-slate-800 text-slate-400 border border-slate-700'
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'

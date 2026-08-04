@@ -20,14 +20,20 @@ export function createEncoderPins(config: EncoderConfig, currentInputs?: PinData
   }
 
   // 1. Generate Input Pins (D0..D{N-1})
-  const inputs: PinData[] = Array.from({ length: numInputs }, (_, i) => {
+  const inputs: PinData[] = [];
+  inputs.push({
+    id: 'in-EI',
+    name: 'EI',
+    value: inputMap.get('in-EI') ?? -1,
+  });
+  for (let i = 0; i < numInputs; i++) {
     const pinId = `in-${i}`;
-    return {
+    inputs.push({
       id: pinId,
       name: `D${i}`,
       value: inputMap.get(pinId) ?? -1,
-    };
-  });
+    });
+  }
 
   // 2. Generate Binary Output Pins (A{M-1}..A0)
   const outputs: PinData[] = [];

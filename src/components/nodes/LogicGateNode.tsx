@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { GateIcon } from './GateIcons';
 
-export const LogicGateNode: React.FC<NodeProps> = ({ id, data, selected }) => {
+export const LogicGateNode = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, gateType, inputs = [], outputs = [] } = nodeData;
 
@@ -15,10 +15,10 @@ export const LogicGateNode: React.FC<NodeProps> = ({ id, data, selected }) => {
 
   return (
     <div
-      className={`relative min-w-[140px] px-3 py-2.5 rounded-xl transition-all duration-200 border backdrop-blur-md shadow-lg group ${
+      className={`relative min-w-[140px] px-3 py-2.5 rounded-xl transition-all duration-200 border backdrop-blur-md shadow-md group ${
         selected
-          ? 'border-emerald-400/80 shadow-emerald-500/20 ring-2 ring-emerald-500/30 bg-slate-900/90'
-          : 'border-slate-700/60 hover:border-slate-500/80 bg-slate-900/80 hover:shadow-cyan-500/10'
+          ? 'border-emerald-400/80 ring-1 ring-emerald-500/40 bg-slate-900/90'
+          : 'border-slate-700/60 hover:border-slate-500/80 bg-slate-900/80'
       }`}
     >
       {/* Small LED status indicator at top-right */}
@@ -26,7 +26,7 @@ export const LogicGateNode: React.FC<NodeProps> = ({ id, data, selected }) => {
         <span
           className={`w-2 h-2 rounded-full transition-all duration-300 ${
             isHigh
-              ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+              ? 'bg-emerald-400'
               : isLow
               ? 'bg-slate-600'
               : 'bg-amber-500/80'
@@ -68,7 +68,7 @@ export const LogicGateNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 }}
                 className={`!w-3 !h-3 !border-2 !rounded-full transition-all duration-200 ${
                   pinHigh
-                    ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_6px_#34d399]'
+                    ? '!bg-emerald-400 !border-emerald-200'
                     : pinLow
                     ? '!bg-slate-700 !border-slate-400'
                     : '!bg-amber-500 !border-amber-300'
@@ -103,7 +103,7 @@ export const LogicGateNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 }}
                 className={`!w-3 !h-3 !border-2 !rounded-full transition-all duration-200 ${
                   pinHigh
-                    ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_8px_#34d399]'
+                    ? '!bg-emerald-400 !border-emerald-200'
                     : pinLow
                     ? '!bg-slate-700 !border-slate-400'
                     : '!bg-amber-500 !border-amber-300'
@@ -115,4 +115,6 @@ export const LogicGateNode: React.FC<NodeProps> = ({ id, data, selected }) => {
       </div>
     </div>
   );
-};
+});
+
+LogicGateNode.displayName = 'LogicGateNode';

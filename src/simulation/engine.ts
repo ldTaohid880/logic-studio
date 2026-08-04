@@ -2,8 +2,35 @@ import { Node, Edge } from '@xyflow/react';
 import { NodeData, SignalValue } from '../types/circuit';
 import { evaluateGate } from '../utils/gateLogic';
 import { evaluateEncoder } from './encoderLogic';
+import { evaluateIC } from './icLogic';
 import { DEFAULT_ENCODER_CONFIG } from '../types/encoder';
 import { DEFAULT_MULTI_INPUT_CONFIG } from '../types/multiInput';
+import {
+  evaluateCfgEncoder,
+  evaluateCfgDecoder,
+  evaluateCfgMux,
+  evaluateCfgDemux,
+  evaluateCfgComparator,
+  evaluateCfgRegister,
+  evaluateCfgShiftRegister,
+  evaluateCfgCounter,
+  evaluateCfgConstant,
+  evaluateCfgBusSplitter,
+  evaluateCfgBusJoiner,
+} from './configurableLogic';
+import {
+  DEFAULT_CFG_ENCODER_CONFIG,
+  DEFAULT_CFG_DECODER_CONFIG,
+  DEFAULT_CFG_MUX_CONFIG,
+  DEFAULT_CFG_DEMUX_CONFIG,
+  DEFAULT_CFG_COMPARATOR_CONFIG,
+  DEFAULT_CFG_REGISTER_CONFIG,
+  DEFAULT_CFG_SHIFT_REGISTER_CONFIG,
+  DEFAULT_CFG_COUNTER_CONFIG,
+  DEFAULT_CFG_CONSTANT_CONFIG,
+  DEFAULT_CFG_BUS_SPLITTER_CONFIG,
+  DEFAULT_CFG_BUS_JOINER_CONFIG,
+} from '../types/configurable';
 
 export interface PropagateResult {
   nodes: Node[];
@@ -61,7 +88,30 @@ export function propagateSignals(
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     let iterChanged = false;
 
-    // Step A: Map output signals from source pins to connected input pins via edges
+    // Step A.1: Tunnel wireless signal propagation pass
+    const tunnelMap = new Map<string, SignalValue>();
+    nodesMap.forEach((n) => {
+      const d = n.data as unknown as NodeData;
+      if (d.gateType === 'TUNNEL' && d.tunnelLabel && d.inputs.length > 0) {
+        const val = d.inputs[0]?.value ?? -1;
+        if (val !== -1) {
+          tunnelMap.set(d.tunnelLabel.toUpperCase(), val);
+        }
+      }
+    });
+
+    nodesMap.forEach((n) => {
+      const d = n.data as unknown as NodeData;
+      if (d.gateType === 'TUNNEL' && d.tunnelLabel) {
+        const matchedVal = tunnelMap.get(d.tunnelLabel.toUpperCase()) ?? -1;
+        if (d.outputs.length > 0 && d.outputs[0].value !== matchedVal) {
+          d.outputs[0].value = matchedVal;
+          iterChanged = true;
+        }
+      }
+    });
+
+    // Step A.2: Map output signals from source pins to connected input pins via edges
     inputEdges.forEach((edge) => {
       const sourceNode = nodesMap.get(edge.source);
       const targetNode = nodesMap.get(edge.target);
@@ -102,17 +152,24 @@ export function propagateSignals(
       const data = node.data as unknown as NodeData;
       const inputs = data.inputs.map((p) => p.value);
 
-      if (data.gateType === 'INPUT' || data.gateType === 'CLOCK') {
-        // Output pins inherit current user value
-        const val = data.value ?? 0;
+      if (data.gateType === 'INPUT' || data.gateType === 'CLOCK' || data.gateType === 'PUSH_BUTTON' || data.gateType === 'CONST_HIGH' || data.gateType === 'CONST_LOW') {
+        const val = data.gateType === 'CONST_HIGH' ? 1 : data.gateType === 'CONST_LOW' ? 0 : (data.value ?? 0);
         data.outputs.forEach((outPin) => {
           if (outPin.value !== val) {
             outPin.value = val;
             iterChanged = true;
           }
         });
+      } else if (data.gateType === 'DIP_SWITCH') {
+        const dipVals = data.dipValues || [0, 0, 0, 0];
+        data.outputs.forEach((outPin, idx) => {
+          const expectedVal = (dipVals[idx] ?? 0) === 1 ? 1 : 0;
+          if (outPin.value !== expectedVal) {
+            outPin.value = expectedVal;
+            iterChanged = true;
+          }
+        });
       } else if (data.gateType === 'MULTI_INPUT') {
-        // Multi-Input node output pins reflect the values configured in multiInputConfig
         const config = data.multiInputConfig || DEFAULT_MULTI_INPUT_CONFIG;
         data.outputs.forEach((outPin) => {
           let expectedVal: SignalValue = 0;
@@ -129,8 +186,15 @@ export function propagateSignals(
             iterChanged = true;
           }
         });
-      } else if (data.gateType === 'OUTPUT') {
-        // Output node takes first input pin or target value
+      } else if (
+        data.gateType === 'OUTPUT' ||
+        data.gateType === 'LOGIC_PROBE' ||
+        data.gateType === 'RGB_LED' ||
+        data.gateType === 'SEVEN_SEGMENT' ||
+        data.gateType === 'HEX_DISPLAY' ||
+        data.gateType === 'BUS_MONITOR' ||
+        data.gateType === 'OSCILLOSCOPE'
+      ) {
         const val = inputs[0] ?? data.value ?? -1;
         if (data.value !== val) {
           data.value = val;
@@ -148,10 +212,82 @@ export function propagateSignals(
             iterChanged = true;
           }
         });
-      } else if (data.gateType === 'SEVEN_SEGMENT') {
-        // 7-Segment display evaluates visually from current input pins
+      } else if ([
+        'CFG_ENCODER', 'CFG_DECODER', 'CFG_MUX', 'CFG_DEMUX', 'CFG_COMPARATOR',
+        'CFG_REGISTER', 'CFG_SHIFT_REGISTER', 'CFG_COUNTER', 'CFG_CONSTANT',
+        'CFG_BUS_SPLITTER', 'CFG_BUS_JOINER'
+      ].includes(data.gateType)) {
+        let evalRes: { outputs: Record<string, SignalValue>; newState?: Record<string, any> } = { outputs: {} };
+
+        switch (data.gateType) {
+          case 'CFG_ENCODER':
+            evalRes = evaluateCfgEncoder(data.inputs, data.cfgEncoderConfig || DEFAULT_CFG_ENCODER_CONFIG);
+            break;
+          case 'CFG_DECODER':
+            evalRes = evaluateCfgDecoder(data.inputs, data.cfgDecoderConfig || DEFAULT_CFG_DECODER_CONFIG);
+            break;
+          case 'CFG_MUX':
+            evalRes = evaluateCfgMux(data.inputs, data.cfgMuxConfig || DEFAULT_CFG_MUX_CONFIG);
+            break;
+          case 'CFG_DEMUX':
+            evalRes = evaluateCfgDemux(data.inputs, data.cfgDemuxConfig || DEFAULT_CFG_DEMUX_CONFIG);
+            break;
+          case 'CFG_COMPARATOR':
+            evalRes = evaluateCfgComparator(data.inputs, data.cfgComparatorConfig || DEFAULT_CFG_COMPARATOR_CONFIG);
+            break;
+          case 'CFG_REGISTER':
+            evalRes = evaluateCfgRegister(data.inputs, data.cfgRegisterConfig || DEFAULT_CFG_REGISTER_CONFIG, data.icState || {});
+            break;
+          case 'CFG_SHIFT_REGISTER':
+            evalRes = evaluateCfgShiftRegister(data.inputs, data.cfgShiftRegisterConfig || DEFAULT_CFG_SHIFT_REGISTER_CONFIG, data.icState || {});
+            break;
+          case 'CFG_COUNTER':
+            evalRes = evaluateCfgCounter(data.inputs, data.cfgCounterConfig || DEFAULT_CFG_COUNTER_CONFIG, data.icState || {});
+            break;
+          case 'CFG_CONSTANT':
+            evalRes = evaluateCfgConstant(data.cfgConstantConfig || DEFAULT_CFG_CONSTANT_CONFIG);
+            break;
+          case 'CFG_BUS_SPLITTER':
+            evalRes = evaluateCfgBusSplitter(data.inputs, data.cfgBusSplitterConfig || DEFAULT_CFG_BUS_SPLITTER_CONFIG);
+            break;
+          case 'CFG_BUS_JOINER':
+            evalRes = evaluateCfgBusJoiner(data.inputs, data.cfgBusJoinerConfig || DEFAULT_CFG_BUS_JOINER_CONFIG);
+            break;
+        }
+
+        if (evalRes.newState) {
+          data.icState = evalRes.newState;
+        }
+
+        data.outputs.forEach((outPin) => {
+          const expectedVal = evalRes.outputs[outPin.id] ?? 0;
+          if (outPin.value !== expectedVal) {
+            outPin.value = expectedVal;
+            iterChanged = true;
+          }
+        });
+      } else if ([
+        'HALF_SUBTRACTOR', 'FULL_SUBTRACTOR', 'MUX_4TO1', 'DEMUX_1TO4',
+        'PRIORITY_ENCODER', 'COMPARATOR_4BIT', 'DECODER_BCD_TO_7SEG',
+        'D_LATCH', 'JK_FLIPFLOP', 'REGISTER_4BIT', 'SHIFT_REGISTER_4BIT',
+        'UP_COUNTER_4BIT', 'DOWN_COUNTER_4BIT',
+        'MUX_8TO1', 'DEMUX_1TO8', 'DECODER_3TO8', 'DECODER_4TO16', 'ENCODER_8TO3',
+        'PARITY_GENERATOR', 'PARITY_CHECKER', 'CONVERTER_BIN_TO_GRAY', 'CONVERTER_GRAY_TO_BIN',
+        'T_FLIPFLOP', 'RING_COUNTER', 'RIPPLE_COUNTER', 'SYNCHRONOUS_COUNTER', 'UP_DOWN_COUNTER', 'FREQUENCY_DIVIDER',
+        'INCREMENTER_4BIT', 'DECREMENTER_4BIT', 'ADDER_SUBTRACTOR_4BIT', 'ALU_4BIT',
+        'BUS_SPLITTER', 'BUS_JOINER', 'BUS_TAP', 'BIT_EXTRACTOR', 'DELAY_ELEMENT', 'TUNNEL'
+      ].includes(data.gateType)) {
+        const icRes = evaluateIC(data.gateType, inputs, data.icState || {});
+        data.icState = icRes.newState;
+        data.outputs.forEach((outPin) => {
+          const expectedVal = icRes.outputs[outPin.id] ?? 0;
+          if (outPin.value !== expectedVal) {
+            outPin.value = expectedVal;
+            iterChanged = true;
+          }
+        });
       } else {
-        // Logic Gates (AND, OR, NOT, NAND, NOR, XOR, XNOR)
+        // Basic Logic Gates (AND, OR, NOT, NAND, NOR, XOR, XNOR, BUFFER, TRI_STATE_BUFFER)
         const computedOutput = evaluateGate(
           data.gateType,
           inputs,

@@ -18,7 +18,45 @@ import { ClockConfig, ClockState, DEFAULT_CLOCK_CONFIG, DEFAULT_CLOCK_STATE } fr
 import { MultiInputConfig, DEFAULT_MULTI_INPUT_CONFIG, generateInputLabels } from '../types/multiInput';
 import { createMultiInputPins } from '../utils/multiInputPins';
 import { propagateSignals } from '../simulation/engine';
+import { getDefaultICPins } from '../simulation/icLogic';
 import { CIRCUIT_PRESETS } from '../utils/presets';
+import {
+  DEFAULT_CFG_ENCODER_CONFIG,
+  DEFAULT_CFG_DECODER_CONFIG,
+  DEFAULT_CFG_MUX_CONFIG,
+  DEFAULT_CFG_DEMUX_CONFIG,
+  DEFAULT_CFG_COMPARATOR_CONFIG,
+  DEFAULT_CFG_REGISTER_CONFIG,
+  DEFAULT_CFG_SHIFT_REGISTER_CONFIG,
+  DEFAULT_CFG_COUNTER_CONFIG,
+  DEFAULT_CFG_CONSTANT_CONFIG,
+  DEFAULT_CFG_BUS_SPLITTER_CONFIG,
+  DEFAULT_CFG_BUS_JOINER_CONFIG,
+  CfgEncoderConfig,
+  CfgDecoderConfig,
+  CfgMuxConfig,
+  CfgDemuxConfig,
+  CfgComparatorConfig,
+  CfgRegisterConfig,
+  CfgShiftRegisterConfig,
+  CfgCounterConfig,
+  CfgConstantConfig,
+  CfgBusSplitterConfig,
+  CfgBusJoinerConfig,
+} from '../types/configurable';
+import {
+  createCfgEncoderPins,
+  createCfgDecoderPins,
+  createCfgMuxPins,
+  createCfgDemuxPins,
+  createCfgComparatorPins,
+  createCfgRegisterPins,
+  createCfgShiftRegisterPins,
+  createCfgCounterPins,
+  createCfgConstantPins,
+  createCfgBusSplitterPins,
+  createCfgBusJoinerPins,
+} from '../utils/configurablePins';
 
 interface HistorySnapshot {
   nodes: Node[];
@@ -31,6 +69,8 @@ interface CircuitStore {
   simulation: SimulationState;
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
+  isDragging: boolean;
+  setIsDragging: (val: boolean) => void;
 
   // History stack
   historyPast: HistorySnapshot[];
@@ -51,10 +91,17 @@ interface CircuitStore {
   // Node operations
   addNode: (gateType: GateType, position: { x: number; y: number }) => void;
   deleteSelected: () => void;
+  duplicateSelected: () => void;
+  copySelected: () => void;
+  cutSelected: () => void;
+  pasteClipboard: () => void;
+  resetAllInputs: () => void;
+  toggleLockNode: (nodeId: string) => void;
   updateNodeLabel: (nodeId: string, label: string) => void;
   updateNodeInputCount: (nodeId: string, count: number) => void;
   updateEncoderConfig: (nodeId: string, config: Partial<EncoderConfig>) => void;
   updateSevenSegmentConfig: (nodeId: string, config: Partial<SevenSegmentConfig>) => void;
+  updateConfigurableConfig: (nodeId: string, partialConfig: Record<string, any>) => void;
   toggleInputValue: (nodeId: string) => void;
 
   // Clock Node Controls
@@ -124,7 +171,19 @@ const getInitialPresets = (): CircuitPreset[] => {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        const validPresets = parsed.filter((p) => {
+          return (
+            p &&
+            typeof p === 'object' &&
+            typeof p.id === 'string' &&
+            typeof p.name === 'string' &&
+            Array.isArray(p.nodes) &&
+            Array.isArray(p.edges)
+          );
+        });
+        if (validPresets.length > 0) {
+          return validPresets;
+        }
       }
     }
   } catch (e) {
@@ -147,16 +206,8 @@ const initialPreset = CIRCUIT_PRESETS[0];
 const STORAGE_KEY_THEME = 'logic_studio_theme';
 
 const getInitialTheme = (): 'dark' | 'light' => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_THEME);
-    if (stored === 'light' || stored === 'dark') {
-      if (stored === 'light') document.documentElement.classList.add('light');
-      else document.documentElement.classList.remove('light');
-      return stored;
-    }
-  } catch (e) {
-    console.error('Failed to read theme', e);
-  }
+  document.documentElement.classList.add('dark');
+  document.documentElement.classList.remove('light');
   return 'dark';
 };
 
@@ -167,27 +218,20 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   simulation: DEFAULT_SIMULATION,
   selectedNodeId: null,
   selectedEdgeId: null,
+  isDragging: false,
+  setIsDragging: (isDragging) => set({ isDragging }),
 
-  theme: getInitialTheme(),
+  theme: 'dark',
   toastMessage: null,
 
   setTheme: (theme) => {
-    try {
-      localStorage.setItem(STORAGE_KEY_THEME, theme);
-    } catch (e) {
-      console.error('Failed to save theme', e);
-    }
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-    } else {
-      document.documentElement.classList.remove('light');
-    }
-    set({ theme });
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+    set({ theme: 'dark' });
   },
 
   toggleTheme: () => {
-    const nextTheme = get().theme === 'dark' ? 'light' : 'dark';
-    get().setTheme(nextTheme);
+    set({ theme: 'dark' });
   },
 
   showToast: (message) => {
@@ -339,14 +383,138 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
     } else if (gateType === 'ENCODER') {
       nodeLabel = 'Encoder';
       typeName = 'encoderNode';
+    } else if (gateType === 'PUSH_BUTTON') {
+      nodeLabel = 'Push Button';
+      inputsCount = 0;
+      typeName = 'pushButton';
+    } else if (gateType === 'DIP_SWITCH') {
+      nodeLabel = 'DIP Switch';
+      inputsCount = 0;
+      typeName = 'dipSwitch';
+    } else if (gateType === 'CONST_HIGH') {
+      nodeLabel = 'Constant HIGH';
+      inputsCount = 0;
+      typeName = 'logicGate';
+    } else if (gateType === 'CONST_LOW') {
+      nodeLabel = 'Constant LOW';
+      inputsCount = 0;
+      typeName = 'logicGate';
+    } else if (gateType === 'RGB_LED') {
+      nodeLabel = 'RGB LED';
+      inputsCount = 3;
+      typeName = 'rgbLed';
+    } else if (gateType === 'LOGIC_PROBE') {
+      nodeLabel = 'Logic Probe';
+      inputsCount = 1;
+      typeName = 'logicProbe';
+    } else if (gateType === 'HEX_DISPLAY') {
+      nodeLabel = 'Hex Display';
+      inputsCount = 4;
+      typeName = 'hexDisplay';
+    } else if (gateType === 'BUS_MONITOR') {
+      nodeLabel = 'Bus Monitor';
+      inputsCount = 4;
+      typeName = 'busMonitor';
+    } else if (gateType === 'OSCILLOSCOPE') {
+      nodeLabel = 'Digital Oscilloscope';
+      inputsCount = 4;
+      typeName = 'oscilloscope';
+    } else if (gateType === 'BUFFER') {
+      nodeLabel = 'Buffer';
+      inputsCount = 1;
+      typeName = 'logicGate';
+    } else if (gateType === 'TRI_STATE_BUFFER') {
+      nodeLabel = 'Tri-State Buffer';
+      inputsCount = 2;
+      typeName = 'logicGate';
     } else if (gateType === 'NOT') {
       inputsCount = 1;
+    } else if (['BUS_SPLITTER', 'BUS_JOINER', 'BUS_TAP', 'BIT_EXTRACTOR', 'DELAY_ELEMENT', 'TUNNEL', 'TEXT_LABEL'].includes(gateType)) {
+      typeName = 'utility';
+      if (gateType === 'TEXT_LABEL') nodeLabel = 'Annotation Note';
+      else if (gateType === 'TUNNEL') nodeLabel = 'Tunnel Connector';
+    } else if ([
+      'HALF_SUBTRACTOR', 'FULL_SUBTRACTOR', 'MUX_4TO1', 'DEMUX_1TO4',
+      'PRIORITY_ENCODER', 'COMPARATOR_4BIT', 'DECODER_BCD_TO_7SEG',
+      'D_LATCH', 'JK_FLIPFLOP', 'REGISTER_4BIT', 'SHIFT_REGISTER_4BIT',
+      'UP_COUNTER_4BIT', 'DOWN_COUNTER_4BIT',
+      'MUX_8TO1', 'DEMUX_1TO8', 'DECODER_3TO8', 'DECODER_4TO16', 'ENCODER_8TO3',
+      'PARITY_GENERATOR', 'PARITY_CHECKER', 'CONVERTER_BIN_TO_GRAY', 'CONVERTER_GRAY_TO_BIN',
+      'T_FLIPFLOP', 'RING_COUNTER', 'RIPPLE_COUNTER', 'SYNCHRONOUS_COUNTER', 'UP_DOWN_COUNTER', 'FREQUENCY_DIVIDER',
+      'INCREMENTER_4BIT', 'DECREMENTER_4BIT', 'ADDER_SUBTRACTOR_4BIT', 'ALU_4BIT'
+    ].includes(gateType)) {
+      typeName = 'icComponent';
+    } else if ([
+      'CFG_ENCODER', 'CFG_DECODER', 'CFG_MUX', 'CFG_DEMUX', 'CFG_COMPARATOR',
+      'CFG_REGISTER', 'CFG_SHIFT_REGISTER', 'CFG_COUNTER', 'CFG_CONSTANT',
+      'CFG_BUS_SPLITTER', 'CFG_BUS_JOINER'
+    ].includes(gateType)) {
+      typeName = 'configurableNode';
     }
 
     let inputs: PinData[] = [];
     let outputs: PinData[] = [];
 
-    if (gateType === 'ENCODER') {
+    if (typeName === 'icComponent') {
+      const icPins = getDefaultICPins(gateType);
+      inputs = icPins.inputs;
+      outputs = icPins.outputs;
+    } else if (gateType === 'CFG_ENCODER') {
+      nodeLabel = 'Config Encoder';
+      const pins = createCfgEncoderPins(DEFAULT_CFG_ENCODER_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_DECODER') {
+      nodeLabel = 'Config Decoder';
+      const pins = createCfgDecoderPins(DEFAULT_CFG_DECODER_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_MUX') {
+      nodeLabel = 'Config MUX';
+      const pins = createCfgMuxPins(DEFAULT_CFG_MUX_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_DEMUX') {
+      nodeLabel = 'Config DEMUX';
+      const pins = createCfgDemuxPins(DEFAULT_CFG_DEMUX_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_COMPARATOR') {
+      nodeLabel = 'Config Comparator';
+      const pins = createCfgComparatorPins(DEFAULT_CFG_COMPARATOR_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_REGISTER') {
+      nodeLabel = 'Config Register';
+      const pins = createCfgRegisterPins(DEFAULT_CFG_REGISTER_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_SHIFT_REGISTER') {
+      nodeLabel = 'Config Shift Reg';
+      const pins = createCfgShiftRegisterPins(DEFAULT_CFG_SHIFT_REGISTER_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_COUNTER') {
+      nodeLabel = 'Config Counter';
+      const pins = createCfgCounterPins(DEFAULT_CFG_COUNTER_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_CONSTANT') {
+      nodeLabel = 'Config Constant';
+      const pins = createCfgConstantPins(DEFAULT_CFG_CONSTANT_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_BUS_SPLITTER') {
+      nodeLabel = 'Bus Splitter';
+      const pins = createCfgBusSplitterPins(DEFAULT_CFG_BUS_SPLITTER_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'CFG_BUS_JOINER') {
+      nodeLabel = 'Bus Joiner';
+      const pins = createCfgBusJoinerPins(DEFAULT_CFG_BUS_JOINER_CONFIG);
+      inputs = pins.inputs;
+      outputs = pins.outputs;
+    } else if (gateType === 'ENCODER') {
       const encConfig = DEFAULT_ENCODER_CONFIG;
       const pins = createEncoderPins(encConfig);
       inputs = pins.inputs;
@@ -358,6 +526,28 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
     } else if (gateType === 'MULTI_INPUT') {
       inputs = [];
       outputs = createMultiInputPins(DEFAULT_MULTI_INPUT_CONFIG);
+    } else if (gateType === 'DIP_SWITCH') {
+      inputs = [];
+      outputs = Array.from({ length: 4 }, (_, i) => ({ id: `out-${i}`, name: `SW${i + 1}`, value: 0 }));
+    } else if (gateType === 'RGB_LED') {
+      inputs = [
+        { id: 'in-0', name: 'R', value: 0 },
+        { id: 'in-1', name: 'G', value: 0 },
+        { id: 'in-2', name: 'B', value: 0 },
+      ];
+      outputs = [];
+    } else if (gateType === 'BUS_MONITOR') {
+      inputs = Array.from({ length: 4 }, (_, i) => ({ id: `in-${i}`, name: `B${i}`, value: 0 }));
+      outputs = [];
+    } else if (gateType === 'HEX_DISPLAY') {
+      inputs = Array.from({ length: 4 }, (_, i) => ({ id: `in-${i}`, name: `D${i}`, value: 0 }));
+      outputs = [];
+    } else if (gateType === 'TRI_STATE_BUFFER') {
+      inputs = [
+        { id: 'in-0', name: 'In', value: -1 },
+        { id: 'in-1', name: 'EN', value: 1 },
+      ];
+      outputs = [{ id: 'out-0', name: 'Out', value: -1 }];
     } else {
       inputs = Array.from({ length: inputsCount }, (_, i) => ({
         id: `in-${i}`,
@@ -365,8 +555,8 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
         value: -1,
       }));
 
-      outputs = gateType === 'OUTPUT' ? [] : [
-        { id: 'out-0', name: 'Out', value: gateType === 'INPUT' ? 0 : gateType === 'CLOCK' ? 0 : -1 },
+      outputs = ['OUTPUT', 'LOGIC_PROBE'].includes(gateType) ? [] : [
+        { id: 'out-0', name: 'Out', value: gateType === 'INPUT' || gateType === 'CONST_LOW' ? 0 : gateType === 'CONST_HIGH' ? 1 : -1 },
       ];
     }
 
@@ -377,10 +567,12 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
       data: {
         label: nodeLabel,
         gateType,
-        value: gateType === 'INPUT' ? 0 : gateType === 'CLOCK' ? 0 : -1,
+        value: gateType === 'CONST_HIGH' ? 1 : 0,
         inputCount: inputsCount,
         inputs,
         outputs,
+        ...(gateType === 'DIP_SWITCH' ? { bitWidth: 4, dipValues: [0, 0, 0, 0] } : {}),
+        ...(gateType === 'BUS_MONITOR' ? { bitWidth: 4, displayFormat: 'hex' } : {}),
         ...(gateType === 'CLOCK' ? { clockConfig: DEFAULT_CLOCK_CONFIG, clockState: DEFAULT_CLOCK_STATE } : {}),
         ...(gateType === 'MULTI_INPUT' ? { multiInputConfig: DEFAULT_MULTI_INPUT_CONFIG } : {}),
         ...(gateType === 'ENCODER' ? { encoderConfig: DEFAULT_ENCODER_CONFIG } : {}),
@@ -419,6 +611,112 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
     });
 
     get().tickSimulation();
+  },
+
+  duplicateSelected: () => {
+    const { nodes, selectedNodeId } = get();
+    if (!selectedNodeId) return;
+
+    const targetNode = nodes.find((n) => n.id === selectedNodeId);
+    if (!targetNode) return;
+
+    get().saveHistory();
+
+    const newId = `${targetNode.type}-${Date.now()}`;
+    const newNode: Node = {
+      ...targetNode,
+      id: newId,
+      position: {
+        x: targetNode.position.x + 35,
+        y: targetNode.position.y + 35,
+      },
+      selected: true,
+      data: JSON.parse(JSON.stringify(targetNode.data)),
+    };
+
+    const updatedNodes = nodes.map((n) => ({ ...n, selected: false }));
+    set({
+      nodes: [...updatedNodes, newNode],
+      selectedNodeId: newId,
+    });
+
+    get().tickSimulation();
+  },
+
+  copySelected: () => {
+    const { nodes, selectedNodeId } = get();
+    if (!selectedNodeId) return;
+    const targetNode = nodes.find((n) => n.id === selectedNodeId);
+    if (!targetNode) return;
+    (window as any).__circuit_clipboard__ = JSON.parse(JSON.stringify(targetNode));
+    get().showToast('Node copied to clipboard');
+  },
+
+  cutSelected: () => {
+    const { selectedNodeId } = get();
+    if (!selectedNodeId) return;
+    get().copySelected();
+    get().deleteSelected();
+    get().showToast('Node cut to clipboard');
+  },
+
+  pasteClipboard: () => {
+    const copied = (window as any).__circuit_clipboard__ as Node | undefined;
+    if (!copied) return;
+
+    get().saveHistory();
+    const newId = `${copied.type}-${Date.now()}`;
+    const newNode: Node = {
+      ...copied,
+      id: newId,
+      position: {
+        x: copied.position.x + 40,
+        y: copied.position.y + 40,
+      },
+      selected: true,
+      data: JSON.parse(JSON.stringify(copied.data)),
+    };
+
+    const updatedNodes = get().nodes.map((n) => ({ ...n, selected: false }));
+    set({
+      nodes: [...updatedNodes, newNode],
+      selectedNodeId: newId,
+    });
+    get().tickSimulation();
+    get().showToast('Pasted node from clipboard');
+  },
+
+  resetAllInputs: () => {
+    get().saveHistory();
+    const updatedNodes = get().nodes.map((n) => {
+      const d = n.data as unknown as NodeData;
+      if (d.gateType === 'INPUT' || d.gateType === 'PUSH_BUTTON') {
+        return { ...n, data: { ...n.data, value: 0 } };
+      }
+      if (d.gateType === 'DIP_SWITCH' && d.dipValues) {
+        return { ...n, data: { ...n.data, dipValues: Array(d.bitWidth || 4).fill(0) } };
+      }
+      return n;
+    });
+    set({ nodes: updatedNodes });
+    get().tickSimulation(true);
+    get().showToast('All inputs reset to LOW (0)');
+  },
+
+  toggleLockNode: (nodeId: string) => {
+    const updatedNodes = get().nodes.map((n) => {
+      if (n.id === nodeId) {
+        const isLocked = !(n.data as unknown as NodeData).isLocked;
+        return {
+          ...n,
+          draggable: !isLocked,
+          data: { ...n.data, isLocked },
+        };
+      }
+      return n;
+    });
+    set({ nodes: updatedNodes });
+    get().showToast('Node lock state toggled');
   },
 
   updateNodeLabel: (nodeId: string, label: string) => {
@@ -614,6 +912,155 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
 
       const newEdges = get().edges.filter((e) => {
         if (e.target === nodeId && e.targetHandle && !validInHandles.has(e.targetHandle)) {
+          return false;
+        }
+        return true;
+      });
+
+      set({ nodes, edges: newEdges });
+    } else {
+      set({ nodes });
+    }
+
+    get().tickSimulation();
+  },
+
+  updateConfigurableConfig: (nodeId: string, partialConfig: Record<string, any>) => {
+    get().saveHistory();
+
+    const nodes = get().nodes.map((node) => {
+      if (node.id === nodeId) {
+        const data = node.data as unknown as NodeData;
+        let newInputs = data.inputs;
+        let newOutputs = data.outputs;
+        const configUpdates: Record<string, any> = {};
+
+        switch (data.gateType) {
+          case 'CFG_ENCODER': {
+            const cur = (data.cfgEncoderConfig as CfgEncoderConfig) || DEFAULT_CFG_ENCODER_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgEncoderConfig = updated;
+            const pins = createCfgEncoderPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_DECODER': {
+            const cur = (data.cfgDecoderConfig as CfgDecoderConfig) || DEFAULT_CFG_DECODER_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgDecoderConfig = updated;
+            const pins = createCfgDecoderPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_MUX': {
+            const cur = (data.cfgMuxConfig as CfgMuxConfig) || DEFAULT_CFG_MUX_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgMuxConfig = updated;
+            const pins = createCfgMuxPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_DEMUX': {
+            const cur = (data.cfgDemuxConfig as CfgDemuxConfig) || DEFAULT_CFG_DEMUX_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgDemuxConfig = updated;
+            const pins = createCfgDemuxPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_COMPARATOR': {
+            const cur = (data.cfgComparatorConfig as CfgComparatorConfig) || DEFAULT_CFG_COMPARATOR_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgComparatorConfig = updated;
+            const pins = createCfgComparatorPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_REGISTER': {
+            const cur = (data.cfgRegisterConfig as CfgRegisterConfig) || DEFAULT_CFG_REGISTER_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgRegisterConfig = updated;
+            const pins = createCfgRegisterPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_SHIFT_REGISTER': {
+            const cur = (data.cfgShiftRegisterConfig as CfgShiftRegisterConfig) || DEFAULT_CFG_SHIFT_REGISTER_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgShiftRegisterConfig = updated;
+            const pins = createCfgShiftRegisterPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_COUNTER': {
+            const cur = (data.cfgCounterConfig as CfgCounterConfig) || DEFAULT_CFG_COUNTER_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgCounterConfig = updated;
+            const pins = createCfgCounterPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_CONSTANT': {
+            const cur = (data.cfgConstantConfig as CfgConstantConfig) || DEFAULT_CFG_CONSTANT_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgConstantConfig = updated;
+            const pins = createCfgConstantPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_BUS_SPLITTER': {
+            const cur = (data.cfgBusSplitterConfig as CfgBusSplitterConfig) || DEFAULT_CFG_BUS_SPLITTER_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgBusSplitterConfig = updated;
+            const pins = createCfgBusSplitterPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+          case 'CFG_BUS_JOINER': {
+            const cur = (data.cfgBusJoinerConfig as CfgBusJoinerConfig) || DEFAULT_CFG_BUS_JOINER_CONFIG;
+            const updated = { ...cur, ...partialConfig };
+            configUpdates.cfgBusJoinerConfig = updated;
+            const pins = createCfgBusJoinerPins(updated, data.inputs, data.outputs);
+            newInputs = pins.inputs;
+            newOutputs = pins.outputs;
+            break;
+          }
+        }
+
+        return {
+          ...node,
+          data: {
+            ...data,
+            ...configUpdates,
+            inputs: newInputs,
+            outputs: newOutputs,
+          },
+        };
+      }
+      return node;
+    });
+
+    const updatedNode = nodes.find((n) => n.id === nodeId);
+    if (updatedNode) {
+      const data = updatedNode.data as unknown as NodeData;
+      const validInHandles = new Set(data.inputs.map((p) => p.id));
+      const validOutHandles = new Set(data.outputs.map((p) => p.id));
+
+      const newEdges = get().edges.filter((e) => {
+        if (e.target === nodeId && e.targetHandle && !validInHandles.has(e.targetHandle)) {
+          return false;
+        }
+        if (e.source === nodeId && e.sourceHandle && !validOutHandles.has(e.sourceHandle)) {
           return false;
         }
         return true;

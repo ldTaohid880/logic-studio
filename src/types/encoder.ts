@@ -13,6 +13,8 @@ export interface EncoderConfig {
   showValid: boolean;
   showEnableOutput: boolean;
   showGroupSignal: boolean;
+  showEnableInput: boolean;
+  enableInputActiveMode: EncoderActiveMode;
   outputFormat: EncoderOutputFormat;
   showTruthTable: boolean;
   animateActiveSignals: boolean;
@@ -41,6 +43,8 @@ export const DEFAULT_ENCODER_CONFIG: EncoderConfig = {
   showValid: true,
   showEnableOutput: true,
   showGroupSignal: false,
+  showEnableInput: true,
+  enableInputActiveMode: 'low',
   outputFormat: 'binary_decimal',
   showTruthTable: true,
   animateActiveSignals: true,
