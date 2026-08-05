@@ -111,7 +111,7 @@ export const LogicGateNode = React.memo(({ id, data, selected }: NodeProps) => {
                 position={Position.Right}
                 id={pin.id}
                 style={{
-                  right: '-12px',
+                  right: '0px',
                   top: '50%',
                 }}
                 className={`!w-3 !h-3 !border-2 !rounded-full transition-all duration-200 ${

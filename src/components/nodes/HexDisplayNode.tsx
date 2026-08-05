@@ -39,6 +39,7 @@ export const HexDisplayNode: React.FC<NodeProps> = memo(({ id, data: nodeData, s
                   type="target"
                   position={Position.Left}
                   id={`in-${idx}`}
+                  style={{left:"-12px!important"}}
                   className={`!w-3 !h-3 !-left-[19px] !border-2 !transition-all ${
                     isHigh
                       ? '!bg-indigo-400 !border-indigo-200 !shadow-[0_0_8px_rgba(129,140,248,0.8)]'

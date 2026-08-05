@@ -67,7 +67,7 @@ export const DigitalInputNode = React.memo(({ id, data, selected }: NodeProps) =
         type="source"
         position={Position.Right}
         id="out-0"
-        style={{ right: '-12px', top: '50%' }}
+        style={{ right: '0px', top: '50%' }}
         className={`!w-3.5 !h-3.5 !border-2 !rounded-full ${
           isHigh
             ? '!bg-emerald-500 !border-emerald-250'

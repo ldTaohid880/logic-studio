@@ -190,7 +190,7 @@ export const MultiInputNode = React.memo(({ id, data, selected }: NodeProps) => 
                 type="source"
                 position={Position.Right}
                 id={handleId}
-                style={{ right: '-19px', top: '50%' }}
+                style={{ right: '-12px', top: '50%' }}
                 className={`!w-3.5 !h-3.5 !border-2 !rounded-full transition-all duration-150 ${
                   isHigh
                     ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_8px_#34d399]'

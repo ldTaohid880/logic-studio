@@ -22,7 +22,7 @@ export const DigitalOutputNode = React.memo(({ data, selected }: NodeProps) => {
         type="target"
         position={Position.Left}
         id="in-0"
-        style={{ left: '-12px', top: '50%' }}
+        style={{ left: '0px', top: '50%' }}
         className={`!w-3.5 !h-3.5 !border-2 !rounded-full transition-all duration-200 ${
           isHigh
             ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_8px_#34d399]'
