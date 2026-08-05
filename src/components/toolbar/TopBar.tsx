@@ -128,12 +128,12 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold shadow-sm">
           <Cpu className="w-5 h-5 stroke-[2]" />
         </div>
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <h1 className="text-xs font-mono font-bold text-slate-100">
               LOGIC STUDIO
             </h1>
-            <Badge variant="emerald" size="xs">
+            <Badge variant="emerald" size="xs" className="leading-none">
               v1.0 Pro
             </Badge>
           </div>
