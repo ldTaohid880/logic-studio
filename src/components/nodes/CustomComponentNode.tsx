@@ -75,7 +75,7 @@ export const CustomComponentNode: React.FC<NodeProps> = memo(({ id, data, select
                   type="target"
                   position={Position.Left}
                   id={handleId}
-                  className="!w-3.5 !h-3.5 !bg-slate-400 hover:!bg-cyan-400 !border-2 !border-slate-900 transition-colors cursor-crosshair !-left-[19px] top-1/2 -translate-y-1/2"
+                  className="!w-3.5 !h-3.5 !bg-slate-400 hover:!bg-cyan-400 !border-2 !border-slate-900 transition-colors cursor-crosshair !-left-[12px] top-1/2 -translate-y-1/2"
                 />
                 <span className={`w-2 h-2 rounded-full border shrink-0 ${getSignalColor(inPin.value)}`} />
                 <span className="text-[11px] font-mono font-medium tracking-tight text-slate-300 truncate">
@@ -100,7 +100,7 @@ export const CustomComponentNode: React.FC<NodeProps> = memo(({ id, data, select
                   type="source"
                   position={Position.Right}
                   id={handleId}
-                  className="!w-3.5 !h-3.5 !bg-slate-400 hover:!bg-emerald-400 !border-2 !border-slate-900 transition-colors cursor-crosshair !-right-[19px] top-1/2 -translate-y-1/2"
+                  className="!w-3.5 !h-3.5 !bg-slate-400 hover:!bg-emerald-400 !border-2 !border-slate-900 transition-colors cursor-crosshair !-right-[12px] top-1/2 -translate-y-1/2"
                 />
               </div>
             );

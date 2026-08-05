@@ -65,7 +65,7 @@ export const PushButtonNode: React.FC<NodeProps> = memo(({ id, data: nodeData, s
         type="source"
         position={Position.Right}
         id="out-0"
-        className={`!w-3 !h-3 !-right-[19px] !top-1/2 !-translate-y-1/2 !border-2 !transition-all ${
+        className={`!w-3 !h-3 !-right-[12px] !top-1/2 !-translate-y-1/2 !border-2 !transition-all ${
           isPressed
             ? '!bg-amber-400 !border-amber-200 !shadow-[0_0_8px_rgba(245,158,11,0.8)]'
             : '!bg-slate-800 !border-slate-600'

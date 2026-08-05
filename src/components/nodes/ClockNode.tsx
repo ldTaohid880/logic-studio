@@ -148,7 +148,7 @@ export const ClockNode = React.memo(({ id, data, selected }: NodeProps) => {
         type="source"
         position={Position.Right}
         id="out-0"
-        style={{ right: '-9px', top: '50%' }}
+        style={{ right: '-12px', top: '50%' }}
         className={`!w-3.5 !h-3.5 !border-2 !rounded-full transition-all duration-150 ${
           isHigh && enabled
             ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_4px_#34d399]'

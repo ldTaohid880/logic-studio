@@ -13,17 +13,6 @@ export const HierarchyBreadcrumbs: React.FC = () => {
     <div
       className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border shadow-lg backdrop-blur-md text-xs font-mono select-none bg-slate-900/90 border-slate-800 text-slate-200 shadow-black/50"
     >
-      <button
-        onClick={() => exitSubcircuitView(0)}
-        title="Return to Main Project"
-        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-bold transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        <span>Main Project</span>
-      </button>
-
-      <span className="text-slate-500">|</span>
-
       {hierarchyPath.map((item, index) => {
         const isLast = index === hierarchyPath.length - 1;
 

@@ -56,7 +56,7 @@ export const ConfigurableNode: React.FC<NodeProps> = memo(({ id, data: nodeData,
                   type="target"
                   position={Position.Left}
                   id={pin.id}
-                  className={`!w-3 !h-3 !-left-[19px] !border-2 ${
+                  className={`!w-3 !h-3 !-left-[12px] !border-2 ${
                     isHigh
                       ? '!bg-emerald-500 !border-emerald-250'
                       : '!bg-slate-800 !border-slate-600'
@@ -83,7 +83,7 @@ export const ConfigurableNode: React.FC<NodeProps> = memo(({ id, data: nodeData,
                   type="source"
                   position={Position.Right}
                   id={pin.id}
-                  className={`!w-3 !h-3 !-right-[19px] !border-2 ${
+                  className={`!w-3 !h-3 !-right-[12px] !border-2 ${
                     isHigh
                       ? '!bg-emerald-500 !border-emerald-250'
                       : '!bg-slate-800 !border-slate-600'

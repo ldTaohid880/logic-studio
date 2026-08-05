@@ -42,7 +42,7 @@ export const BusMonitorNode: React.FC<NodeProps> = memo(({ id, data: nodeData, s
                   type="target"
                   position={Position.Left}
                   id={`in-${idx}`}
-                  className={`!w-3 !h-3 !-left-[19px] !border-2 !transition-all ${
+                  className={`!w-3 !h-3 !-left-[12px] !border-2 !transition-all ${
                     isHigh
                       ? '!bg-cyan-400 !border-cyan-200 !shadow-[0_0_8px_rgba(34,211,238,0.8)]'
                       : '!bg-slate-800 !border-slate-600'

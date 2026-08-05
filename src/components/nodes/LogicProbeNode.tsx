@@ -55,7 +55,7 @@ export const LogicProbeNode: React.FC<NodeProps> = memo(({ id, data: nodeData, s
           type="target"
           position={Position.Left}
           id="in-0"
-          className={`!w-3 !h-3 !-left-[19px] !border-2 !transition-all ${
+          className={`!w-3 !h-3 !-left-[12px] !border-2 !transition-all ${
             val === 1
               ? '!bg-emerald-400 !border-emerald-200 !shadow-[0_0_8px_rgba(52,211,153,0.8)]'
               : '!bg-slate-800 !border-slate-600'

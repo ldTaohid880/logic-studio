@@ -57,7 +57,7 @@ export const RgbLedNode: React.FC<NodeProps> = memo(({ id, data: nodeData, selec
                   type="target"
                   position={Position.Left}
                   id={`in-${idx}`}
-                  className={`!w-3 !h-3 !-left-[19px] !border-2 !transition-all ${
+                  className={`!w-3 !h-3 !-left-[12px] !border-2 !transition-all ${
                     isHigh
                       ? '!bg-white !border-purple-300 !shadow-[0_0_8px_rgba(217,70,239,0.8)]'
                       : '!bg-slate-800 !border-slate-600'

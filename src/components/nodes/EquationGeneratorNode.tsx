@@ -39,7 +39,7 @@ export const EquationGeneratorNode: React.FC<NodeProps> = memo(({ id, data: node
         type="target"
         position={Position.Left}
         id="in-0"
-        style={{ left: '-18px' }}
+        style={{ left: '-12px' }}
         className="!w-3 !h-3 !border-2 !bg-cyan-400 !border-cyan-200 shadow-[0_0_8px_#22d3ee] !transition-all"
         title="Input logic signal"
       />

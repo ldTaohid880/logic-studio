@@ -42,7 +42,7 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
           type="target"
           position={Position.Left}
           id="in-0"
-          className={`!w-3 !h-3 !-left-[15px] !border-2 !transition-all ${
+          className={`!w-3 !h-3 !-left-[12px] !border-2 !transition-all ${
             isHigh ? '!bg-cyan-400 !border-cyan-200 !shadow-[0_0_8px_rgba(34,211,238,0.8)]' : '!bg-slate-800 !border-slate-600'
           }`}
         />
@@ -58,7 +58,7 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
           type="source"
           position={Position.Right}
           id="out-0"
-          className={`!w-3 !h-3 !-right-[15px] !border-2 !transition-all ${
+          className={`!w-3 !h-3 !-right-[12px] !border-2 !transition-all ${
             isHigh ? '!bg-cyan-400 !border-cyan-200 !shadow-[0_0_8px_rgba(34,211,238,0.8)]' : '!bg-slate-800 !border-slate-600'
           }`}
         />
@@ -88,7 +88,7 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
                   type="target"
                   position={Position.Left}
                   id={pin.id}
-                  className={`!w-3 !h-3 !-left-[17px] !border-2 ${
+                  className={`!w-3 !h-3 !-left-[12px] !border-2 ${
                     isHigh ? '!bg-emerald-400 !border-emerald-200' : '!bg-slate-800 !border-slate-600'
                   }`}
                 />
@@ -108,7 +108,7 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
                   type="source"
                   position={Position.Right}
                   id={pin.id}
-                  className={`!w-3 !h-3 !-right-[17px] !border-2 ${
+                  className={`!w-3 !h-3 !-right-[12px] !border-2 ${
                     isHigh ? '!bg-emerald-400 !border-emerald-200' : '!bg-slate-800 !border-slate-600'
                   }`}
                 />

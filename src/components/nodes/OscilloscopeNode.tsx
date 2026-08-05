@@ -443,6 +443,7 @@ export const OscilloscopeNode: React.FC<NodeProps> = memo(({ id, data: nodeData,
               type="target"
               position={Position.Left}
               id={pin.id}
+              style={{ right: '-12px', top:  20 + idx * (50 / (inputs.length - 1)) }}
               className={`!w-3.5 !h-3.5 !border-2 !transition-all ${
                 selectedBitIndex === idx
                   ? '!bg-cyan-400 !border-cyan-200 shadow-[0_0_4px_#22d3ee]'

@@ -75,7 +75,7 @@ export const LedMatrixNode: React.FC<NodeProps> = memo(({ data: nodeData, select
                   type="target"
                   position={Position.Left}
                   id={pin.id}
-                  style={{ left: '-18px' }}
+                  style={{ left: '-12px' }}
                   className={`!w-2.5 !h-2.5 !border-2 !transition-all ${
                     isHigh
                       ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_6px_#34d399]'
@@ -161,7 +161,7 @@ export const LedMatrixNode: React.FC<NodeProps> = memo(({ data: nodeData, select
                 type="target"
                 position={Position.Bottom}
                 id={pin.id}
-                style={{ bottom: '-18px' }}
+                style={{ bottom: '-12px' }}
                 className={`!w-2.5 !h-2.5 !border-2 !transition-all ${
                   isHigh
                     ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_6px_#34d399]'
