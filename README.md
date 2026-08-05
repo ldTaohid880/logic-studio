@@ -114,7 +114,7 @@ Make sure you have [Node.js](https://nodejs.org/) installed (v18+ recommended).
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/digital-logic-simulator.git
+   git clone https://github.com/ldTaohid880/logic-studio.git
    cd digital-logic-simulator
    ```
 
