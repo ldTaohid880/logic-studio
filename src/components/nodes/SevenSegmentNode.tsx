@@ -8,7 +8,7 @@ import {
 } from '../../types/sevenSegment';
 import { evaluateSevenSegment } from '../../utils/sevenSegmentLogic';
 
-export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
+export const SevenSegmentNode = React.memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, inputs = [] } = nodeData;
 
@@ -20,38 +20,51 @@ export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
   const opacityVal = (config.brightness ?? 100) / 100;
   const glowBlur = ((config.glowIntensity ?? 60) / 100) * 8;
 
+  // Retrieve pin aliases
+  const pinAliases = nodeData.pinAliases || {};
+
+  const getPinDisplayName = (pin: { id: string; name: string }) => {
+    const alias = pinAliases[pin.id];
+    if (!alias) return pin.name;
+    return alias.length > 6 ? alias.substring(0, 6) + '…' : alias;
+  };
+
   const getSegmentStyle = (isOn: boolean) => {
     if (!isOn) {
       return {
-        stroke: '#1e293b',
-        opacity: 0.35,
+        fill: '#151c28', // Darker gray for inactive state
+        opacity: 0.15,   // Dim/subtle but visible
         filter: 'none',
-      };
-    }
-    return {
-      stroke: colorStyle.stroke,
-      opacity: opacityVal,
-      filter: glowBlur > 0 ? `drop-shadow(0 0 ${glowBlur}px ${colorStyle.glow})` : 'none',
-    };
-  };
-
-  const getDpStyle = (isOn: boolean) => {
-    if (!isOn) {
-      return {
-        fill: '#1e293b',
-        opacity: 0.35,
-        filter: 'none',
+        transition: 'fill 0.15s ease, opacity 0.15s ease',
       };
     }
     return {
       fill: colorStyle.stroke,
       opacity: opacityVal,
       filter: glowBlur > 0 ? `drop-shadow(0 0 ${glowBlur}px ${colorStyle.glow})` : 'none',
+      transition: 'fill 0.15s ease, opacity 0.15s ease, filter 0.15s ease',
+    };
+  };
+
+  const getDpStyle = (isOn: boolean) => {
+    if (!isOn) {
+      return {
+        fill: '#151c28',
+        opacity: 0.15,
+        filter: 'none',
+        transition: 'fill 0.15s ease, opacity 0.15s ease',
+      };
+    }
+    return {
+      fill: colorStyle.stroke,
+      opacity: opacityVal,
+      filter: glowBlur > 0 ? `drop-shadow(0 0 ${glowBlur}px ${colorStyle.glow})` : 'none',
+      transition: 'fill 0.15s ease, opacity 0.15s ease, filter 0.15s ease',
     };
   };
 
   const modeBadgeText = {
-    binary: 'BINARY (4-bit)',
+    binary: 'BIN 4-BIT',
     direct: 'DIRECT SEG',
     bcd: 'BCD DECODER',
     hex: 'HEX DECODER',
@@ -59,10 +72,10 @@ export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
 
   return (
     <div
-      className={`relative min-w-[180px] p-3.5 rounded-2xl transition-all duration-200 border backdrop-blur-xl shadow-2xl ${
+      className={`relative min-w-[180px] p-3.5 rounded-xl transition-all duration-200 border backdrop-blur-xl shadow-sm ${
         selected
-          ? 'border-cyan-400/80 shadow-cyan-500/20 ring-2 ring-cyan-500/30 bg-slate-950/95'
-          : 'border-slate-800/80 hover:border-slate-600/80 bg-slate-950/90 hover:shadow-cyan-500/10'
+          ? 'border-purple-500 ring-1 ring-purple-500/20 bg-slate-950/95'
+          : 'border-slate-800 hover:border-slate-700 bg-slate-950/90'
       }`}
     >
       <div className="flex flex-col items-center gap-2">
@@ -72,7 +85,7 @@ export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
             {label}
           </span>
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 uppercase">
+            <span className="text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-800/60 uppercase">
               {modeBadgeText}
             </span>
             <span className="text-[9px] font-mono text-slate-400 uppercase">
@@ -82,62 +95,55 @@ export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
         </div>
 
         {/* 7-Segment SVG Graphic Container */}
-        <div className="w-28 h-36 bg-[#080c14] border-2 border-slate-800/80 rounded-2xl p-3 flex flex-col items-center justify-center relative shadow-inner group">
-          <svg viewBox="0 0 70 110" className="w-full h-full">
-            {/* Segment a (Top) */}
-            <line
-              x1="18" y1="12" x2="52" y2="12"
-              strokeWidth="5.5" strokeLinecap="round"
-              className="transition-all duration-150"
+        <div className="w-28 h-36 bg-[#05080f] border border-slate-900 rounded-lg p-3.5 flex flex-col items-center justify-center relative shadow-inner group">
+          <svg viewBox="0 0 70 110" className="w-full h-full transform skew-x-[-4deg]">
+            {/* Segment a (Top horizontal) */}
+            <polygon
+              points="16,10 22,4 48,4 54,10 48,16 22,16"
+              className="transition-all duration-150 cursor-pointer"
               style={getSegmentStyle(segments.a)}
             />
-            {/* Segment f (Top Left) */}
-            <line
-              x1="14" y1="16" x2="14" y2="48"
-              strokeWidth="5.5" strokeLinecap="round"
-              className="transition-all duration-150"
+            {/* Segment f (Top Left vertical) */}
+            <polygon
+              points="10,16 16,22 16,48 10,54 4,48 4,22"
+              className="transition-all duration-150 cursor-pointer"
               style={getSegmentStyle(segments.f)}
             />
-            {/* Segment b (Top Right) */}
-            <line
-              x1="56" y1="16" x2="56" y2="48"
-              strokeWidth="5.5" strokeLinecap="round"
-              className="transition-all duration-150"
+            {/* Segment b (Top Right vertical) */}
+            <polygon
+              points="54,16 60,22 60,48 54,54 48,48 48,22"
+              className="transition-all duration-150 cursor-pointer"
               style={getSegmentStyle(segments.b)}
             />
-            {/* Segment g (Middle) */}
-            <line
-              x1="18" y1="52" x2="52" y2="52"
-              strokeWidth="5.5" strokeLinecap="round"
-              className="transition-all duration-150"
+            {/* Segment g (Middle horizontal) */}
+            <polygon
+              points="16,54 22,48 48,48 54,54 48,60 22,60"
+              className="transition-all duration-150 cursor-pointer"
               style={getSegmentStyle(segments.g)}
             />
-            {/* Segment e (Bottom Left) */}
-            <line
-              x1="14" y1="56" x2="14" y2="88"
-              strokeWidth="5.5" strokeLinecap="round"
-              className="transition-all duration-150"
+            {/* Segment e (Bottom Left vertical) */}
+            <polygon
+              points="10,54 16,60 16,86 10,92 4,86 4,60"
+              className="transition-all duration-150 cursor-pointer"
               style={getSegmentStyle(segments.e)}
             />
-            {/* Segment c (Bottom Right) */}
-            <line
-              x1="56" y1="56" x2="56" y2="88"
-              strokeWidth="5.5" strokeLinecap="round"
-              className="transition-all duration-150"
+            {/* Segment c (Bottom Right vertical) */}
+            <polygon
+              points="54,54 60,60 60,86 54,92 48,86 48,60"
+              className="transition-all duration-150 cursor-pointer"
               style={getSegmentStyle(segments.c)}
             />
-            {/* Segment d (Bottom) */}
-            <line
-              x1="18" y1="92" x2="52" y2="92"
-              strokeWidth="5.5" strokeLinecap="round"
-              className="transition-all duration-150"
+            {/* Segment d (Bottom horizontal) */}
+            <polygon
+              points="16,98 22,92 48,92 54,98 48,104 22,104"
+              className="transition-all duration-150 cursor-pointer"
               style={getSegmentStyle(segments.d)}
             />
 
             {/* Optional DP (Decimal Point) */}
             {config.showDecimalPoint && (
               <circle
-                cx="64" cy="92" r="3.5"
+                cx="64" cy="98" r="3.5"
                 className="transition-all duration-150"
                 style={getDpStyle(segments.dp)}
               />
@@ -145,7 +151,7 @@ export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
           </svg>
 
           {/* Decoded Character Overlay Badge */}
-          <div className="absolute bottom-1.5 right-2 px-1.5 py-0.5 rounded bg-slate-900/90 border border-slate-700/80 text-[10px] font-mono font-black text-slate-300">
+          <div className="absolute bottom-1.5 right-2 px-1.5 py-0.5 rounded bg-slate-900/90 border border-slate-800 text-[10px] font-mono font-black text-slate-400">
             {decodedChar === ' ' ? 'OFF' : decodedChar}
           </div>
         </div>
@@ -166,14 +172,18 @@ export const SevenSegmentNode = React.memo(({ data, selected }: NodeProps) => {
                 style={{ left: '-12px' }}
                 className={`!w-3 !h-3 !border-2 !rounded-full transition-all duration-200 ${
                   pinHigh
-                    ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_8px_#34d399]'
+                    ? '!bg-emerald-400 !border-emerald-200'
                     : pinLow
-                    ? '!bg-slate-800 !border-slate-500'
+                    ? '!bg-slate-850 !border-slate-600'
                     : '!bg-amber-500 !border-amber-300'
                 }`}
+                title={`${pin.name}: ${pin.value === 1 ? 'HIGH' : pin.value === 0 ? 'LOW' : 'UNKNOWN'}`}
               />
-              <span className="text-[9px] text-slate-400 font-mono font-semibold pl-1.5 select-none">
-                {pin.name}
+              <span
+                className="text-[9px] text-slate-500 font-mono font-bold pl-1.5 select-none truncate max-w-[50px]"
+                title={pinAliases[pin.id] ? `${pin.name} (${pinAliases[pin.id]})` : pin.name}
+              >
+                {getPinDisplayName(pin)}
               </span>
             </div>
           );

@@ -10,6 +10,8 @@ import {
   FolderOpen,
   Keyboard,
   Cpu,
+  Layers,
+  PanelRight,
 } from 'lucide-react';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { Button } from '../ui/Button';
@@ -20,12 +22,14 @@ import { toPng } from 'html-to-image';
 interface TopBarProps {
   onOpenPresets: () => void;
   onOpenShortcuts: () => void;
+  onOpenSubcircuitLibrary?: () => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   onOpenPresets,
   onOpenShortcuts,
+  onOpenSubcircuitLibrary,
   canvasRef,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,14 +38,15 @@ export const TopBar: React.FC<TopBarProps> = ({
     nodes,
     edges,
     presets,
+    customComponents,
+    showInspector,
+    toggleInspector,
     loadCircuit,
     clearCanvas,
     historyPast,
     historyFuture,
     undo,
     redo,
-    theme,
-    toggleTheme,
     showToast,
   } = useCircuitStore();
 
@@ -56,6 +61,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       timestamp: new Date().toISOString(),
       nodes,
       edges,
+      customComponents: useCircuitStore.getState().customComponents,
     };
 
     const blob = new Blob([JSON.stringify(circuitData, null, 2)], {
@@ -79,6 +85,11 @@ export const TopBar: React.FC<TopBarProps> = ({
       try {
         const json = JSON.parse(event.target?.result as string);
         if (json.nodes && json.edges) {
+          if (json.customComponents && typeof json.customComponents === 'object') {
+            useCircuitStore.setState((state) => ({
+              customComponents: { ...state.customComponents, ...json.customComponents },
+            }));
+          }
           loadCircuit(json.nodes, json.edges);
           showToast('Circuit JSON loaded successfully');
         } else {
@@ -96,7 +107,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     if (!canvasRef.current) return;
     try {
       const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: theme === 'light' ? '#f8fafc' : '#080b11',
+        backgroundColor: '#080b11',
         quality: 0.95,
       });
       const link = document.createElement('a');
@@ -111,39 +122,29 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   return (
-    <header className={`h-14 px-4 flex items-center justify-between z-30 select-none border-b transition-colors duration-200 ${
-      theme === 'light'
-        ? 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
-        : 'bg-slate-950/90 border-slate-800 text-slate-100'
-    }`}>
+    <header className="w-full h-14 border-b flex items-center justify-between px-4 shrink-0 z-10 bg-slate-950/80 border-slate-900 backdrop-blur-md">
       {/* Left: Brand Logo & Title */}
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-slate-950 font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-          <Cpu className="w-5 h-5 stroke-[2.5]" />
+        <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold shadow-sm">
+          <Cpu className="w-5 h-5 stroke-[2]" />
         </div>
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <h1 className={`text-sm font-bold font-mono tracking-wider ${
-              theme === 'light' ? 'text-slate-900' : 'text-slate-100'
-            }`}>
+            <h1 className="text-xs font-mono font-bold text-slate-100">
               LOGIC STUDIO
             </h1>
             <Badge variant="emerald" size="xs">
               v1.0 Pro
             </Badge>
           </div>
-          <span className={`text-[10px] font-sans ${
-            theme === 'light' ? 'text-slate-500' : 'text-slate-400'
-          }`}>
+          <span className="text-[9px] font-mono font-bold text-slate-400 px-1.5 py-0.5 bg-slate-900 rounded-full border border-slate-800">
             Professional Desktop Circuit Suite
           </span>
         </div>
       </div>
 
       {/* Middle: Action Toolbar */}
-      <div className={`flex items-center gap-1 border p-1 rounded-2xl shadow-inner transition-colors duration-200 ${
-        theme === 'light' ? 'bg-slate-100 border-slate-200' : 'bg-slate-900/90 border-slate-800'
-      }`}>
+      <div className="flex items-center gap-1 p-1 rounded-xl border bg-slate-900/90 border-slate-800">
         <Button
           variant="ghost"
           size="xs"
@@ -162,7 +163,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           Presets ({presets.length})
         </Button>
 
-        <div className={`w-[1px] h-4 my-auto mx-1 ${theme === 'light' ? 'bg-slate-300' : 'bg-slate-800'}`} />
+        <Button
+          variant="success"
+          size="xs"
+          leftIcon={<Layers className="w-3.5 h-3.5 text-emerald-400" />}
+          onClick={onOpenSubcircuitLibrary}
+        >
+          Subcircuits ({Object.keys(customComponents || {}).length})
+        </Button>
+
+        <div className="w-[1px] h-4 my-auto mx-1 bg-slate-800" />
 
         {/* Undo / Redo */}
         <IconButton
@@ -181,7 +191,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={redo}
         />
 
-        <div className={`w-[1px] h-4 my-auto mx-1 ${theme === 'light' ? 'bg-slate-300' : 'bg-slate-800'}`} />
+        <div className="w-[1px] h-4 my-auto mx-1 bg-slate-800" />
 
         {/* Save / Load / Export */}
         <Button
@@ -212,7 +222,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <Button
           variant="ghost"
           size="xs"
-          leftIcon={<Camera className="w-3.5 h-3.5 text-purple-400" />}
+          leftIcon={<Camera className="w-3.5 h-3.5 text-slate-450" />}
           onClick={handleExportPNG}
         >
           Export PNG
@@ -241,8 +251,17 @@ export const TopBar: React.FC<TopBarProps> = ({
         />
       </div>
 
-      {/* Right Controls: Shortcuts */}
+      {/* Right Controls: Properties & Shortcuts */}
       <div className="flex items-center gap-2">
+        <Button
+          variant={showInspector ? 'success' : 'secondary'}
+          size="xs"
+          leftIcon={<PanelRight className={`w-3.5 h-3.5 ${showInspector ? 'text-emerald-400' : 'text-slate-450'}`} />}
+          onClick={toggleInspector}
+        >
+          {showInspector ? 'Hide Properties' : 'Show Properties'}
+        </Button>
+
         <Button
           variant="secondary"
           size="xs"

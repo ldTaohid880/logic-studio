@@ -14,12 +14,18 @@ import { EncoderConfig, DEFAULT_ENCODER_CONFIG } from '../types/encoder';
 import { createEncoderPins } from '../utils/encoderPins';
 import { SevenSegmentConfig, DEFAULT_SEVEN_SEGMENT_CONFIG } from '../types/sevenSegment';
 import { createSevenSegmentPins } from '../utils/sevenSegmentPins';
-import { ClockConfig, ClockState, DEFAULT_CLOCK_CONFIG, DEFAULT_CLOCK_STATE } from '../types/clock';
+import { ClockConfig, ClockState, DEFAULT_CLOCK_CONFIG, DEFAULT_CLOCK_STATE, toHz } from '../types/clock';
+import { DEFAULT_OSCILLOSCOPE_CONFIG } from '../types/oscilloscope';
 import { MultiInputConfig, DEFAULT_MULTI_INPUT_CONFIG, generateInputLabels } from '../types/multiInput';
 import { createMultiInputPins } from '../utils/multiInputPins';
+import { LedMatrixConfig, DEFAULT_LED_MATRIX_CONFIG } from '../types/ledMatrix';
+import { createLedMatrixPins } from '../utils/ledMatrixPins';
 import { propagateSignals } from '../simulation/engine';
 import { getDefaultICPins } from '../simulation/icLogic';
 import { CIRCUIT_PRESETS } from '../utils/presets';
+import { CustomComponentDefinition, CustomPinDefinition, HierarchyBreadcrumb } from '../types/customComponent';
+import { detectComponentRecursion } from '../simulation/customComponentLogic';
+import { exportCustomComponentToJSON, parseCustomComponentFromJSON } from '../utils/customComponentIO';
 import {
   DEFAULT_CFG_ENCODER_CONFIG,
   DEFAULT_CFG_DECODER_CONFIG,
@@ -58,6 +64,8 @@ import {
   createCfgBusJoinerPins,
 } from '../utils/configurablePins';
 
+const oscilloscopeBuffers = new Map<string, { samples: number[]; writeIndex: number; lastSampleSimTime: number }>();
+
 interface HistorySnapshot {
   nodes: Node[];
   edges: Edge[];
@@ -87,6 +95,10 @@ interface CircuitStore {
   // Selection
   setSelectedNodeId: (id: string | null) => void;
   setSelectedEdgeId: (id: string | null) => void;
+
+  // Grouping
+  groupSelectedNodes: (label?: string) => void;
+  ungroupNode: (groupId: string) => void;
 
   // Node operations
   addNode: (gateType: GateType, position: { x: number; y: number }) => void;
@@ -138,9 +150,6 @@ interface CircuitStore {
   tickSimulation: (isStep?: boolean) => void;
 
   // Theme & Toasts
-  theme: 'dark' | 'light';
-  setTheme: (theme: 'dark' | 'light') => void;
-  toggleTheme: () => void;
   toastMessage: string | null;
   showToast: (message: string) => void;
 
@@ -153,6 +162,55 @@ interface CircuitStore {
   removePreset: (presetId: string) => void;
   resetPresetsToDefault: () => void;
   clearCanvas: () => void;
+
+  // Wire Labels
+  showWireLabels: boolean;
+  toggleWireLabels: () => void;
+  updateEdgeLabel: (edgeId: string, label: string) => void;
+  updateEdgeColor: (edgeId: string, color: string | undefined) => void;
+
+  // Inspector visibility
+  showInspector: boolean;
+  toggleInspector: () => void;
+
+  // Pin Aliases
+  updatePinAlias: (nodeId: string, pinId: string, alias: string) => void;
+
+  // Led Matrix Config
+  updateLedMatrixConfig: (nodeId: string, config: Partial<LedMatrixConfig>) => void;
+
+  // Clock manual pulse
+  triggerManualPulse: (nodeId: string) => void;
+
+  // Simulation time-based logic
+  simulationTimeMs: number;
+  lastTickTime: number;
+  updateClocks: (currentTime: number) => void;
+  sampleOscilloscopes: (currentTime: number) => void;
+  getOscilloscopeBuffer: (nodeId: string) => { samples: number[]; writeIndex: number; lastSampleSimTime: number } | undefined;
+  clearOscilloscopeBuffer: (nodeId: string) => void;
+  // Custom Components & Subcircuits
+  customComponents: Record<string, CustomComponentDefinition>;
+  hierarchyPath: HierarchyBreadcrumb[];
+  rootCircuitState: { nodes: Node[]; edges: Edge[] } | null;
+  addCustomComponent: (def: CustomComponentDefinition) => void;
+  updateCustomComponent: (id: string, updates: Partial<CustomComponentDefinition>) => void;
+  deleteCustomComponent: (id: string) => void;
+  toggleFavoriteCustomComponent: (id: string) => void;
+  convertSelectionToCustomComponent: (
+    name: string,
+    category: string,
+    description?: string,
+    customPins?: { inputs: CustomPinDefinition[]; outputs: CustomPinDefinition[] },
+    color?: string,
+    targetNodeIds?: string[]
+  ) => string | null;
+  instantiateCustomComponent: (customComponentId: string, position: { x: number; y: number }) => void;
+  enterSubcircuitView: (componentId: string, instanceId?: string) => void;
+  exitSubcircuitView: (targetDepth?: number) => void;
+  findCustomComponentInstances: (componentId: string) => void;
+  importCustomComponentJSON: (jsonString: string) => boolean;
+  exportCustomComponentJSON: (componentId: string) => string | null;
 }
 
 const DEFAULT_SIMULATION: SimulationState = {
@@ -203,36 +261,60 @@ const savePresetsToStorage = (presets: CircuitPreset[]) => {
 // Initial state with Half Adder preset loaded by default
 const initialPreset = CIRCUIT_PRESETS[0];
 
-const STORAGE_KEY_THEME = 'logic_studio_theme';
 
-const getInitialTheme = (): 'dark' | 'light' => {
-  document.documentElement.classList.add('dark');
-  document.documentElement.classList.remove('light');
-  return 'dark';
+
+import { BUILTIN_HALF_ADDER, BUILTIN_FULL_ADDER } from '../utils/builtinAdders';
+
+const STORAGE_KEY_CUSTOM_COMPONENTS = 'logic_studio_custom_components';
+
+const getInitialCustomComponents = (): Record<string, CustomComponentDefinition> => {
+  let customComps: Record<string, CustomComponentDefinition> = {
+    builtin_half_adder: BUILTIN_HALF_ADDER,
+    builtin_full_adder: BUILTIN_FULL_ADDER,
+  };
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_CUSTOM_COMPONENTS);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === 'object') {
+        customComps = { ...customComps, ...parsed };
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load custom components from localStorage', e);
+  }
+  customComps.builtin_half_adder = BUILTIN_HALF_ADDER;
+  customComps.builtin_full_adder = BUILTIN_FULL_ADDER;
+  saveCustomComponentsToStorage(customComps);
+  return customComps;
+};
+
+const saveCustomComponentsToStorage = (customComponents: Record<string, CustomComponentDefinition>) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_CUSTOM_COMPONENTS, JSON.stringify(customComponents));
+  } catch (e) {
+    console.error('Failed to save custom components to localStorage', e);
+  }
 };
 
 export const useCircuitStore = create<CircuitStore>((set, get) => ({
   nodes: initialPreset.nodes,
   edges: initialPreset.edges,
   presets: getInitialPresets(),
+  customComponents: getInitialCustomComponents(),
+  hierarchyPath: [{ id: 'root', name: 'Main Project' }],
+  rootCircuitState: null,
   simulation: DEFAULT_SIMULATION,
+  simulationTimeMs: 0,
+  lastTickTime: 0,
   selectedNodeId: null,
   selectedEdgeId: null,
   isDragging: false,
   setIsDragging: (isDragging) => set({ isDragging }),
+  showWireLabels: true,
+  showInspector: true,
 
-  theme: 'dark',
   toastMessage: null,
-
-  setTheme: (theme) => {
-    document.documentElement.classList.add('dark');
-    document.documentElement.classList.remove('light');
-    set({ theme: 'dark' });
-  },
-
-  toggleTheme: () => {
-    set({ theme: 'dark' });
-  },
 
   showToast: (message) => {
     set({ toastMessage: message });
@@ -294,14 +376,20 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
     const updatedNodes = applyNodeChanges(changes, get().nodes);
     set({ nodes: updatedNodes });
 
-    // Find if node selection changed
-    const selectionChange = changes.find((c) => c.type === 'select');
-    if (selectionChange) {
-      if (selectionChange.selected) {
-        set({ selectedNodeId: selectionChange.id });
-      } else if (get().selectedNodeId === selectionChange.id) {
-        set({ selectedNodeId: null });
+    // Process all selection changes sequentially to find the final selected node
+    let nextSelectedNodeId = get().selectedNodeId;
+    changes.forEach((c) => {
+      if (c.type === 'select') {
+        if (c.selected) {
+          nextSelectedNodeId = c.id;
+        } else if (nextSelectedNodeId === c.id) {
+          nextSelectedNodeId = null;
+        }
       }
+    });
+    
+    if (get().selectedNodeId !== nextSelectedNodeId) {
+      set({ selectedNodeId: nextSelectedNodeId });
     }
   },
 
@@ -309,13 +397,20 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
     const updatedEdges = applyEdgeChanges(changes, get().edges);
     set({ edges: updatedEdges });
 
-    const selectionChange = changes.find((c) => c.type === 'select');
-    if (selectionChange) {
-      if (selectionChange.selected) {
-        set({ selectedEdgeId: selectionChange.id });
-      } else if (get().selectedEdgeId === selectionChange.id) {
-        set({ selectedEdgeId: null });
+    // Process all selection changes sequentially to find the final selected edge
+    let nextSelectedEdgeId = get().selectedEdgeId;
+    changes.forEach((c) => {
+      if (c.type === 'select') {
+        if (c.selected) {
+          nextSelectedEdgeId = c.id;
+        } else if (nextSelectedEdgeId === c.id) {
+          nextSelectedEdgeId = null;
+        }
       }
+    });
+
+    if (get().selectedEdgeId !== nextSelectedEdgeId) {
+      set({ selectedEdgeId: nextSelectedEdgeId });
     }
   },
 
@@ -419,6 +514,14 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
       nodeLabel = 'Digital Oscilloscope';
       inputsCount = 4;
       typeName = 'oscilloscope';
+    } else if (gateType === 'LED_MATRIX') {
+      nodeLabel = 'LED Matrix Display';
+      inputsCount = 16;
+      typeName = 'ledMatrix';
+    } else if (gateType === 'BOOLEAN_EQUATION_GENERATOR') {
+      nodeLabel = 'Boolean Equation Generator';
+      inputsCount = 3;
+      typeName = 'equationGenerator';
     } else if (gateType === 'BUFFER') {
       nodeLabel = 'Buffer';
       inputsCount = 1;
@@ -431,9 +534,17 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
       inputsCount = 1;
     } else if (['BUS_SPLITTER', 'BUS_JOINER', 'BUS_TAP', 'BIT_EXTRACTOR', 'DELAY_ELEMENT', 'TUNNEL', 'TEXT_LABEL'].includes(gateType)) {
       typeName = 'utility';
-      if (gateType === 'TEXT_LABEL') nodeLabel = 'Annotation Note';
-      else if (gateType === 'TUNNEL') nodeLabel = 'Tunnel Connector';
+    } else if (gateType === 'HALF_ADDER') {
+      nodeLabel = 'Half Adder';
+      typeName = 'icComponent';
+    } else if (gateType === 'FULL_ADDER') {
+      nodeLabel = 'Full Adder';
+      typeName = 'icComponent';
+    } else if (gateType === 'ADDER_4BIT') {
+      nodeLabel = '4-Bit Adder';
+      typeName = 'icComponent';
     } else if ([
+      'HALF_ADDER', 'FULL_ADDER', 'ADDER_4BIT',
       'HALF_SUBTRACTOR', 'FULL_SUBTRACTOR', 'MUX_4TO1', 'DEMUX_1TO4',
       'PRIORITY_ENCODER', 'COMPARATOR_4BIT', 'DECODER_BCD_TO_7SEG',
       'D_LATCH', 'JK_FLIPFLOP', 'REGISTER_4BIT', 'SHIFT_REGISTER_4BIT',
@@ -523,6 +634,12 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
       const segConfig = DEFAULT_SEVEN_SEGMENT_CONFIG;
       inputs = createSevenSegmentPins(segConfig);
       outputs = [];
+    } else if (gateType === 'LED_MATRIX') {
+      inputs = createLedMatrixPins(DEFAULT_LED_MATRIX_CONFIG);
+      outputs = [];
+    } else if (gateType === 'BOOLEAN_EQUATION_GENERATOR') {
+      inputs = [{ id: 'in-0', name: 'In', value: 0 }];
+      outputs = [];
     } else if (gateType === 'MULTI_INPUT') {
       inputs = [];
       outputs = createMultiInputPins(DEFAULT_MULTI_INPUT_CONFIG);
@@ -571,12 +688,16 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
         inputCount: inputsCount,
         inputs,
         outputs,
+        ...(gateType === 'HALF_ADDER' ? { customComponentId: 'builtin_half_adder' } : {}),
+        ...(gateType === 'FULL_ADDER' ? { customComponentId: 'builtin_full_adder' } : {}),
         ...(gateType === 'DIP_SWITCH' ? { bitWidth: 4, dipValues: [0, 0, 0, 0] } : {}),
         ...(gateType === 'BUS_MONITOR' ? { bitWidth: 4, displayFormat: 'hex' } : {}),
         ...(gateType === 'CLOCK' ? { clockConfig: DEFAULT_CLOCK_CONFIG, clockState: DEFAULT_CLOCK_STATE } : {}),
+        ...(gateType === 'OSCILLOSCOPE' ? { scopeConfig: { ...DEFAULT_OSCILLOSCOPE_CONFIG } } : {}),
         ...(gateType === 'MULTI_INPUT' ? { multiInputConfig: DEFAULT_MULTI_INPUT_CONFIG } : {}),
         ...(gateType === 'ENCODER' ? { encoderConfig: DEFAULT_ENCODER_CONFIG } : {}),
         ...(gateType === 'SEVEN_SEGMENT' ? { sevenSegmentConfig: DEFAULT_SEVEN_SEGMENT_CONFIG } : {}),
+        ...(gateType === 'LED_MATRIX' ? { ledMatrixConfig: DEFAULT_LED_MATRIX_CONFIG } : {}),
       } as unknown as Record<string, unknown>,
     };
 
@@ -586,22 +707,33 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
 
   deleteSelected: () => {
     const { nodes, edges, selectedNodeId, selectedEdgeId } = get();
-    if (!selectedNodeId && !selectedEdgeId) return;
+    const selectedNodes = nodes.filter((n) => n.selected || n.id === selectedNodeId);
+    const selectedEdges = edges.filter((e) => e.selected || e.id === selectedEdgeId);
+
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
 
     get().saveHistory();
 
-    let newNodes = [...nodes];
-    let newEdges = [...edges];
+    const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
+    const selectedEdgeIds = new Set(selectedEdges.map((e) => e.id));
 
-    if (selectedNodeId) {
-      newNodes = newNodes.filter((n) => n.id !== selectedNodeId);
-      // Remove connected edges
-      newEdges = newEdges.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId);
-    }
+    // Also include any child nodes inside deleted group nodes
+    selectedNodes.forEach((n) => {
+      if (n.type === 'groupNode') {
+        nodes.forEach((child) => {
+          if (child.parentId === n.id) {
+            selectedNodeIds.add(child.id);
+          }
+        });
+      }
+    });
 
-    if (selectedEdgeId) {
-      newEdges = newEdges.filter((e) => e.id !== selectedEdgeId);
-    }
+    const newNodes = nodes.filter((n) => !selectedNodeIds.has(n.id));
+    const newEdges = edges.filter(
+      (e) => !selectedEdgeIds.has(e.id) && !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)
+    );
+
+    selectedNodeIds.forEach((id) => oscilloscopeBuffers.delete(id));
 
     set({
       nodes: newNodes,
@@ -614,76 +746,228 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   },
 
   duplicateSelected: () => {
-    const { nodes, selectedNodeId } = get();
-    if (!selectedNodeId) return;
-
-    const targetNode = nodes.find((n) => n.id === selectedNodeId);
-    if (!targetNode) return;
-
-    get().saveHistory();
-
-    const newId = `${targetNode.type}-${Date.now()}`;
-    const newNode: Node = {
-      ...targetNode,
-      id: newId,
-      position: {
-        x: targetNode.position.x + 35,
-        y: targetNode.position.y + 35,
-      },
-      selected: true,
-      data: JSON.parse(JSON.stringify(targetNode.data)),
-    };
-
-    const updatedNodes = nodes.map((n) => ({ ...n, selected: false }));
-    set({
-      nodes: [...updatedNodes, newNode],
-      selectedNodeId: newId,
-    });
-
-    get().tickSimulation();
+    get().copySelected();
+    get().pasteClipboard();
   },
 
   copySelected: () => {
-    const { nodes, selectedNodeId } = get();
-    if (!selectedNodeId) return;
-    const targetNode = nodes.find((n) => n.id === selectedNodeId);
-    if (!targetNode) return;
-    (window as any).__circuit_clipboard__ = JSON.parse(JSON.stringify(targetNode));
-    get().showToast('Node copied to clipboard');
+    const { nodes, edges, selectedNodeId } = get();
+    const selectedNodes = nodes.filter((n) => n.selected || n.id === selectedNodeId);
+    if (selectedNodes.length === 0) return;
+
+    const selectedIds = new Set(selectedNodes.map((n) => n.id));
+    const internalEdges = edges.filter((e) => selectedIds.has(e.source) && selectedIds.has(e.target));
+
+    (window as any).__circuit_clipboard__ = {
+      nodes: JSON.parse(JSON.stringify(selectedNodes)),
+      edges: JSON.parse(JSON.stringify(internalEdges)),
+    };
+
+    get().showToast(`Copied ${selectedNodes.length} item${selectedNodes.length > 1 ? 's' : ''} to clipboard`);
   },
 
   cutSelected: () => {
-    const { selectedNodeId } = get();
-    if (!selectedNodeId) return;
     get().copySelected();
     get().deleteSelected();
-    get().showToast('Node cut to clipboard');
+    get().showToast('Cut items to clipboard');
   },
 
   pasteClipboard: () => {
-    const copied = (window as any).__circuit_clipboard__ as Node | undefined;
-    if (!copied) return;
+    const clipboard = (window as any).__circuit_clipboard__ as
+      | { nodes: Node[]; edges: Edge[] }
+      | Node
+      | undefined;
+    if (!clipboard) return;
 
     get().saveHistory();
-    const newId = `${copied.type}-${Date.now()}`;
-    const newNode: Node = {
-      ...copied,
-      id: newId,
-      position: {
-        x: copied.position.x + 40,
-        y: copied.position.y + 40,
-      },
+
+    const timestamp = Date.now();
+    const idMap = new Map<string, string>();
+
+    // Support both multi-node clipboard format and single legacy node clipboard
+    const rawNodes: Node[] = Array.isArray((clipboard as any).nodes)
+      ? (clipboard as any).nodes
+      : [clipboard as Node];
+    const rawEdges: Edge[] = Array.isArray((clipboard as any).edges)
+      ? (clipboard as any).edges
+      : [];
+
+    const newNodes: Node[] = rawNodes.map((node, index) => {
+      const newId = `${node.type || 'node'}-${timestamp}-${index}`;
+      idMap.set(node.id, newId);
+
+      return {
+        ...node,
+        id: newId,
+        position: {
+          x: node.position.x + 40,
+          y: node.position.y + 40,
+        },
+        selected: true,
+        data: JSON.parse(JSON.stringify(node.data)),
+      };
+    });
+
+    // Re-link parentId if parent group was also copied
+    newNodes.forEach((node) => {
+      if (node.parentId && idMap.has(node.parentId)) {
+        node.parentId = idMap.get(node.parentId);
+      } else if (node.parentId && !idMap.has(node.parentId)) {
+        // If parent wasn't copied, make node top-level
+        delete node.parentId;
+      }
+    });
+
+    const newEdges: Edge[] = rawEdges.map((edge, index) => {
+      const newSource = idMap.get(edge.source) || edge.source;
+      const newTarget = idMap.get(edge.target) || edge.target;
+      return {
+        ...edge,
+        id: `e-${newSource}-${edge.sourceHandle || '0'}-${newTarget}-${edge.targetHandle || '0'}-${timestamp}-${index}`,
+        source: newSource,
+        target: newTarget,
+        type: 'signalEdge',
+        data: {
+          ...edge.data,
+          signalValue: -1,
+        },
+      };
+    });
+
+    const updatedExistingNodes = get().nodes.map((n) => ({ ...n, selected: false }));
+    set({
+      nodes: [...updatedExistingNodes, ...newNodes],
+      edges: [...get().edges, ...newEdges],
+      selectedNodeId: newNodes.length === 1 ? newNodes[0].id : null,
+    });
+
+    get().tickSimulation();
+    get().showToast(`Pasted ${newNodes.length} item${newNodes.length > 1 ? 's' : ''}`);
+  },
+
+  groupSelectedNodes: (customLabel?: string) => {
+    const { nodes } = get();
+    const selectedNodes = nodes.filter((n) => n.selected && n.type !== 'groupNode');
+    if (selectedNodes.length === 0) {
+      get().showToast('Select components to group');
+      return;
+    }
+
+    get().saveHistory();
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    selectedNodes.forEach((n) => {
+      let x = n.position.x;
+      let y = n.position.y;
+      if (n.parentId) {
+        const parent = nodes.find((p) => p.id === n.parentId);
+        if (parent) {
+          x += parent.position.x;
+          y += parent.position.y;
+        }
+      }
+
+      const width = (n.measured?.width || n.width || 160);
+      const height = (n.measured?.height || n.height || 100);
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    });
+
+    const groupWidth = Math.max(220, (maxX - minX) + 50);
+    const groupHeight = Math.max(140, (maxY - minY) + 70);
+    const groupX = minX - 25;
+    const groupY = minY - 45;
+
+    const groupId = `group-${Date.now()}`;
+    const groupLabel = customLabel || `Group (${selectedNodes.length})`;
+
+    const groupNode: Node = {
+      id: groupId,
+      type: 'groupNode',
+      position: { x: groupX, y: groupY },
+      style: { width: groupWidth, height: groupHeight },
       selected: true,
-      data: JSON.parse(JSON.stringify(copied.data)),
+      data: {
+        label: groupLabel,
+        color: 'purple',
+      } as unknown as Record<string, unknown>,
     };
 
-    const updatedNodes = get().nodes.map((n) => ({ ...n, selected: false }));
-    set({
-      nodes: [...updatedNodes, newNode],
-      selectedNodeId: newId,
+    const selectedIds = new Set(selectedNodes.map((n) => n.id));
+    const updatedNodes = nodes.map((node) => {
+      if (selectedIds.has(node.id)) {
+        let absX = node.position.x;
+        let absY = node.position.y;
+        if (node.parentId) {
+          const parent = nodes.find((p) => p.id === node.parentId);
+          if (parent) {
+            absX += parent.position.x;
+            absY += parent.position.y;
+          }
+        }
+
+        return {
+          ...node,
+          selected: false,
+          parentId: groupId,
+          position: {
+            x: absX - groupX,
+            y: absY - groupY,
+          },
+          extent: 'parent' as const,
+        };
+      }
+      return { ...node, selected: false };
     });
-    get().tickSimulation();
-    get().showToast('Pasted node from clipboard');
+
+    set({
+      nodes: [groupNode, ...updatedNodes],
+      selectedNodeId: groupId,
+    });
+
+    get().showToast(`Created ${groupLabel}`);
+  },
+
+  ungroupNode: (groupId: string) => {
+    const { nodes } = get();
+    const groupNode = nodes.find((n) => n.id === groupId);
+    if (!groupNode) return;
+
+    get().saveHistory();
+
+    const groupX = groupNode.position.x;
+    const groupY = groupNode.position.y;
+
+    const updatedNodes = nodes
+      .filter((n) => n.id !== groupId)
+      .map((node) => {
+        if (node.parentId === groupId) {
+          const { parentId, extent, ...rest } = node;
+          return {
+            ...rest,
+            position: {
+              x: node.position.x + groupX,
+              y: node.position.y + groupY,
+            },
+            selected: true,
+          };
+        }
+        return node;
+      });
+
+    set({
+      nodes: updatedNodes,
+      selectedNodeId: null,
+    });
+
+    get().showToast('Ungrouped selection');
   },
 
   resetAllInputs: () => {
@@ -1099,6 +1383,7 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   startSimulation: () => {
     set((state) => ({
       simulation: { ...state.simulation, isRunning: true, isPaused: false },
+      lastTickTime: performance.now(),
     }));
   },
 
@@ -1143,9 +1428,18 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
       data: { ...edge.data, signalValue: -1 },
     }));
 
+    // Clear all scope buffers
+    oscilloscopeBuffers.forEach((buf) => {
+      buf.samples.fill(0);
+      buf.writeIndex = 0;
+      buf.lastSampleSimTime = 0;
+    });
+
     set({
       nodes,
       edges,
+      simulationTimeMs: 0,
+      lastTickTime: 0,
       simulation: { ...get().simulation, stepCount: 0 },
     });
 
@@ -1153,37 +1447,67 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   },
 
   stepSimulation: () => {
+    const nextTime = get().simulationTimeMs + 10; // Advance 10ms of simulation time on step
+    set({
+      simulationTimeMs: nextTime,
+      lastTickTime: performance.now(),
+    });
+    get().updateClocks(nextTime);
     get().tickSimulation(true);
   },
 
   setSpeed: (speed) => {
     set((state) => ({
       simulation: { ...state.simulation, speed },
+      lastTickTime: performance.now(), // Reset tick timer reference for smooth speed change transition
     }));
   },
 
   toggleLoopMode: () => {
     set((state) => ({
       simulation: { ...state.simulation, loopMode: !state.simulation.loopMode },
+      lastTickTime: performance.now(),
     }));
   },
 
   tickSimulation: (isStep: boolean = true) => {
-    const { nodes, edges, simulation } = get();
-    const result = propagateSignals(nodes, edges, false);
+    const { edges, simulation, simulationTimeMs, lastTickTime } = get();
+
+    let nextTimeMs = simulationTimeMs;
+    let nextLastTickTime = lastTickTime;
+
+    if (!isStep && simulation.isRunning && !simulation.isPaused) {
+      const now = performance.now();
+      const elapsedWallTime = lastTickTime > 0 ? now - lastTickTime : 0;
+      const cappedWallTime = Math.min(100, elapsedWallTime); // cap huge deltas
+      nextTimeMs = simulationTimeMs + cappedWallTime * simulation.speed;
+      nextLastTickTime = now;
+    }
+
+    // Step 1: Update clock states at the target simulation time
+    get().updateClocks(nextTimeMs);
+
+    // Step 2: Propagate signals
+    const result = propagateSignals(get().nodes, edges, false, get().customComponents);
 
     set({
       nodes: result.nodes,
       edges: result.edges,
+      simulationTimeMs: nextTimeMs,
+      lastTickTime: nextLastTickTime,
       simulation: {
         ...simulation,
         stepCount: simulation.stepCount + 1,
       },
     });
+
+    // Step 3: Sample oscilloscopes
+    get().sampleOscilloscopes(nextTimeMs);
   },
 
   // Clock Node Actions
   startClockNode: (nodeId: string) => {
+    const now = performance.now();
     const nodes = get().nodes.map((node) => {
       if (node.id === nodeId) {
         const data = node.data as unknown as NodeData;
@@ -1192,7 +1516,12 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
           ...node,
           data: {
             ...data,
-            clockState: { ...curState, status: 'running' },
+            clockState: {
+              ...curState,
+              status: 'running',
+              lastTickTime: now,
+              phaseAccumulator: 0,
+            },
           },
         };
       }
@@ -1232,7 +1561,14 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
             ...data,
             value: startVal,
             outputs: (data.outputs || []).map((p) => ({ ...p, value: startVal })),
-            clockState: { ...curState, status: 'stopped', tickCount: 0, outputValue: startVal },
+            clockState: {
+              ...curState,
+              status: 'stopped',
+              tickCount: 0,
+              outputValue: startVal,
+              lastTickTime: 0,
+              phaseAccumulator: 0,
+            },
           },
         };
       }
@@ -1288,6 +1624,9 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
           newOutputs = (data.outputs || []).map((p) => ({ ...p, value: startVal }));
         }
 
+        // Reset phase accumulator when frequency or duty cycle changes
+        const freqChanged = config.frequencyHz !== undefined || config.dutyCycle !== undefined;
+
         return {
           ...node,
           data: {
@@ -1295,7 +1634,11 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
             value: newVal,
             outputs: newOutputs,
             clockConfig: newConfig,
-            clockState: { ...curState, outputValue: newOutputVal },
+            clockState: {
+              ...curState,
+              outputValue: newOutputVal,
+              ...(freqChanged ? { phaseAccumulator: 0, lastTickTime: performance.now() } : {}),
+            },
           },
         };
       }
@@ -1306,6 +1649,7 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   },
 
   tickClockNode: (nodeId: string) => {
+    const now = performance.now();
     const nodes = get().nodes.map((node) => {
       if (node.id === nodeId) {
         const data = node.data as unknown as NodeData;
@@ -1320,7 +1664,13 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
             ...data,
             value: curVal,
             outputs: data.outputs.map((p) => ({ ...p, value: curVal })),
-            clockState: { ...curState, tickCount: nextTick, outputValue: curVal },
+            clockState: {
+              ...curState,
+              tickCount: nextTick,
+              outputValue: curVal,
+              lastTickTime: now,
+              phaseAccumulator: 0,
+            },
           },
         };
       }
@@ -1548,6 +1898,283 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
     get().tickSimulation(true);
   },
 
+  toggleWireLabels: () => {
+    set({ showWireLabels: !get().showWireLabels });
+  },
+
+  toggleInspector: () => {
+    set({ showInspector: !get().showInspector });
+  },
+
+  updateEdgeLabel: (edgeId: string, label: string) => {
+    const edges = get().edges.map((edge) => {
+      if (edge.id === edgeId) {
+        return {
+          ...edge,
+          data: {
+            ...edge.data,
+            label,
+          },
+        };
+      }
+      return edge;
+    });
+    set({ edges });
+  },
+
+  updateEdgeColor: (edgeId: string, color: string | undefined) => {
+    get().saveHistory();
+    const edges = get().edges.map((edge) => {
+      if (edge.id === edgeId) {
+        return {
+          ...edge,
+          data: {
+            ...edge.data,
+            color,
+          },
+        };
+      }
+      return edge;
+    });
+    set({ edges });
+  },
+
+  updatePinAlias: (nodeId: string, pinId: string, alias: string) => {
+    const nodes = get().nodes.map((node) => {
+      if (node.id === nodeId) {
+        const data = node.data as unknown as NodeData;
+        const currentAliases = data.pinAliases || {};
+        const nextAliases = { ...currentAliases };
+        if (alias.trim() === '') {
+          delete nextAliases[pinId];
+        } else {
+          nextAliases[pinId] = alias;
+        }
+        return {
+          ...node,
+          data: {
+            ...data,
+            pinAliases: nextAliases,
+          },
+        };
+      }
+      return node;
+    });
+    set({ nodes });
+  },
+
+  updateLedMatrixConfig: (nodeId: string, config: Partial<LedMatrixConfig>) => {
+    const { nodes, edges } = get();
+    const targetNode = nodes.find((n) => n.id === nodeId);
+    if (!targetNode) return;
+
+    const data = targetNode.data as unknown as NodeData;
+    const curConfig = data.ledMatrixConfig || DEFAULT_LED_MATRIX_CONFIG;
+    const newConfig = { ...curConfig, ...config };
+
+    let newInputs = data.inputs;
+    let nextEdges = edges;
+
+    if (config.size && config.size !== curConfig.size) {
+      newInputs = createLedMatrixPins(newConfig);
+      nextEdges = edges.filter((e) => {
+        if (e.target === nodeId) {
+          return newInputs.some((p) => p.id === e.targetHandle);
+        }
+        return true;
+      });
+    }
+
+    const updatedNodes = nodes.map((node) => {
+      if (node.id === nodeId) {
+        return {
+          ...node,
+          data: {
+            ...data,
+            ledMatrixConfig: newConfig,
+            inputs: newInputs,
+          },
+        };
+      }
+      return node;
+    });
+
+    set({ nodes: updatedNodes, edges: nextEdges });
+    get().tickSimulation(true);
+  },
+
+  triggerManualPulse: (nodeId: string) => {
+    const { nodes } = get();
+    const target = nodes.find((n) => n.id === nodeId);
+    if (!target) return;
+    const data = target.data as unknown as NodeData;
+    const config = data.clockConfig || DEFAULT_CLOCK_CONFIG;
+    const pulseWidth = config.pulseWidthMs || 100;
+
+    const activeVal = config.startState === 'low' ? 1 : 0;
+
+    set({
+      nodes: get().nodes.map((node) => {
+        if (node.id === nodeId) {
+          const currentData = node.data as unknown as NodeData;
+          return {
+            ...node,
+            data: {
+              ...currentData,
+              value: activeVal,
+              outputs: (currentData.outputs || []).map((p) => ({ ...p, value: activeVal })),
+            },
+          };
+        }
+        return node;
+      }),
+    });
+    get().tickSimulation(true);
+
+    setTimeout(() => {
+      const inactiveVal = config.startState === 'low' ? 0 : 1;
+      set({
+        nodes: get().nodes.map((node) => {
+          if (node.id === nodeId) {
+            const currentData = node.data as unknown as NodeData;
+            return {
+              ...node,
+              data: {
+                ...currentData,
+                value: inactiveVal,
+                outputs: (currentData.outputs || []).map((p) => ({ ...p, value: inactiveVal })),
+              },
+            };
+          }
+          return node;
+        }),
+      });
+      get().tickSimulation(true);
+    }, pulseWidth);
+  },
+
+  updateClocks: (currentTime: number) => {
+    const { nodes } = get();
+    let changed = false;
+    const nextNodes = nodes.map((node) => {
+      if (node.type === 'clockNode') {
+        const data = node.data as unknown as NodeData;
+        const config = data.clockConfig || DEFAULT_CLOCK_CONFIG;
+        const state = data.clockState || DEFAULT_CLOCK_STATE;
+
+        if (state.status !== 'running' || !config.enabled) return node;
+
+        const actualHz = toHz(config.frequencyHz, config.frequencyUnit || 'Hz');
+        if (actualHz <= 0) return node;
+
+        const periodMs = 1000 / actualHz;
+        const phase = currentTime % periodMs;
+        const dutyRatio = (config.dutyCycle ?? 50) / 100;
+        
+        let isHigh = false;
+        if (config.startState === 'high') {
+          isHigh = phase < periodMs * dutyRatio;
+        } else {
+          isHigh = phase >= periodMs * (1 - dutyRatio);
+        }
+
+        const newValue = isHigh ? 1 : 0;
+        if (data.value !== newValue) {
+          changed = true;
+          const nextTick = state.tickCount + 1;
+          return {
+            ...node,
+            data: {
+              ...data,
+              value: newValue,
+              outputs: (data.outputs || []).map((p) => ({ ...p, value: newValue })),
+              clockState: {
+                ...state,
+                tickCount: nextTick,
+                outputValue: newValue,
+                lastTickTime: performance.now(),
+              },
+            },
+          };
+        }
+      }
+      return node;
+    });
+
+    if (changed) {
+      set({ nodes: nextNodes });
+    }
+  },
+
+  sampleOscilloscopes: (currentTime: number) => {
+    const { nodes } = get();
+    nodes.forEach((node) => {
+      if (node.type === 'oscilloscope') {
+        const data = node.data as unknown as NodeData;
+        const config = data.scopeConfig || DEFAULT_OSCILLOSCOPE_CONFIG;
+        if (config.isPaused) return;
+
+        let buffer = oscilloscopeBuffers.get(node.id);
+        const limit = config.bufferSize || 2000;
+
+        if (!buffer) {
+          buffer = {
+            samples: new Array(limit).fill(0),
+            writeIndex: 0,
+            lastSampleSimTime: currentTime,
+          };
+          oscilloscopeBuffers.set(node.id, buffer);
+        }
+
+        // Resize buffer if limit changed
+        if (buffer.samples.length !== limit) {
+          const newSamples = new Array(limit).fill(0);
+          const oldLen = buffer.samples.length;
+          const w = buffer.writeIndex;
+          for (let i = 0; i < Math.min(oldLen, limit); i++) {
+            newSamples[i] = buffer.samples[(w - i - 1 + oldLen) % oldLen];
+          }
+          buffer.samples = newSamples;
+          buffer.writeIndex = Math.min(oldLen, limit) % limit;
+        }
+
+        const selectedIdx = config.selectedBitIndex ?? 0;
+        const activeInputPin = data.inputs[selectedIdx] || data.inputs[0];
+        const currentSignalVal = activeInputPin?.value === 1 ? 1 : 0;
+
+        const sampleIntervalMs = 1000 / config.sampleRateHz;
+        const elapsed = currentTime - buffer.lastSampleSimTime;
+
+        if (elapsed >= sampleIntervalMs) {
+          const sampleCount = Math.floor(elapsed / sampleIntervalMs);
+          const samples = buffer.samples;
+          let w = buffer.writeIndex;
+          const N = samples.length;
+
+          for (let i = 0; i < sampleCount; i++) {
+            samples[w] = currentSignalVal;
+            w = (w + 1) % N;
+          }
+
+          buffer.writeIndex = w;
+          buffer.lastSampleSimTime += sampleCount * sampleIntervalMs;
+        }
+      }
+    });
+  },
+
+  getOscilloscopeBuffer: (nodeId: string) => {
+    return oscilloscopeBuffers.get(nodeId);
+  },
+
+  clearOscilloscopeBuffer: (nodeId: string) => {
+    const buffer = oscilloscopeBuffers.get(nodeId);
+    if (buffer) {
+      buffer.samples.fill(0);
+      buffer.writeIndex = 0;
+    }
+  },
+
   loadCircuit: (nodes, edges) => {
     get().saveHistory();
     set({
@@ -1618,5 +2245,369 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
       selectedNodeId: null,
       selectedEdgeId: null,
     });
+  },
+
+  // Custom Components Actions
+  addCustomComponent: (def: CustomComponentDefinition) => {
+    const customComponents = { ...get().customComponents, [def.id]: def };
+    set({ customComponents });
+    saveCustomComponentsToStorage(customComponents);
+  },
+
+  updateCustomComponent: (id: string, updates: Partial<CustomComponentDefinition>) => {
+    const existing = get().customComponents[id];
+    if (!existing) return;
+    const updatedComp = { ...existing, ...updates, updatedAt: Date.now() };
+    const customComponents = { ...get().customComponents, [id]: updatedComp };
+    set({ customComponents });
+    saveCustomComponentsToStorage(customComponents);
+  },
+
+  deleteCustomComponent: (id: string) => {
+    const customComponents = { ...get().customComponents };
+    delete customComponents[id];
+    set({ customComponents });
+    saveCustomComponentsToStorage(customComponents);
+  },
+
+  toggleFavoriteCustomComponent: (id: string) => {
+    const comp = get().customComponents[id];
+    if (!comp) return;
+    get().updateCustomComponent(id, { isFavorite: !comp.isFavorite });
+  },
+
+  convertSelectionToCustomComponent: (
+    name: string,
+    category: string,
+    description: string = '',
+    customPins?: { inputs: CustomPinDefinition[]; outputs: CustomPinDefinition[] },
+    color: string = '#10b981',
+    targetNodeIds?: string[]
+  ) => {
+    const { nodes, edges } = get();
+    const selectedNodes = targetNodeIds && targetNodeIds.length > 0
+      ? nodes.filter((n) => targetNodeIds.includes(n.id))
+      : nodes.filter((n) => n.selected);
+    const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
+    const compId = `custom_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+
+    const inputs = customPins?.inputs || [];
+    const outputs = customPins?.outputs || [];
+
+    // If 0 nodes selected, create a new subcircuit from scratch with template input/output nodes
+    if (selectedNodes.length === 0) {
+      const templateNodes: Node[] = [];
+
+      inputs.forEach((p, idx) => {
+        const inNodeId = p.internalNodeId || `in-node-${idx}-${Date.now()}`;
+        p.internalNodeId = inNodeId;
+        templateNodes.push({
+          id: inNodeId,
+          type: 'digitalInput',
+          position: { x: 80, y: 100 + idx * 90 },
+          data: {
+            label: p.name,
+            gateType: 'INPUT',
+            inputs: [],
+            outputs: [{ id: 'out-0', name: 'OUT', value: 0 }],
+          },
+        });
+      });
+
+      outputs.forEach((p, idx) => {
+        const outNodeId = p.internalNodeId || `out-node-${idx}-${Date.now()}`;
+        p.internalNodeId = outNodeId;
+        templateNodes.push({
+          id: outNodeId,
+          type: 'digitalOutput',
+          position: { x: 500, y: 100 + idx * 90 },
+          data: {
+            label: p.name,
+            gateType: 'OUTPUT',
+            inputs: [{ id: 'in-0', name: 'IN', value: 0 }],
+            outputs: [],
+          },
+        });
+      });
+
+      const newDefinition: CustomComponentDefinition = {
+        id: compId,
+        name,
+        category: category || 'Custom Components',
+        description,
+        color,
+        inputs,
+        outputs,
+        nodes: templateNodes,
+        edges: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const customComponents = { ...get().customComponents, [compId]: newDefinition };
+      saveCustomComponentsToStorage(customComponents);
+
+      set({ customComponents });
+      get().enterSubcircuitView(compId);
+      return compId;
+    }
+
+    // Filter edges internal to selection
+    const internalEdges = edges.filter((e) => selectedNodeIds.has(e.source) && selectedNodeIds.has(e.target));
+    const externalIncomingEdges = edges.filter((e) => !selectedNodeIds.has(e.source) && selectedNodeIds.has(e.target));
+    const externalOutgoingEdges = edges.filter((e) => selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target));
+
+    const newDefinition: CustomComponentDefinition = {
+      id: compId,
+      name,
+      category: category || 'Custom Components',
+      description,
+      color,
+      inputs,
+      outputs,
+      nodes: JSON.parse(JSON.stringify(selectedNodes.map((n) => ({ ...n, selected: false })))),
+      edges: JSON.parse(JSON.stringify(internalEdges)),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    // Bounding box center for position
+    const avgX = selectedNodes.reduce((sum, n) => sum + n.position.x, 0) / selectedNodes.length;
+    const avgY = selectedNodes.reduce((sum, n) => sum + n.position.y, 0) / selectedNodes.length;
+
+    const customNodeId = `custom-node-${Date.now()}`;
+    const customNode: Node = {
+      id: customNodeId,
+      type: 'customNode',
+      position: { x: avgX, y: avgY },
+      data: {
+        label: name,
+        gateType: 'CUSTOM',
+        customComponentId: compId,
+        inputs: inputs.map((p) => ({ id: p.id, name: p.name, value: -1 })),
+        outputs: outputs.map((p) => ({ id: p.id, name: p.name, value: -1 })),
+      },
+    };
+
+    // Re-route external edges
+    const reRoutedEdges: Edge[] = [];
+    externalIncomingEdges.forEach((e) => {
+      const targetPin = inputs.find((p) => p.internalNodeId === e.target) || inputs[0];
+      if (targetPin) {
+        reRoutedEdges.push({
+          ...e,
+          id: `e-${e.source}-${e.sourceHandle || '0'}-${customNodeId}-${targetPin.id}`,
+          target: customNodeId,
+          targetHandle: targetPin.id,
+        });
+      }
+    });
+
+    externalOutgoingEdges.forEach((e) => {
+      const sourcePin = outputs.find((p) => p.internalNodeId === e.source) || outputs[0];
+      if (sourcePin) {
+        reRoutedEdges.push({
+          ...e,
+          id: `e-${customNodeId}-${sourcePin.id}-${e.target}-${e.targetHandle || '0'}`,
+          source: customNodeId,
+          sourceHandle: sourcePin.id,
+        });
+      }
+    });
+
+    const remainingNodes = nodes.filter((n) => !selectedNodeIds.has(n.id));
+    const remainingEdges = edges.filter(
+      (e) => !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)
+    );
+
+    const nextNodes = [...remainingNodes, customNode];
+    const nextEdges = [...remainingEdges, ...reRoutedEdges];
+
+    const customComponents = { ...get().customComponents, [compId]: newDefinition };
+    saveCustomComponentsToStorage(customComponents);
+
+    set({
+      customComponents,
+      nodes: nextNodes,
+      edges: nextEdges,
+    });
+
+    get().saveHistory();
+    get().tickSimulation();
+
+    return compId;
+  },
+
+  instantiateCustomComponent: (customComponentId: string, position: { x: number; y: number }) => {
+    const def = get().customComponents[customComponentId];
+    if (!def) return;
+
+    const currentPath = get().hierarchyPath;
+    if (currentPath.length > 1) {
+      const currentParentId = currentPath[currentPath.length - 1].id;
+      if (detectComponentRecursion(customComponentId, currentParentId, get().customComponents)) {
+        get().showToast(`Cannot add "${def.name}": Recursion detected! Component cannot contain itself.`);
+        return;
+      }
+    }
+
+    get().saveHistory();
+
+    const nodeId = `custom-${customComponentId.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
+    const newNode: Node = {
+      id: nodeId,
+      type: 'customNode',
+      position,
+      data: {
+        label: def.name,
+        gateType: 'CUSTOM',
+        customComponentId,
+        inputs: def.inputs.map((p) => ({ id: p.id, name: p.name, value: -1 })),
+        outputs: def.outputs.map((p) => ({ id: p.id, name: p.name, value: -1 })),
+      },
+    };
+
+    set((state) => ({
+      nodes: [...state.nodes, newNode],
+    }));
+
+    get().tickSimulation();
+  },
+
+  enterSubcircuitView: (componentId: string, instanceId?: string) => {
+    const { hierarchyPath, customComponents, nodes, edges, rootCircuitState } = get();
+    const targetComp = customComponents[componentId];
+    if (!targetComp) return;
+
+    if (hierarchyPath.length > 1) {
+      const currentEditingId = hierarchyPath[hierarchyPath.length - 1].id;
+      if (detectComponentRecursion(componentId, currentEditingId, customComponents)) {
+        get().showToast('Recursion detected! Component cannot edit itself recursively.');
+        return;
+      }
+    }
+
+    if (hierarchyPath.length === 1) {
+      set({ rootCircuitState: { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) } });
+    } else {
+      const currentId = hierarchyPath[hierarchyPath.length - 1].id;
+      const updatedComponents = {
+        ...customComponents,
+        [currentId]: {
+          ...customComponents[currentId],
+          nodes: JSON.parse(JSON.stringify(nodes)),
+          edges: JSON.parse(JSON.stringify(edges)),
+          updatedAt: Date.now(),
+        },
+      };
+      set({ customComponents: updatedComponents });
+      saveCustomComponentsToStorage(updatedComponents);
+    }
+
+    const newPath = [...hierarchyPath, { id: componentId, name: targetComp.name, instanceId }];
+    set({
+      hierarchyPath: newPath,
+      nodes: JSON.parse(JSON.stringify(targetComp.nodes || [])),
+      edges: JSON.parse(JSON.stringify(targetComp.edges || [])),
+      selectedNodeId: null,
+      selectedEdgeId: null,
+    });
+
+    get().tickSimulation();
+  },
+
+  exitSubcircuitView: (targetDepth: number = 0) => {
+    const { hierarchyPath, customComponents, nodes, edges, rootCircuitState } = get();
+    if (hierarchyPath.length <= 1) return;
+
+    const currentId = hierarchyPath[hierarchyPath.length - 1].id;
+    const updatedCustomComponents = {
+      ...customComponents,
+      [currentId]: {
+        ...customComponents[currentId],
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges)),
+        updatedAt: Date.now(),
+      },
+    };
+    saveCustomComponentsToStorage(updatedCustomComponents);
+
+    const newPath = hierarchyPath.slice(0, targetDepth + 1);
+
+    if (newPath.length === 1 && rootCircuitState) {
+      set({
+        customComponents: updatedCustomComponents,
+        hierarchyPath: newPath,
+        nodes: rootCircuitState.nodes,
+        edges: rootCircuitState.edges,
+        selectedNodeId: null,
+        selectedEdgeId: null,
+      });
+    } else {
+      const parentId = newPath[newPath.length - 1].id;
+      const parentComp = updatedCustomComponents[parentId];
+      set({
+        customComponents: updatedCustomComponents,
+        hierarchyPath: newPath,
+        nodes: parentComp ? JSON.parse(JSON.stringify(parentComp.nodes)) : [],
+        edges: parentComp ? JSON.parse(JSON.stringify(parentComp.edges)) : [],
+        selectedNodeId: null,
+        selectedEdgeId: null,
+      });
+    }
+
+    get().tickSimulation();
+  },
+
+  findCustomComponentInstances: (componentId: string) => {
+    const { nodes } = get();
+    const matchingNodeIds = nodes
+      .filter(
+        (n) =>
+          (n.data as unknown as NodeData).gateType === 'CUSTOM' &&
+          (n.data as unknown as NodeData).customComponentId === componentId
+      )
+      .map((n) => n.id);
+
+    if (matchingNodeIds.length === 0) {
+      get().showToast('No instances of this component placed on canvas');
+      return;
+    }
+
+    const updatedNodes = nodes.map((n) => ({
+      ...n,
+      selected: matchingNodeIds.includes(n.id),
+    }));
+
+    set({ nodes: updatedNodes, selectedNodeId: matchingNodeIds[0] });
+    get().showToast(`Found ${matchingNodeIds.length} instance(s) on canvas`);
+  },
+
+  importCustomComponentJSON: (jsonString: string) => {
+    try {
+      const { component, dependencies } = parseCustomComponentFromJSON(jsonString);
+      if (!component || !component.id || !component.name) return false;
+
+      const updatedComponents = {
+        ...get().customComponents,
+        ...dependencies,
+        [component.id]: component,
+      };
+      set({ customComponents: updatedComponents });
+      saveCustomComponentsToStorage(updatedComponents);
+      return true;
+    } catch (e) {
+      console.error('Failed to import subcircuit JSON', e);
+      return false;
+    }
+  },
+
+  exportCustomComponentJSON: (componentId: string) => {
+    try {
+      return exportCustomComponentToJSON(componentId, get().customComponents);
+    } catch (e) {
+      console.error('Failed to export subcircuit JSON', e);
+      return null;
+    }
   },
 }));

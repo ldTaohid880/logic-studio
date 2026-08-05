@@ -32,6 +32,9 @@ import {
   DEFAULT_CFG_BUS_JOINER_CONFIG,
 } from '../types/configurable';
 
+import { CustomComponentDefinition } from '../types/customComponent';
+import { evaluateCustomComponentLogic } from './customComponentLogic';
+
 export interface PropagateResult {
   nodes: Node[];
   edges: Edge[];
@@ -41,7 +44,8 @@ export interface PropagateResult {
 export function propagateSignals(
   inputNodes: Node[],
   inputEdges: Edge[],
-  clockTick: boolean = false
+  clockTick: boolean = false,
+  customComponentsMap: Record<string, CustomComponentDefinition> = {}
 ): PropagateResult {
   // Deep clone or construct updated node state map
   const nodesMap = new Map<string, Node>();
@@ -193,7 +197,9 @@ export function propagateSignals(
         data.gateType === 'SEVEN_SEGMENT' ||
         data.gateType === 'HEX_DISPLAY' ||
         data.gateType === 'BUS_MONITOR' ||
-        data.gateType === 'OSCILLOSCOPE'
+        data.gateType === 'OSCILLOSCOPE' ||
+        data.gateType === 'LED_MATRIX' ||
+        data.gateType === 'BOOLEAN_EQUATION_GENERATOR'
       ) {
         const val = inputs[0] ?? data.value ?? -1;
         if (data.value !== val) {
@@ -209,6 +215,21 @@ export function propagateSignals(
           const newPinVal = evalRes.outputPinValues[outPin.id] ?? -1;
           if (outPin.value !== newPinVal) {
             outPin.value = newPinVal;
+            iterChanged = true;
+          }
+        });
+      } else if (data.gateType === 'CUSTOM') {
+        const evalRes = evaluateCustomComponentLogic(
+          data,
+          customComponentsMap,
+          (nodes, edges, tick) => propagateSignals(nodes, edges, tick, customComponentsMap),
+          clockTick
+        );
+        data.subcircuitNodeStates = evalRes.internalNodeStates;
+        data.outputs.forEach((outPin) => {
+          const expectedVal = evalRes.updatedOutputs[outPin.id] ?? -1;
+          if (outPin.value !== expectedVal) {
+            outPin.value = expectedVal;
             iterChanged = true;
           }
         });
@@ -267,6 +288,7 @@ export function propagateSignals(
           }
         });
       } else if ([
+        'HALF_ADDER', 'FULL_ADDER', 'ADDER_4BIT',
         'HALF_SUBTRACTOR', 'FULL_SUBTRACTOR', 'MUX_4TO1', 'DEMUX_1TO4',
         'PRIORITY_ENCODER', 'COMPARATOR_4BIT', 'DECODER_BCD_TO_7SEG',
         'D_LATCH', 'JK_FLIPFLOP', 'REGISTER_4BIT', 'SHIFT_REGISTER_4BIT',

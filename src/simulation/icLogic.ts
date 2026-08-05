@@ -8,6 +8,53 @@ export interface ICPins {
 
 export function getDefaultICPins(gateType: GateType): ICPins {
   switch (gateType) {
+    case 'HALF_ADDER':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'A', value: 0 },
+          { id: 'in-1', name: 'B', value: 0 },
+        ],
+        outputs: [
+          { id: 'out-0', name: 'Sum', value: 0 },
+          { id: 'out-1', name: 'Cout', value: 0 },
+        ],
+      };
+
+    case 'FULL_ADDER':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'A', value: 0 },
+          { id: 'in-1', name: 'B', value: 0 },
+          { id: 'in-2', name: 'Cin', value: 0 },
+        ],
+        outputs: [
+          { id: 'out-0', name: 'Sum', value: 0 },
+          { id: 'out-1', name: 'Cout', value: 0 },
+        ],
+      };
+
+    case 'ADDER_4BIT':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'A0 (LSB)', value: 0 },
+          { id: 'in-1', name: 'A1', value: 0 },
+          { id: 'in-2', name: 'A2', value: 0 },
+          { id: 'in-3', name: 'A3 (MSB)', value: 0 },
+          { id: 'in-4', name: 'B0 (LSB)', value: 0 },
+          { id: 'in-5', name: 'B1', value: 0 },
+          { id: 'in-6', name: 'B2', value: 0 },
+          { id: 'in-7', name: 'B3 (MSB)', value: 0 },
+          { id: 'in-8', name: 'Cin', value: 0 },
+        ],
+        outputs: [
+          { id: 'out-0', name: 'S0 (LSB)', value: 0 },
+          { id: 'out-1', name: 'S1', value: 0 },
+          { id: 'out-2', name: 'S2', value: 0 },
+          { id: 'out-3', name: 'S3 (MSB)', value: 0 },
+          { id: 'out-4', name: 'Cout', value: 0 },
+        ],
+      };
+
     case 'HALF_SUBTRACTOR':
       return {
         inputs: [
@@ -425,6 +472,41 @@ export function evaluateIC(
   const newState = { ...currentState };
 
   switch (gateType) {
+    case 'HALF_ADDER': {
+      const a = inputs[0] === 1 ? 1 : 0;
+      const b = inputs[1] === 1 ? 1 : 0;
+      const sum = a ^ b;
+      const cout = a & b;
+      outputs['out-0'] = sum as SignalValue; // Sum
+      outputs['out-1'] = cout as SignalValue; // Cout
+      break;
+    }
+
+    case 'FULL_ADDER': {
+      const a = inputs[0] === 1 ? 1 : 0;
+      const b = inputs[1] === 1 ? 1 : 0;
+      const cin = inputs[2] === 1 ? 1 : 0;
+      const sum = a ^ b ^ cin;
+      const cout = (a & b) | (cin & (a ^ b));
+      outputs['out-0'] = sum as SignalValue;
+      outputs['out-1'] = cout as SignalValue;
+      break;
+    }
+
+    case 'ADDER_4BIT': {
+      const a = (inputs[0] === 1 ? 1 : 0) | ((inputs[1] === 1 ? 1 : 0) << 1) | ((inputs[2] === 1 ? 1 : 0) << 2) | ((inputs[3] === 1 ? 1 : 0) << 3);
+      const b = (inputs[4] === 1 ? 1 : 0) | ((inputs[5] === 1 ? 1 : 0) << 1) | ((inputs[6] === 1 ? 1 : 0) << 2) | ((inputs[7] === 1 ? 1 : 0) << 3);
+      const cin = inputs[8] === 1 ? 1 : 0;
+
+      const res = a + b + cin;
+      outputs['out-0'] = ((res >> 0) & 1) as SignalValue;
+      outputs['out-1'] = ((res >> 1) & 1) as SignalValue;
+      outputs['out-2'] = ((res >> 2) & 1) as SignalValue;
+      outputs['out-3'] = ((res >> 3) & 1) as SignalValue;
+      outputs['out-4'] = res > 15 ? 1 : 0;
+      break;
+    }
+
     case 'HALF_SUBTRACTOR': {
       const a = inputs[0] === 1 ? 1 : 0;
       const b = inputs[1] === 1 ? 1 : 0;

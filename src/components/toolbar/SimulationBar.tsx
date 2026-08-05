@@ -42,7 +42,6 @@ export const SimulationBar: React.FC<SimulationBarProps> = () => {
     stepSimulation,
     setSpeed,
     toggleLoopMode,
-    theme,
   } = useCircuitStore();
 
   const speedOptions = [
@@ -54,15 +53,9 @@ export const SimulationBar: React.FC<SimulationBarProps> = () => {
   ];
 
   return (
-    <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5 px-3 py-2 backdrop-blur-xl border rounded-2xl transition-colors duration-200 ${
-      theme === 'light'
-        ? 'bg-white/95 border-slate-200 text-slate-800 shadow-xl'
-        : 'bg-slate-950/90 border-slate-800 text-slate-200 shadow-2xl'
-    }`}>
+    <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5 px-3 py-2 backdrop-blur-xl border rounded-2xl transition-colors duration-200 bg-slate-950/90 border-slate-800 text-slate-200 shadow-2xl">
       {/* Play / Pause / Stop Group */}
-      <div className={`flex items-center gap-1 border p-1 rounded-xl ${
-        theme === 'light' ? 'bg-slate-100 border-slate-200' : 'bg-slate-900/90 border-slate-800/80'
-      }`}>
+      <div className="flex items-center gap-1 border p-1 rounded-xl bg-slate-900/90 border-slate-800/80">
         {!simulation.isRunning || simulation.isPaused ? (
           <Button
             variant="primary"
@@ -93,7 +86,7 @@ export const SimulationBar: React.FC<SimulationBarProps> = () => {
           onClick={stopSimulation}
         />
 
-        <div className={`w-[1px] h-4 my-auto mx-0.5 ${theme === 'light' ? 'bg-slate-300' : 'bg-slate-800'}`} />
+        <div className="w-[1px] h-4 my-auto mx-0.5 bg-slate-800" />
 
         <IconButton
           icon={<RotateCcw className="w-3.5 h-3.5 text-slate-400" />}
@@ -113,7 +106,7 @@ export const SimulationBar: React.FC<SimulationBarProps> = () => {
         </Button>
       </div>
 
-      <div className={`w-[1px] h-5 my-auto ${theme === 'light' ? 'bg-slate-300' : 'bg-slate-800'}`} />
+      <div className="w-[1px] h-5 my-auto bg-slate-800" />
 
       {/* Loop Toggle Button */}
       <Button
@@ -128,9 +121,7 @@ export const SimulationBar: React.FC<SimulationBarProps> = () => {
       </Button>
 
       {/* Speed Selector Segmented Control */}
-      <div className={`flex items-center gap-1.5 border px-2 py-1 rounded-xl ${
-        theme === 'light' ? 'bg-slate-100 border-slate-200' : 'bg-slate-900/90 border-slate-800/80'
-      }`}>
+      <div className="flex items-center gap-1.5 border px-2 py-1 rounded-xl bg-slate-900/90 border-slate-800/80">
         <Gauge className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         <SegmentedControl
           options={speedOptions}

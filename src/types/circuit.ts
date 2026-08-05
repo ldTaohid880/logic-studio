@@ -2,10 +2,11 @@ import { EncoderConfig, EncoderState } from './encoder';
 import { SevenSegmentConfig } from './sevenSegment';
 import { ClockConfig, ClockState } from './clock';
 import { MultiInputConfig } from './multiInput';
+import { LedMatrixConfig } from './ledMatrix';
 
 export type SignalValue = 0 | 1 | -1; // 0 = LOW, 1 = HIGH, -1 = UNKNOWN/FLOATING
 
-import { OscilloscopeConfig, OscilloscopeState } from './oscilloscope';
+import { OscilloscopeConfig } from './oscilloscope';
 
 export type GateType = 
   | 'INPUT' 
@@ -31,6 +32,8 @@ export type GateType =
   | 'HEX_DISPLAY'
   | 'BUS_MONITOR'
   | 'OSCILLOSCOPE'
+  | 'LED_MATRIX'
+  | 'BOOLEAN_EQUATION_GENERATOR'
   | 'HALF_SUBTRACTOR'
   | 'FULL_SUBTRACTOR'
   | 'MUX_4TO1'
@@ -63,6 +66,9 @@ export type GateType =
   | 'UP_DOWN_COUNTER'
   | 'FREQUENCY_DIVIDER'
   // Phase 2 Arithmetic
+  | 'HALF_ADDER'
+  | 'FULL_ADDER'
+  | 'ADDER_4BIT'
   | 'INCREMENTER_4BIT'
   | 'DECREMENTER_4BIT'
   | 'ADDER_SUBTRACTOR_4BIT'
@@ -86,7 +92,9 @@ export type GateType =
   | 'CFG_COUNTER'
   | 'CFG_CONSTANT'
   | 'CFG_BUS_SPLITTER'
-  | 'CFG_BUS_JOINER';
+  | 'CFG_BUS_JOINER'
+  // Custom Component / Subcircuit
+  | 'CUSTOM';
 
 export interface PinData {
   id: string;
@@ -99,6 +107,12 @@ export interface NodeData {
   gateType: GateType;
   inputs: PinData[];
   outputs: PinData[];
+  customComponentId?: string; // Reference ID of CustomComponentDefinition
+  customPinConfig?: {
+    inputs: { id: string; name: string; description?: string }[];
+    outputs: { id: string; name: string; description?: string }[];
+  };
+  subcircuitNodeStates?: Record<string, any>; // Internal node states for this specific instance
   value?: SignalValue; // For INPUT, OUTPUT, PUSH_BUTTON, CONST_HIGH, CONST_LOW
   inputCount?: number; // For configurable gate inputs (e.g., 2, 3, 4)
   bitWidth?: number; // For DIP switch, bus monitor, counters (2, 4, 8)
@@ -119,7 +133,8 @@ export interface NodeData {
   encoderState?: EncoderState;
   sevenSegmentConfig?: SevenSegmentConfig;
   scopeConfig?: OscilloscopeConfig;
-  scopeState?: OscilloscopeState;
+  ledMatrixConfig?: LedMatrixConfig;
+  pinAliases?: Record<string, string>;
   cfgEncoderConfig?: any;
   cfgDecoderConfig?: any;
   cfgMuxConfig?: any;

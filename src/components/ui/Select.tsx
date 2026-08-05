@@ -61,7 +61,7 @@ export function Select<T extends string | number>({
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/90 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-100 hover:border-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 disabled:opacity-40 transition-all cursor-pointer"
+        className="w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs font-mono text-slate-100 hover:border-slate-600 focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-700/50 disabled:opacity-40 transition-all cursor-pointer"
       >
         <span className="truncate flex items-center gap-2">
           {selectedOption?.icon}
@@ -101,7 +101,7 @@ export function Select<T extends string | number>({
                   }}
                   className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-mono transition-colors text-left ${
                     isSelected
-                      ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30'
+                      ? 'bg-slate-800 text-slate-100 font-bold border border-slate-700/60'
                       : 'text-slate-200 hover:bg-slate-800/80 hover:text-white'
                   }`}
                 >
