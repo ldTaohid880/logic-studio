@@ -5,6 +5,7 @@ import { NodeData } from '../../types/circuit';
 import {
   X,
   Sparkles,
+  Component,
   Layers,
   CheckCircle2,
   ArrowRight,
@@ -284,7 +285,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
               className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg"
               style={{ backgroundColor: color }}
             >
-              <Sparkles className="w-5 h-5" />
+              <Component className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-bold font-mono tracking-wide">

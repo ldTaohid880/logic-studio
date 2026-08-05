@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
-import { Sparkles } from 'lucide-react';
+import { Siren } from 'lucide-react';
 
 export const RgbLedNode: React.FC<NodeProps> = memo(({ id, data: nodeData, selected }) => {
   const data = nodeData as unknown as NodeData;
@@ -39,7 +39,7 @@ export const RgbLedNode: React.FC<NodeProps> = memo(({ id, data: nodeData, selec
       }`}
     >
       <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-800">
-        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+        <Siren className="w-3.5 h-3.5 text-purple-400" />
         <span className="text-xs font-mono font-bold text-slate-100 truncate">
           {data.label || 'RGB LED'}
         </span>
