@@ -83,6 +83,9 @@ const TOOLBOX_ITEMS: ToolboxItem[] = [
   { type: 'CFG_COUNTER', name: 'Counter', description: 'Variable N-bit modulo counter (Up/Down/BCD)', category: 'Sequential', isConfigurable: true, badgeTag: 'Configurable' },
 
   // Arithmetic Components
+  { type: 'HALF_ADDER', name: 'Half Adder', description: 'Adds 2 bits -> Sum & Carry Out', category: 'Arithmetic', badgeTag: 'ADD-2' },
+  { type: 'FULL_ADDER', name: 'Full Adder', description: '3-bit adder with Carry In & Carry Out', category: 'Arithmetic', badgeTag: 'ADD-3' },
+  { type: 'ADDER_4BIT', name: '4-Bit Adder', description: '4-bit parallel ripple carry adder', category: 'Arithmetic', badgeTag: '74HC283' },
   { type: 'INCREMENTER_4BIT', name: '4-Bit Incrementer', description: 'Increments 4-bit input by +1', category: 'Arithmetic', badgeTag: 'INC-4' },
   { type: 'DECREMENTER_4BIT', name: '4-Bit Decrementer', description: 'Decrements 4-bit input by -1', category: 'Arithmetic', badgeTag: 'DEC-4' },
   { type: 'ADDER_SUBTRACTOR_4BIT', name: 'Adder/Subtractor', description: '4-bit combined adder/subtractor', category: 'Arithmetic', badgeTag: '74HC283S' },
@@ -107,13 +110,15 @@ const TOOLBOX_ITEMS: ToolboxItem[] = [
   { type: 'SEVEN_SEGMENT', name: '7-Segment LED', description: '4-bit numeric segment display', category: 'Outputs', badgeTag: 'Fixed IC' },
   { type: 'HEX_DISPLAY', name: 'Hex Display', description: 'Single hexadecimal digit display (0-F)', category: 'Outputs', badgeTag: 'Fixed IC' },
   { type: 'BUS_MONITOR', name: 'Bus Monitor', description: 'Displays multi-bit bus in Hex/Dec/Bin', category: 'Outputs', badgeTag: 'Fixed IC' },
+  { type: 'LED_MATRIX', name: 'LED Matrix', description: 'Configurable LED dot-matrix display (8x8/16x16)', category: 'Outputs', isConfigurable: true, badgeTag: 'Configurable' },
+  { type: 'BOOLEAN_EQUATION_GENERATOR', name: 'Boolean Equation', description: 'Live mathematical expression solver from connected logic graph', category: 'Outputs', badgeTag: 'Fixed IC' },
 ];
 
 export const LeftToolbox: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'fixed' | 'configurable'>('all');
   const addNode = useCircuitStore((state) => state.addNode);
-  const theme = useCircuitStore((state) => state.theme);
+
 
   const handleAddAtCenter = (type: GateType) => {
     const x = 320 + Math.random() * 80;
@@ -146,28 +151,22 @@ export const LeftToolbox: React.FC = () => {
   });
 
   const categories = ['Inputs', 'Logic Gates', 'Combinational', 'Sequential', 'Arithmetic', 'Utility', 'Outputs'] as const;
+  const customComponentList = Object.values(useCircuitStore.getState().customComponents || {});
+  const { instantiateCustomComponent } = useCircuitStore();
 
   return (
-    <aside className={`w-64 h-full border-r flex flex-col z-20 select-none overflow-hidden transition-colors duration-200 ${
-      theme === 'light'
-        ? 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
-        : 'bg-slate-950/90 border-slate-800 text-slate-100'
-    }`}>
+    <aside className="w-64 h-full border-r flex flex-col z-20 select-none overflow-hidden bg-slate-950/90 border-slate-900 text-slate-100">
       {/* Header & Search */}
-      <div className={`p-3.5 border-b space-y-3 shrink-0 ${
-        theme === 'light' ? 'border-slate-200' : 'border-slate-800'
-      }`}>
+      <div className="p-3.5 border-b space-y-3 shrink-0 border-slate-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Cpu className="w-4 h-4 text-emerald-400" />
-            <span className={`text-xs font-bold font-mono tracking-wider uppercase ${
-              theme === 'light' ? 'text-slate-800' : 'text-slate-200'
-            }`}>
+            <span className="text-xs font-mono font-bold tracking-wider uppercase text-slate-200">
               Palette
             </span>
           </div>
           <Badge variant="slate" size="xs">
-            {filteredItems.length} Items
+            {filteredItems.length + customComponentList.length} Items
           </Badge>
         </div>
 
@@ -184,7 +183,7 @@ export const LeftToolbox: React.FC = () => {
           options={[
             { value: 'all', label: 'All' },
             { value: 'fixed', label: 'Fixed IC' },
-            { value: 'configurable', label: 'CFG' },
+            { value: 'configurable', label: 'Cfg' },
           ]}
           value={typeFilter}
           onChange={(val) => setTypeFilter(val as 'all' | 'fixed' | 'configurable')}
@@ -195,6 +194,52 @@ export const LeftToolbox: React.FC = () => {
 
       {/* Component Palette Item List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
+        {/* Custom Components Category Section */}
+        {customComponentList.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-slate-400 px-1">
+              <div className="flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-300">
+                  Custom Subcircuits
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-500">{customComponentList.length}</span>
+            </div>
+
+            <div className="space-y-1.5">
+              {customComponentList
+                .filter((c) => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map((comp) => (
+                  <div
+                    key={comp.id}
+                    onClick={() => instantiateCustomComponent(comp.id, { x: 300, y: 200 })}
+                    className="group flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all duration-150 bg-emerald-950/20 border-emerald-900/60 hover:border-emerald-500/50 hover:bg-emerald-900/40"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                        style={{ backgroundColor: comp.color || '#10b981' }}
+                      >
+                        ⚡
+                      </div>
+                      <div className="flex flex-col min-w-0 pr-1">
+                        <span className="text-xs font-mono font-bold truncate text-slate-100">
+                          {comp.name}
+                        </span>
+                        <span className="text-[10px] font-sans truncate text-slate-400">
+                          {comp.inputs.length} IN / {comp.outputs.length} OUT
+                        </span>
+                      </div>
+                    </div>
+
+                    <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
         {categories.map((category) => {
           const items = filteredItems
             .filter((i) => i.category === category)
@@ -206,14 +251,14 @@ export const LeftToolbox: React.FC = () => {
             <div key={category} className="space-y-2">
               <div className="flex items-center justify-between text-slate-400 px-1">
                 <div className="flex items-center gap-1.5">
-                  {category === 'Inputs' && <ToggleLeft className="w-3.5 h-3.5 text-cyan-400" />}
-                  {category === 'Logic Gates' && <Cpu className="w-3.5 h-3.5 text-emerald-400" />}
+                  {category === 'Inputs' && <ToggleLeft className="w-3.5 h-3.5 text-slate-400" />}
+                  {category === 'Logic Gates' && <Cpu className="w-3.5 h-3.5 text-slate-400" />}
                   {category === 'Combinational' && <Cpu className="w-3.5 h-3.5 text-blue-400" />}
-                  {category === 'Sequential' && <Cpu className="w-3.5 h-3.5 text-amber-400" />}
-                  {category === 'Outputs' && <Monitor className="w-3.5 h-3.5 text-purple-400" />}
-                  <span className={`text-[11px] font-mono font-bold tracking-wider uppercase ${
-                    theme === 'light' ? 'text-slate-700' : 'text-slate-300'
-                  }`}>
+                  {category === 'Sequential' && <Cpu className="w-3.5 h-3.5 text-slate-400" />}
+                  {category === 'Arithmetic' && <Cpu className="w-3.5 h-3.5 text-amber-400" />}
+                  {category === 'Utility' && <Cpu className="w-3.5 h-3.5 text-slate-500" />}
+                  {category === 'Outputs' && <Monitor className="w-3.5 h-3.5 text-emerald-400" />}
+                  <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-300">
                     {category}
                   </span>
                 </div>
@@ -227,47 +272,33 @@ export const LeftToolbox: React.FC = () => {
                     draggable
                     onDragStart={(e) => handleDragStart(e, item.type)}
                     onClick={() => handleAddAtCenter(item.type)}
-                    className={`group flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all duration-150 ${
-                      item.isConfigurable
-                        ? theme === 'light'
-                          ? 'bg-purple-50/80 border-purple-200 hover:border-purple-500/50 hover:bg-purple-100'
-                          : 'bg-purple-950/30 border-purple-900/60 hover:border-purple-500/50 hover:bg-purple-900/40'
-                        : theme === 'light'
-                          ? 'bg-slate-50 border-slate-200 hover:border-emerald-500/50 hover:bg-slate-100'
-                          : 'bg-slate-900/60 border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/80'
-                    }`}
+                    className="group flex items-center justify-between p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-emerald-500/50 hover:bg-slate-800/80 cursor-pointer transition-all duration-150"
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className={`${item.isConfigurable ? 'text-purple-400' : 'text-emerald-400'} group-hover:scale-110 transition-transform shrink-0`}>
+                      <div className="text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
                         <GateIcon type={item.type} className="w-6 h-6" />
                       </div>
                       <div className="flex flex-col min-w-0 pr-1">
-                        <span className={`text-xs font-mono font-medium truncate ${
-                          theme === 'light' ? 'text-slate-800 group-hover:text-slate-950' : 'text-slate-200 group-hover:text-white'
-                        }`}>
+                        <span className="text-xs font-mono font-medium truncate text-slate-200 group-hover:text-white">
                           {item.name}
                         </span>
-                        <span className={`text-[10px] font-sans truncate ${
-                          theme === 'light' ? 'text-slate-500' : 'text-slate-400'
-                        }`}>
+                        <span className="text-[10px] font-sans truncate text-slate-400">
                           {item.description}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      {item.badgeTag && (
-                        <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                          item.isConfigurable
-                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        }`}>
+                      {item.isConfigurable ? (
+                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          Cfg
+                        </span>
+                      ) : (item.badgeTag && item.badgeTag.startsWith('74HC')) ? (
+                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                           {item.badgeTag}
                         </span>
-                      )}
-                      <Plus className={`w-3.5 h-3.5 text-slate-500 transition-colors ${
-                        item.isConfigurable ? 'group-hover:text-purple-400' : 'group-hover:text-emerald-400'
-                      }`} />
+                      ) : null}
+                      <Plus className="w-3.5 h-3.5 text-slate-500 transition-colors group-hover:text-emerald-400" />
                     </div>
                   </div>
                 ))}

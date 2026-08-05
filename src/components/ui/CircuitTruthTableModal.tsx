@@ -62,11 +62,23 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const activeRowRef = useRef<HTMLTableRowElement>(null);
 
-  // Analyze circuit graph on open
+  // Create stable topology key (gate types, IDs, labels, wire connections)
+  const topologyKey = useMemo(() => {
+    if (!isOpen) return '';
+    const nodeStr = nodes
+      .map((n) => `${n.id}:${(n.data as any).gateType}:${(n.data as any).label || ''}`)
+      .join('|');
+    const edgeStr = edges
+      .map((e) => `${e.id}:${e.source}:${e.sourceHandle}->${e.target}:${e.targetHandle}`)
+      .join('|');
+    return `${nodeStr}___${edgeStr}`;
+  }, [isOpen, nodes, edges]);
+
+  // Analyze circuit graph only when topology changes
   const analysis = useMemo(() => {
     if (!isOpen) return null;
     return analyzeCircuitGraph(nodes, edges);
-  }, [isOpen, nodes, edges]);
+  }, [isOpen, topologyKey]);
 
   // Initialize visible signals on open/analysis
   useEffect(() => {
@@ -81,12 +93,14 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
   }, [analysis]);
 
   // Generate Truth Table Action
-  const runGeneration = useCallback(async () => {
+  const runGeneration = useCallback(async (showLoader: boolean = false) => {
     if (!analysis) return;
 
     cancellationRef.current = false;
-    setIsGenerating(true);
-    setProgress(0);
+    if (showLoader) {
+      setIsGenerating(true);
+      setProgress(0);
+    }
 
     const total = Math.pow(2, analysis.inputs.length);
     setTotalRowsToGenerate(total);
@@ -96,9 +110,11 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
         initialSeqState,
         batchSize: total > 128 ? 64 : 16,
         onProgress: (prog, curr, tot, timeEst) => {
-          setProgress(prog);
-          setCurrentGeneratedRow(curr);
-          setTimeEstimateMs(timeEst);
+          if (showLoader) {
+            setProgress(prog);
+            setCurrentGeneratedRow(curr);
+            setTimeEstimateMs(timeEst);
+          }
         },
         shouldCancel: () => cancellationRef.current,
       });
@@ -109,16 +125,29 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
     } catch (err) {
       console.error('Circuit truth table generation error:', err);
     } finally {
-      setIsGenerating(false);
+      if (showLoader) {
+        setIsGenerating(false);
+      }
     }
   }, [analysis, nodes, edges, initialSeqState]);
 
   // Run generation whenever modal is opened or initial state changed
+  const prevTopologyRef = useRef<string>('');
+  const isFirstLoadRef = useRef<boolean>(true);
+
   useEffect(() => {
     if (isOpen && analysis) {
-      runGeneration();
+      const isTopologyChanged = prevTopologyRef.current !== topologyKey;
+      prevTopologyRef.current = topologyKey;
+
+      const shouldShowLoader = isFirstLoadRef.current || isTopologyChanged;
+      if (isFirstLoadRef.current) {
+        isFirstLoadRef.current = false;
+      }
+
+      runGeneration(shouldShowLoader);
     }
-  }, [isOpen, analysis, runGeneration]);
+  }, [isOpen, analysis, topologyKey, runGeneration]);
 
   // Follow active row auto-scroll
   useEffect(() => {

@@ -212,6 +212,21 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
           <path d="M 9 27 H 18 V 13 H 29 V 27 H 41" stroke="#22d3ee" strokeWidth="2.5" />
         </svg>
       );
+    case 'LED_MATRIX':
+      return (
+        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="6" y="6" width="28" height="28" rx="4" fill="currentColor" fillOpacity="0.15" />
+          <circle cx="13" cy="13" r="2" fill="currentColor" />
+          <circle cx="20" cy="13" r="2" fill="currentColor" />
+          <circle cx="27" cy="13" r="2" fill="currentColor" />
+          <circle cx="13" cy="20" r="2" fill="currentColor" />
+          <circle cx="20" cy="20" r="2" fill="currentColor" />
+          <circle cx="27" cy="20" r="2" fill="currentColor" />
+          <circle cx="13" cy="27" r="2" fill="currentColor" />
+          <circle cx="20" cy="27" r="2" fill="currentColor" />
+          <circle cx="27" cy="27" r="2" fill="currentColor" />
+        </svg>
+      );
 
     case 'HALF_SUBTRACTOR':
     case 'FULL_SUBTRACTOR':
@@ -231,9 +246,17 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
           <rect x="6" y="6" width="28" height="28" rx="5" fill="currentColor" fillOpacity="0.15" />
           <path d="M 12 12 H 16 M 12 20 H 16 M 12 28 H 16" />
           <path d="M 24 12 H 28 M 24 20 H 28 M 24 28 H 28" />
-          <rect x="16" y="10" width="8" height="20" rx="2" fill="currentColor" fillOpacity="0.2" />
         </svg>
       );
+
+    case 'BOOLEAN_EQUATION_GENERATOR':
+      return (
+        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="6" y="6" width="28" height="28" rx="6" fill="#22d3ee" fillOpacity="0.15" stroke="#22d3ee" strokeWidth="2" />
+          <path d="M 12 15 L 18 15 M 15 15 L 15 25 L 20 25 M 24 15 L 28 25 M 28 15 L 24 25" stroke="#22d3ee" strokeWidth="2" />
+        </svg>
+      );
+
 
     case 'CFG_ENCODER':
     case 'CFG_DECODER':
@@ -251,6 +274,16 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
           <rect x="6" y="6" width="28" height="28" rx="6" fill="#c084fc" fillOpacity="0.2" stroke="#c084fc" strokeWidth="2" />
           <circle cx="20" cy="20" r="4" fill="none" stroke="#c084fc" strokeWidth="2" />
           <path d="M 20 10 V 14 M 20 26 V 30 M 10 20 H 14 M 26 20 H 30" stroke="#c084fc" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'HALF_ADDER':
+    case 'FULL_ADDER':
+    case 'ADDER_4BIT':
+      return (
+        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="6" y="6" width="28" height="28" rx="6" fill="#10b981" fillOpacity="0.2" stroke="#10b981" strokeWidth="2" />
+          <path d="M 20 12 V 28 M 12 20 H 28" stroke="#10b981" strokeWidth="2.5" />
         </svg>
       );
 

@@ -20,28 +20,28 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    'inline-flex items-center justify-center font-sans font-medium rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer';
+    'inline-flex items-center justify-center font-sans font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-slate-700/50 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer';
 
   const sizeClasses = {
     xs: 'px-2 py-1 text-[11px] gap-1 rounded-lg',
-    sm: 'px-3 py-1.5 text-xs gap-1.5 rounded-xl',
-    md: 'px-4 py-2 text-sm gap-2 rounded-xl',
-    lg: 'px-5 py-2.5 text-base gap-2.5 rounded-2xl',
+    sm: 'px-3 py-1.5 text-xs gap-1.5 rounded-lg',
+    md: 'px-4 py-2 text-sm gap-2 rounded-lg',
+    lg: 'px-5 py-2.5 text-base gap-2.5 rounded-xl',
   };
 
   const variantClasses = {
     primary:
-      'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold shadow-md shadow-emerald-500/20 focus:ring-emerald-400 border border-emerald-400/40',
+      'bg-emerald-600 hover:bg-emerald-550 active:bg-emerald-750 text-white font-medium shadow-sm border border-emerald-550/20 focus:ring-emerald-500/40',
     secondary:
-      'bg-slate-800/90 hover:bg-slate-700/90 text-slate-100 border border-slate-700/80 focus:ring-slate-500 shadow-sm',
+      'bg-slate-800/90 hover:bg-slate-850 text-slate-100 border border-slate-800 focus:ring-slate-700/40 shadow-sm',
     outline:
-      'bg-transparent hover:bg-slate-800/60 text-slate-200 border border-slate-700 focus:ring-slate-500',
+      'bg-transparent hover:bg-slate-850 text-slate-200 border border-slate-800 focus:ring-slate-700/40',
     ghost:
-      'bg-transparent hover:bg-slate-800/60 text-slate-300 hover:text-slate-100 focus:ring-slate-500',
+      'bg-transparent hover:bg-slate-850 text-slate-300 hover:text-slate-100 focus:ring-slate-700/40',
     danger:
-      'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 focus:ring-rose-500',
+      'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 focus:ring-rose-500/40',
     success:
-      'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 focus:ring-emerald-500',
+      'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 focus:ring-emerald-500/40',
   };
 
   return (

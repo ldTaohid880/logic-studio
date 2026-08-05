@@ -17,11 +17,7 @@ export const DigitalInputNode = React.memo(({ id, data, selected }: NodeProps) =
 
   return (
     <div
-      className={`relative min-w-[130px] p-3 rounded-xl transition-all duration-200 border backdrop-blur-md shadow-lg ${
-        selected
-          ? 'border-emerald-400/80 shadow-emerald-500/20 ring-2 ring-emerald-500/30 bg-slate-900/90'
-          : 'border-slate-700/60 hover:border-slate-500/80 bg-slate-900/80 hover:shadow-emerald-500/10'
-      }`}
+      className="relative min-w-[130px] p-3 rounded-xl transition-all duration-200 border border-slate-800 bg-slate-900/95 backdrop-blur-md shadow-md"
     >
       <div className="flex flex-col items-center gap-2">
         {/* Label */}
@@ -35,16 +31,16 @@ export const DigitalInputNode = React.memo(({ id, data, selected }: NodeProps) =
           type="button"
           className={`relative w-16 h-10 rounded-full p-1 transition-all duration-300 cursor-pointer flex items-center border ${
             isHigh
-              ? 'bg-emerald-950/80 border-emerald-500 shadow-[0_0_12px_rgba(34,197,94,0.4)]'
-              : 'bg-slate-800 border-slate-600'
+              ? 'bg-emerald-600/80 border-emerald-500 shadow-sm'
+              : 'bg-slate-800 border-slate-700'
           }`}
         >
-          {/* Glowing Switch Button Knob */}
+          {/* Flat Switch Button Knob */}
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm font-mono transition-transform duration-300 shadow-md ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm font-mono transition-transform duration-300 shadow-sm ${
               isHigh
-                ? 'translate-x-6 bg-emerald-400 text-slate-950 shadow-[0_0_10px_#34d399]'
-                : 'translate-x-0 bg-slate-600 text-slate-300'
+                ? 'translate-x-6 bg-white text-emerald-600'
+                : 'translate-x-0 bg-slate-400 text-slate-950'
             }`}
           >
             {value}
@@ -56,8 +52,8 @@ export const DigitalInputNode = React.memo(({ id, data, selected }: NodeProps) =
           <span
             className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
               isHigh
-                ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
-                : 'bg-slate-600'
+                ? 'bg-emerald-500'
+                : 'bg-slate-700'
             }`}
           />
           <span className="text-[10px] font-mono font-medium text-slate-400 uppercase">
@@ -72,10 +68,10 @@ export const DigitalInputNode = React.memo(({ id, data, selected }: NodeProps) =
         position={Position.Right}
         id="out-0"
         style={{ right: '-12px', top: '50%' }}
-        className={`!w-3.5 !h-3.5 !border-2 !rounded-full transition-all duration-200 ${
+        className={`!w-3.5 !h-3.5 !border-2 !rounded-full ${
           isHigh
-            ? '!bg-emerald-400 !border-emerald-200 shadow-[0_0_8px_#34d399]'
-            : '!bg-slate-700 !border-slate-400'
+            ? '!bg-emerald-500 !border-emerald-250'
+            : '!bg-slate-800 !border-slate-600'
         }`}
       />
     </div>

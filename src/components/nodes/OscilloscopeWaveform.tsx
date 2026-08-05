@@ -6,71 +6,56 @@ interface OscilloscopeWaveformProps {
   frequencyHz: number;
 }
 
-const BUFFER_SIZE = 64; // 64 samples across 160px width (2.5px per sample)
-const SAMPLES_PER_SEC = 16; // 16 samples per second -> 1 sample = 62.5ms
+const BUFFER_SIZE = 64; // 64 samples across 160px width
 
 export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = ({
   value,
   status,
-  frequencyHz,
 }) => {
-  const isHigh = value === 1;
-  const currentLevel = isHigh ? 1 : 0;
+  const currentLevel = value === 1 ? 1 : 0;
 
-  // History buffer initialized as flat array with current level
+  // History buffer initialized with the current level
   const [history, setHistory] = useState<number[]>(() =>
     new Array(BUFFER_SIZE).fill(currentLevel)
   );
 
-  const levelRef = useRef(currentLevel);
-  levelRef.current = currentLevel;
-
-  const prevValueRef = useRef(value);
   const prevStatusRef = useRef(status);
 
-  // Calculate number of samples in a half-period for the given frequency
-  const halfPeriodSamples = Math.max(1, Math.round(SAMPLES_PER_SEC / (2 * Math.max(0.1, frequencyHz))));
+  // Sync value changes instantly to prevent lag, especially in single-stepping
+  const latestValueRef = useRef(currentLevel);
+  latestValueRef.current = currentLevel;
 
-  // Handle status & value changes
   useEffect(() => {
-    // If status transitioned to 'stopped' or reset was triggered (status is stopped), reset to flat line
     if (status === 'stopped') {
       setHistory(new Array(BUFFER_SIZE).fill(currentLevel));
-      prevValueRef.current = value;
-      prevStatusRef.current = status;
-      return;
     }
-
-    // If value changed (e.g. via Step or Clock tick), append halfPeriodSamples of the new level
-    if (value !== prevValueRef.current) {
-      setHistory((prev) => {
-        const next = [...prev];
-        for (let i = 0; i < halfPeriodSamples; i++) {
-          next.shift();
-          next.push(currentLevel);
-        }
-        return next;
-      });
-      prevValueRef.current = value;
-    }
-
     prevStatusRef.current = status;
-  }, [value, status, currentLevel, halfPeriodSamples]);
+  }, [status, currentLevel]);
 
-  // While running, continuously sample at 62.5ms interval so waveform moves smoothly in real time
+  // When value changes manually (e.g. stepping), push it to the history immediately
+  const prevValueRef = useRef(currentLevel);
+  useEffect(() => {
+    if (currentLevel !== prevValueRef.current) {
+      setHistory((prev) => [...prev.slice(1), currentLevel]);
+      prevValueRef.current = currentLevel;
+    }
+  }, [currentLevel]);
+
+  // When running, continuously sample at a regular interval to scroll the trace
   useEffect(() => {
     if (status !== 'running') return;
 
-    const sampleIntervalMs = Math.round(1000 / SAMPLES_PER_SEC); // 62.5ms
+    // Sample interval of 40ms (~25 FPS scroll rate)
+    const sampleIntervalMs = 40;
 
     const timer = setInterval(() => {
-      setHistory((prev) => [...prev.slice(1), levelRef.current]);
+      setHistory((prev) => [...prev.slice(1), latestValueRef.current]);
     }, sampleIntervalMs);
 
     return () => clearInterval(timer);
   }, [status]);
 
-  // Generate crisp square wave SVG path (sharp 90-degree digital steps)
+  // Generate crisp square wave digital path snap-aligned to 0.5px
   const generatePath = () => {
     const totalSamples = history.length;
     if (totalSamples === 0) return 'M 0 32 H 160';
@@ -86,11 +71,11 @@ export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = ({
       const x = i * dx;
 
       if (curY !== prevY) {
-        // Vertical step transition, then horizontal segment
-        path += ` V ${curY} H ${x.toFixed(1)}`;
+        // Vertical step, then horizontal segment
+        path += ` V ${curY} H ${Math.round(x) + 0.5}`;
         prevY = curY;
       } else {
-        path += ` H ${x.toFixed(1)}`;
+        path += ` H ${Math.round(x) + 0.5}`;
       }
     }
 
@@ -98,13 +83,15 @@ export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = ({
   };
 
   const pathD = generatePath();
-  const lastY = isHigh ? 8 : 32;
+  const lastY = value === 1 ? 8 : 32;
+  const traceColor = value === 1 ? '#10b981' : '#06b6d4'; // Emerald for High, Cyan for Low
+  const glowColor = value === 1 ? '#34d399' : '#22d3ee';
 
   return (
-    <div className="relative h-11 w-full bg-[#060a12] rounded-lg border border-slate-800/90 overflow-hidden flex items-center select-none">
+    <div className="relative h-11 w-full bg-[#060a12] rounded-lg border border-slate-900 overflow-hidden flex items-center select-none">
       {/* Reticle grid */}
       <div
-        className="absolute inset-0 opacity-25"
+        className="absolute inset-0 opacity-20 pointer-events-none"
         style={{
           backgroundImage:
             'linear-gradient(to right, #1e293b 1px, transparent 1px), linear-gradient(to bottom, #1e293b 1px, transparent 1px)',
@@ -113,39 +100,39 @@ export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = ({
       />
 
       {/* Midline reference */}
-      <div className="absolute top-1/2 left-0 right-0 h-[1px] border-t border-dashed border-slate-800" />
+      <div className="absolute top-1/2 left-0 right-0 h-[1px] border-t border-dashed border-slate-800/60 pointer-events-none" />
 
-      {/* Real Live Waveform SVG */}
+      {/* Live Waveform SVG */}
       <svg className="w-full h-full relative z-10" viewBox="0 0 160 40" preserveAspectRatio="none">
-        {/* Glow line underneath */}
+        {/* Glow trace underneath */}
         <path
           d={pathD}
           fill="none"
-          stroke={isHigh ? '#34d399' : '#22d3ee'}
-          strokeWidth="3.5"
+          stroke={glowColor}
+          strokeWidth="3.0"
           strokeLinecap="square"
           strokeLinejoin="miter"
-          opacity="0.25"
-          className="blur-[2px]"
+          opacity="0.2"
+          className="blur-[1px]"
         />
 
         {/* Sharp digital trace */}
         <path
           d={pathD}
           fill="none"
-          stroke={isHigh ? '#10b981' : '#06b6d4'}
-          strokeWidth="2"
+          stroke={traceColor}
+          strokeWidth="1.5"
           strokeLinecap="square"
           strokeLinejoin="miter"
         />
 
-        {/* Live Leading Edge Cursor Dot */}
+        {/* Leading cursor indicator */}
         <circle
           cx="157"
           cy={lastY}
-          r="3"
-          fill={isHigh ? '#34d399' : '#38bdf8'}
-          className={isHigh ? 'drop-shadow-[0_0_6px_#34d399]' : 'drop-shadow-[0_0_6px_#38bdf8]'}
+          r="2.5"
+          fill={glowColor}
+          className="shadow-[0_0_4px_currentColor]"
         />
       </svg>
     </div>

@@ -1,47 +1,62 @@
 @import "tailwindcss";
 
+@theme {
+  --color-slate-950: var(--bg-app);
+  --color-slate-900: var(--bg-surface);
+  --color-slate-850: var(--bg-surface-hover);
+  --color-slate-800: var(--border-medium);
+  --color-slate-700: var(--border-strong);
+  --color-slate-600: var(--border-strong);
+  --color-slate-500: var(--text-muted);
+  --color-slate-400: var(--text-secondary);
+  --color-slate-350: var(--text-secondary);
+  --color-slate-300: var(--text-secondary);
+  --color-slate-250: var(--text-primary);
+  --color-slate-200: var(--text-primary);
+  --color-slate-100: var(--text-primary);
+  --color-slate-50: var(--text-primary);
+
+  --color-emerald-600: var(--accent-emerald-dark);
+  --color-emerald-500: var(--accent-emerald);
+  --color-emerald-450: var(--accent-emerald-light);
+  --color-emerald-400: var(--accent-emerald-light);
+  --color-cyan-600: var(--accent-blue-dark);
+  --color-cyan-500: var(--accent-blue);
+  --color-cyan-400: var(--accent-blue-light);
+  --color-cyan-300: var(--accent-blue-light);
+  --color-purple-600: var(--accent-purple-dark);
+  --color-purple-500: var(--accent-purple);
+  --color-purple-400: var(--accent-purple-light);
+}
+
 @layer base {
   :root {
-    --bg-app: #080b11;
-    --bg-surface: #0f141d;
-    --bg-surface-hover: #18202d;
-    --bg-surface-elevated: #151c28;
-    --bg-input: #0b0f17;
-    --border-subtle: rgba(255, 255, 255, 0.08);
-    --border-medium: rgba(255, 255, 255, 0.15);
-    --border-strong: rgba(255, 255, 255, 0.25);
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    --accent-emerald: #10b981;
-    --accent-cyan: #06b6d4;
-    --accent-blue: #3b82f6;
-    --accent-purple: #a855f7;
-    --accent-rose: #f43f5e;
-    --accent-amber: #f59e0b;
-    --canvas-dot: #1e293b;
+    --bg-app: #09090b; /* Zinc-950 background */
+    --bg-surface: #18181b; /* Zinc-900 surface */
+    --bg-surface-hover: #27272a; /* Zinc-800 */
+    --bg-surface-elevated: #202024; /* Elevated dialog background */
+    --bg-input: #09090b; /* Deep inset inputs */
+    --border-subtle: #27272a; /* Zinc-800 */
+    --border-medium: #3f3f46; /* Zinc-700 */
+    --border-strong: #52525b; /* Zinc-600 */
+    --text-primary: #fafafa; /* Zinc-50 */
+    --text-secondary: #d4d4d8; /* Zinc-300 */
+    --text-muted: #71717a; /* Zinc-500 */
+    
+    --accent-emerald: #10b981; /* Subtle active green */
+    --accent-emerald-dark: #059669;
+    --accent-emerald-light: #34d399;
+    --accent-blue: #3b82f6; /* Subtle info blue */
+    --accent-blue-dark: #2563eb;
+    --accent-blue-light: #60a5fa;
+    --accent-purple: #8b5cf6; /* Indigo/violet selection accent */
+    --accent-purple-dark: #7c3aed;
+    --accent-purple-light: #a78bfa;
+    --accent-rose: #ef4444; /* Alert red */
+    --accent-amber: #f59e0b; /* Alert yellow */
+    --canvas-dot: #27272a; /* Soft zinc dot grid */
   }
 
-  .light {
-    --bg-app: #f8fafc;
-    --bg-surface: #ffffff;
-    --bg-surface-hover: #f1f5f9;
-    --bg-surface-elevated: #f8fafc;
-    --bg-input: #f1f5f9;
-    --border-subtle: rgba(0, 0, 0, 0.08);
-    --border-medium: rgba(0, 0, 0, 0.14);
-    --border-strong: rgba(0, 0, 0, 0.22);
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
-    --accent-emerald: #059669;
-    --accent-cyan: #0891b2;
-    --accent-blue: #2563eb;
-    --accent-purple: #9333ea;
-    --accent-rose: #e11d48;
-    --accent-amber: #d97706;
-    --canvas-dot: #cbd5e1;
-  }
 }
 
 @keyframes wireFlow {
@@ -87,26 +102,25 @@
   animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Glass & Engineering Surface Styling */
+/* Redesigned Clean Surfaces (No cyber gradients or harsh shadows) */
 .glass-panel {
   background: var(--bg-surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.25);
 }
 
 .glass-card {
-  background: var(--bg-surface-elevated);
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   transition: all 0.15s ease-in-out;
 }
 
 .glass-card:hover {
   border-color: var(--border-medium);
+  background: var(--bg-surface-hover);
 }
 
-/* Custom Desktop Scrollbars */
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -117,20 +131,19 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  opacity: 0.4;
+  background: var(--border-strong);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--text-muted);
 }
 
 /* React Flow Custom Node Overrides */
 .react-flow__node {
   background: transparent !important;
   border-color: transparent !important;
-  border-radius: 12px;
+  border-radius: 8px;
   transition: box-shadow 0.2s ease;
 }
 
@@ -140,16 +153,48 @@
   border-color: transparent !important;
 }
 
+/* Override all nodes to have Figma/IDE style */
+.react-flow__node > div {
+  background-color: var(--bg-surface) !important;
+  border-width: 1.5px !important;
+  border-color: var(--border-subtle) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
+  backdrop-filter: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.react-flow__node > div:hover {
+  border-color: var(--border-strong) !important;
+}
+
+.react-flow__node.selected > div {
+  border-color: var(--accent-emerald) !important;
+  box-shadow: 0 0 0 1px var(--accent-emerald), 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* React Flow Connection Handles */
 .react-flow__handle {
-  width: 10px !important;
-  height: 10px !important;
+  width: 8px !important;
+  height: 8px !important;
   border-radius: 9999px !important;
-  border: 2px solid #0f172a !important;
-  transition: box-shadow 0.15s ease, opacity 0.15s ease;
+  border: 1.5px solid var(--bg-surface) !important;
+  background-color: var(--border-strong) !important;
 }
 
 .react-flow__handle:hover {
-  box-shadow: 0 0 6px 2.5px rgba(16, 185, 129, 0.6) !important;
+  background-color: var(--accent-emerald) !important;
+}
+
+/* Override all aggressive neon box-shadows inside nodes globally */
+.react-flow__node [class*="shadow-[0_0_"], 
+.react-flow__node [class*="shadow-[inset_0_0_"],
+.react-flow__node [class*="!shadow-[0_0_"] {
+  box-shadow: none !important;
+}
+
+.react-flow__node [class*="drop-shadow-[0_0_"] {
+  filter: none !important;
 }
 
 /* Monospace font for circuit logic values */
@@ -157,5 +202,3 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-feature-settings: "zero" 1, "tnum" 1;
 }
-
-

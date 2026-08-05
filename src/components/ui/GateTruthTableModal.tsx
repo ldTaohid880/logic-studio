@@ -39,7 +39,11 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
 
   // Generate truth table data for N inputs
   const tableData = useMemo(() => {
-    const totalRows = Math.pow(2, inputCount);
+    const isHalfAdder = gateType === 'HALF_ADDER';
+    const isFullAdder = gateType === 'FULL_ADDER';
+    const count = isHalfAdder ? 2 : isFullAdder ? 3 : inputCount;
+
+    const totalRows = Math.pow(2, count);
     const rows = [];
 
     // Current simulation input signal pattern
@@ -49,35 +53,56 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
 
     for (let i = 0; i < totalRows; i++) {
       const inputs: number[] = [];
-      for (let bit = inputCount - 1; bit >= 0; bit--) {
+      for (let bit = count - 1; bit >= 0; bit--) {
         inputs.push((i >> bit) & 1);
       }
 
-      // Convert inputs to SignalValue[] for evaluation
-      const sigInputs: SignalValue[] = inputs.map((v) => v as SignalValue);
-      const outputVal = evaluateGate(gateType, sigInputs);
+      let outputs: number[] = [];
+      if (isHalfAdder) {
+        const a = inputs[0];
+        const b = inputs[1];
+        outputs = [a ^ b, a & b];
+      } else if (isFullAdder) {
+        const a = inputs[0];
+        const b = inputs[1];
+        const cin = inputs[2];
+        outputs = [a ^ b ^ cin, (a & b) | (cin & (a ^ b))];
+      } else {
+        const sigInputs: SignalValue[] = inputs.map((v) => v as SignalValue);
+        const outputVal = evaluateGate(gateType, sigInputs);
+        outputs = [outputVal === 1 ? 1 : 0];
+      }
 
       // Check if matches live canvas inputs
       const isActive =
         currentPattern &&
-        currentPattern.length === inputCount &&
+        currentPattern.length === count &&
         inputs.every((val, idx) => val === currentPattern[idx]);
 
       rows.push({
         id: `row-${i}`,
         index: i,
         inputs,
-        output: outputVal === 1 ? 1 : 0,
+        outputs,
         isActive: !!isActive,
       });
     }
 
-    const inputHeaders = Array.from({ length: inputCount }, (_, idx) => `In ${idx + 1}`);
+    let inputHeaders = Array.from({ length: count }, (_, idx) => `In ${idx + 1}`);
+    let outputHeaders: string[] = ['Out'];
+
+    if (isHalfAdder) {
+      inputHeaders = ['A', 'B'];
+      outputHeaders = ['Sum (S)', 'Cout'];
+    } else if (isFullAdder) {
+      inputHeaders = ['A', 'B', 'Cin'];
+      outputHeaders = ['Sum', 'Cout'];
+    }
 
     return {
       headers: {
         inputs: inputHeaders,
-        output: 'Out',
+        outputs: outputHeaders,
       },
       rows,
     };
@@ -100,7 +125,8 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
     const q = searchQuery.toLowerCase().trim();
     return tableData.rows.filter((r) => {
       const inputStr = r.inputs.join('');
-      return inputStr.includes(q) || String(r.output).includes(q) || String(r.index).includes(q);
+      const outputStr = r.outputs.join('');
+      return inputStr.includes(q) || outputStr.includes(q) || String(r.index).includes(q);
     });
   }, [tableData.rows, searchQuery]);
 
@@ -110,8 +136,8 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
 
   const handleCopy = () => {
     const text = [
-      [...tableData.headers.inputs, tableData.headers.output].join('\t'),
-      ...tableData.rows.map((r) => [...r.inputs, r.output].join('\t')),
+      [...tableData.headers.inputs, ...tableData.headers.outputs].join('\t'),
+      ...tableData.rows.map((r) => [...r.inputs, ...r.outputs].join('\t')),
     ].join('\n');
 
     navigator.clipboard.writeText(text);
@@ -120,8 +146,8 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
   };
 
   const handleExportCSV = () => {
-    const headerLine = [...tableData.headers.inputs, tableData.headers.output].join(',');
-    const rowLines = tableData.rows.map((r) => [...r.inputs, r.output].join(','));
+    const headerLine = [...tableData.headers.inputs, ...tableData.headers.outputs].join(',');
+    const rowLines = tableData.rows.map((r) => [...r.inputs, ...r.outputs].join(','));
     const csvContent = 'data:text/csv;charset=utf-8,' + [headerLine, ...rowLines].join('\n');
     const link = document.createElement('a');
     link.href = encodeURI(csvContent);
@@ -148,24 +174,20 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={`${nodeLabel || `${gateType} Gate`} Truth Table`}
-        className="bg-[#0f141c] border border-white/10 rounded-2xl w-[90vw] max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden text-slate-100"
+        className="w-full max-w-3xl bg-[#0f141c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
       >
-        
         {/* Header */}
-        <div className="px-6 py-4 border-b border-white/10 bg-slate-900/80 backdrop-blur-lg flex flex-wrap items-center justify-between gap-3">
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-slate-900/80">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
               <Table className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                {nodeLabel || `${gateType} Gate`}{' '}
-                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                  {inputCount}-Input Logic Gate
-                </span>
-              </h2>
+              <h3 className="text-sm font-bold font-mono text-white flex items-center gap-2">
+                {nodeLabel || gateType} Truth Table
+              </h3>
               <p className="text-xs text-slate-400 font-mono">
-                Full boolean truth table ({Math.pow(2, inputCount)} combinations)
+                Truth table evaluation matrix
               </p>
             </div>
           </div>
@@ -176,7 +198,7 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-colors flex items-center gap-1.5"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? 'Copied!' : 'Copy Matrix'}
             </button>
 
             <button
@@ -233,7 +255,7 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
           {activeRow && (
             <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
               <Zap className="w-3.5 h-3.5 animate-pulse" />
-              <span>Live Input Match: Row {activeRow.index} ({activeRow.inputs.join('')} → {activeRow.output})</span>
+              <span>Live Input Match: Row {activeRow.index} ({activeRow.inputs.join('')} → {activeRow.outputs.join(', ')})</span>
             </div>
           )}
         </div>
@@ -253,9 +275,11 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
                       {h}
                     </th>
                   ))}
-                  <th className="py-3 px-3 text-emerald-400 bg-emerald-950/40 font-bold">
-                    Output ({tableData.headers.output})
-                  </th>
+                  {tableData.headers.outputs.map((oh) => (
+                    <th key={oh} className="py-3 px-3 text-emerald-400 bg-emerald-950/40 font-bold border-r border-white/5 last:border-r-0">
+                      {oh}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
@@ -291,13 +315,16 @@ export const GateTruthTableModal: React.FC<GateTruthTableModalProps> = ({
                       </td>
                     ))}
 
-                    <td
-                      className={`py-2.5 px-3 font-bold text-sm ${
-                        row.output === 1 ? 'text-emerald-400 bg-emerald-500/15' : 'text-slate-600'
-                      }`}
-                    >
-                      {row.output}
-                    </td>
+                    {row.outputs.map((val, outIdx) => (
+                      <td
+                        key={outIdx}
+                        className={`py-2.5 px-3 font-bold text-sm border-r border-white/5 last:border-r-0 ${
+                          val === 1 ? 'text-emerald-400 bg-emerald-500/15' : 'text-slate-600'
+                        }`}
+                      >
+                        {val}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

@@ -12,6 +12,7 @@ export interface SegmentedControlProps<T = string | number> {
   size?: 'xs' | 'sm' | 'md';
   fullWidth?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function SegmentedControl<T extends string | number>({
@@ -21,6 +22,7 @@ export function SegmentedControl<T extends string | number>({
   size = 'sm',
   fullWidth = true,
   className = '',
+  disabled = false,
 }: SegmentedControlProps<T>) {
   const sizeClasses = {
     xs: 'p-0.5 text-[10px]',
@@ -31,14 +33,16 @@ export function SegmentedControl<T extends string | number>({
   const itemSizeClasses = {
     xs: 'py-0.5 px-2 rounded-md',
     sm: 'py-1 px-2.5 rounded-lg',
-    md: 'py-1.5 px-3 rounded-xl',
+    md: 'py-1.5 px-3 rounded-lg',
   };
 
   return (
     <div
-      className={`inline-flex items-center bg-slate-900/90 border border-slate-700/80 rounded-xl shadow-inner ${
+      className={`inline-flex items-center bg-slate-900/90 border border-slate-700/80 rounded-lg shadow-inner ${
         sizeClasses[size]
-      } ${fullWidth ? 'w-full grid grid-flow-col auto-cols-fr' : ''} ${className}`}
+      } ${fullWidth ? 'w-full grid grid-flow-col auto-cols-fr' : ''} ${
+        disabled ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+      } ${className}`}
     >
       {options.map((option) => {
         const isSelected = option.value === value;
@@ -46,13 +50,14 @@ export function SegmentedControl<T extends string | number>({
           <button
             key={String(option.value)}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(option.value)}
             className={`font-mono font-bold transition-all duration-150 text-center select-none cursor-pointer ${
               itemSizeClasses[size]
             } ${
               isSelected
-                ? 'bg-emerald-500 text-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.3)] border border-emerald-400/50'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
+                ? 'bg-slate-800 text-slate-100 border border-slate-700/60 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent'
             }`}
           >
             {option.label}
@@ -62,3 +67,4 @@ export function SegmentedControl<T extends string | number>({
     </div>
   );
 }
+

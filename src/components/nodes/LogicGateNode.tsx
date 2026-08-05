@@ -13,6 +13,13 @@ export const LogicGateNode = React.memo(({ id, data, selected }: NodeProps) => {
   const isHigh = primaryOutputVal === 1;
   const isLow = primaryOutputVal === 0;
 
+  const pinAliases = nodeData.pinAliases || {};
+  const getPinDisplayName = (pin: { id: string; name: string }) => {
+    const alias = pinAliases[pin.id];
+    if (!alias) return pin.name;
+    return alias.length > 8 ? alias.substring(0, 8) + '…' : alias;
+  };
+
   return (
     <div
       className={`relative min-w-[140px] px-3 py-2.5 rounded-xl transition-all duration-200 border backdrop-blur-md shadow-md group ${
@@ -74,8 +81,11 @@ export const LogicGateNode = React.memo(({ id, data, selected }: NodeProps) => {
                     : '!bg-amber-500 !border-amber-300'
                 }`}
               />
-              <span className="text-[10px] text-slate-400 font-mono pl-1">
-                {pin.name}
+              <span
+                className="text-[10px] text-slate-400 font-mono pl-1"
+                title={pinAliases[pin.id] ? `${pin.name} (${pinAliases[pin.id]})` : pin.name}
+              >
+                {getPinDisplayName(pin)}
               </span>
             </div>
           );
@@ -90,8 +100,11 @@ export const LogicGateNode = React.memo(({ id, data, selected }: NodeProps) => {
 
           return (
             <React.Fragment key={pin.id}>
-              <span className="text-[10px] text-slate-400 font-mono pr-2">
-                {pin.name}
+              <span
+                className="text-[10px] text-slate-400 font-mono pr-2"
+                title={pinAliases[pin.id] ? `${pin.name} (${pinAliases[pin.id]})` : pin.name}
+              >
+                {getPinDisplayName(pin)}
               </span>
               <Handle
                 type="source"

@@ -2,29 +2,23 @@ export type TriggerMode = 'auto' | 'rising' | 'falling';
 export type WaveColor = 'cyan' | 'emerald' | 'amber' | 'purple' | 'rose';
 
 export interface OscilloscopeConfig {
-  sampleRateHz: number; // e.g., 100, 500, 1000 Hz
-  timePerDivMs: number; // e.g., 1, 5, 10, 25, 50, 100 ms/div
-  bufferSize: number; // e.g., 200, 500, 1000, 2000 samples
+  sampleRateHz: number;       // e.g., 100, 500, 1000, 2000 Hz
+  timePerDivMs: number;       // e.g., 1, 5, 10, 25, 50, 100 ms/div
+  bufferSize: number;         // e.g., 500, 1000, 2000 samples
   triggerMode: TriggerMode;
   autoScroll: boolean;
   waveColor: WaveColor;
   gridVisible: boolean;
   showLabels: boolean;
   isPaused: boolean;
-  selectedBitIndex: number; // For multi-bit bus inputs
-}
-
-export interface OscilloscopeState {
-  samples: number[]; // Circular buffer of signal values (0 or 1)
-  writeIndex: number;
-  triggerFired: boolean;
-  lastSampleVal: number;
+  selectedBitIndex: number;   // For multi-bit bus inputs
+  lastClearedAt?: number;     // Timestamp for clear-buffer signaling
 }
 
 export const DEFAULT_OSCILLOSCOPE_CONFIG: OscilloscopeConfig = {
   sampleRateHz: 500,
   timePerDivMs: 10,
-  bufferSize: 500,
+  bufferSize: 2000,
   triggerMode: 'auto',
   autoScroll: true,
   waveColor: 'cyan',
