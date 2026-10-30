@@ -4,7 +4,7 @@ import { GateType } from '../types/circuit';
  * Catalog of placeable parts, ordered the way a digital-logic course introduces them.
  * Drives the parts bin and the names shown in the properties panel.
  */
-export type PartCategory = 'Signals' | 'Gates' | 'Combinational' | 'Arithmetic' | 'Memory' | 'Displays' | 'Boards' | 'Wiring';
+export type PartCategory = 'Signals' | 'Gates' | 'Combinational' | 'Arithmetic' | 'Memory' | 'Displays' | 'Sensors' | 'Boards' | 'Wiring';
 
 export interface PartInfo {
   type: GateType;
@@ -30,6 +30,7 @@ export const PART_CATEGORIES: CategoryInfo[] = [
   { id: 'Arithmetic', title: 'Arithmetic', layout: 'rows', defaultOpen: false },
   { id: 'Memory', title: 'Memory', layout: 'rows', defaultOpen: false },
   { id: 'Displays', title: 'Displays', layout: 'tiles', defaultOpen: true },
+  { id: 'Sensors', title: 'Sensors', layout: 'tiles', defaultOpen: false },
   { id: 'Boards', title: 'Programmable boards', layout: 'rows', defaultOpen: false },
   { id: 'Wiring', title: 'Wiring and notes', layout: 'rows', defaultOpen: false },
 ];
@@ -95,8 +96,14 @@ export const PARTS: PartInfo[] = [
   { type: 'HEX_DISPLAY', name: 'Hex digit', description: 'Shows 0–F from 4 input bits', category: 'Displays' },
   { type: 'BUS_MONITOR', name: 'Bus value', description: 'Shows a 2–8 bit value in hex, decimal or binary', category: 'Displays' },
 
+  // Sensors
+  { type: 'SENSOR_LIGHT', name: 'Light', description: 'Outputs 1 when brighter than its threshold', category: 'Sensors', partNumber: 'LDR module' },
+  { type: 'SENSOR_TEMPERATURE', name: 'Temperature', description: 'Outputs 1 when hotter than its threshold', category: 'Sensors', partNumber: 'Thermistor module' },
+  { type: 'SENSOR_OBSTACLE', name: 'Obstacle', description: 'Outputs 1 when something is closer than its threshold', category: 'Sensors', partNumber: 'IR proximity module' },
+  { type: 'SENSOR_MOTION', name: 'Motion', description: 'Outputs 1 while it sees movement', category: 'Sensors', partNumber: 'PIR module' },
+
   // Programmable boards
-  { type: 'ARDUINO_UNO', name: 'Uno-compatible board', description: 'Runs a compiled Arduino sketch on pins D2–D13', category: 'Boards', partNumber: 'ATmega328P' },
+  { type: 'ARDUINO_UNO', name: 'Uno-compatible board', description: 'Runs a compiled Arduino sketch on pins D2–D13 and A0–A5', category: 'Boards', partNumber: 'ATmega328P' },
 
   // Wiring and notes
   { type: 'TUNNEL', name: 'Tunnel', description: 'Connects to every tunnel with the same tag, without a wire', category: 'Wiring' },

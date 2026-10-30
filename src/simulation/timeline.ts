@@ -11,8 +11,10 @@ import { propagateSignals } from './engine';
 
 export const CLOCK_RATES_HZ = [0.5, 1, 2, 5, 10, 50, 100];
 export const DEFAULT_CLOCK_HZ = 1;
-/** Board pins shown on the canvas, in pin order: D2–D13 (D0 and D1 are the serial port). */
-export const BOARD_PINS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+/** Board pins on the canvas, in pin order: D2–D13 and A0–A5 (D0 and D1 are the serial port). */
+export const BOARD_PINS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+/** Arduino name of a board pin: D2–D13, then A0–A5 (pins 14–19, used as digital pins). */
+export const boardPinName = (pin: number) => (pin >= 14 ? `A${pin - 14}` : `D${pin}`);
 
 const TIMED_TYPES = new Set<string>(['CLOCK', 'ARDUINO_UNO']);
 const EPSILON = 1e-9;
@@ -130,13 +132,16 @@ export function advanceCircuit(
 export type TracePoint = [time: number, value: SignalValue];
 export type Traces = Record<string, TracePoint[]>;
 
-const TRACED_TYPES = new Set<string>(['CLOCK', 'INPUT', 'PUSH_BUTTON', 'OUTPUT', 'LOGIC_PROBE']);
+const TRACED_TYPES = new Set<string>([
+  'CLOCK', 'INPUT', 'PUSH_BUTTON', 'OUTPUT', 'LOGIC_PROBE', 'SENSOR_LIGHT', 'SENSOR_TEMPERATURE', 'SENSOR_OBSTACLE', 'SENSOR_MOTION',
+]);
 export const MAX_TRACE_POINTS = 2000;
 
 /** Level a traced part shows in the timing diagram; undefined for parts that aren't traced. */
 export function tracedValue(data: NodeData): SignalValue | undefined {
   if (!TRACED_TYPES.has(data.gateType)) return undefined;
   if (data.gateType === 'OUTPUT' || data.gateType === 'LOGIC_PROBE') return data.inputs?.[0]?.value ?? data.value ?? -1;
+  if (data.gateType.startsWith('SENSOR_')) return data.outputs?.[0]?.value ?? -1;
   return data.value ?? 0;
 }
 

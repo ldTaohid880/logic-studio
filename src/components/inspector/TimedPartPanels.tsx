@@ -1,9 +1,10 @@
 import React, { useRef } from 'react';
-import { Clock, Cpu, Database, FileUp, RotateCcw, Terminal } from 'lucide-react';
+import { Clock, Cpu, Database, FileUp, Gauge, RotateCcw, Terminal } from 'lucide-react';
 import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { CLOCK_RATES_HZ, DEFAULT_CLOCK_HZ } from '../../simulation/timeline';
 import { ALU_OPERATIONS, DEFAULT_ROM_CONTENTS } from '../../simulation/icLogic';
+import { SENSORS, SensorType, formatSensorValue, sensorLevel, sensorThreshold } from '../../simulation/sensors';
 import { loadHexFile } from '../nodes/BoardNode';
 import { InspectorSection } from '../ui/InspectorSection';
 import { PropertyRow } from '../ui/PropertyRow';
@@ -162,8 +163,9 @@ export const BoardProperties: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
           </ol>
         </details>
         <p className="text-xs text-fg-subtle">
-          Wire the left side of a pin to read it (digitalRead) and the right side to drive parts (digitalWrite). pinMode, INPUT_PULLUP,
-          delay, millis and Serial work; analogRead and analogWrite aren't simulated.
+          Pins work both ways: drag a wire out of a header pin to drive a part (digitalWrite), or drop a wire on it to read a part
+          (digitalRead). A0–A5 work as digital pins 14–19. pinMode, INPUT_PULLUP, delay, millis and Serial work; analogRead and
+          analogWrite aren't simulated.
         </p>
       </InspectorSection>
 
@@ -175,5 +177,82 @@ export const BoardProperties: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
         </InspectorSection>
       )}
     </>
+  );
+};
+
+const Slider: React.FC<{ label: string; min: number; max: number; step: number; value: number; text: string; onChange: (v: number) => void }> = ({
+  label,
+  min,
+  max,
+  step,
+  value,
+  text,
+  onChange,
+}) => (
+  <PropertyRow label={label}>
+    <div className="flex items-center gap-2 w-full">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="flex-1 min-w-0 accent-[var(--accent)] cursor-pointer"
+      />
+      <span className="w-14 text-right text-xs font-mono text-fg tabular-nums">{text}</span>
+    </div>
+  </PropertyRow>
+);
+
+export const SensorProperties: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
+  const type = nodeData.gateType as SensorType;
+  const spec = SENSORS[type];
+  const level = sensorLevel(nodeData);
+  const threshold = sensorThreshold(nodeData);
+  const out = nodeData.outputs?.[0]?.value;
+  const { setSensorLevel, updateNodeData } = useCircuitStore.getState();
+
+  if (type === 'SENSOR_MOTION') {
+    return (
+      <InspectorSection title="Sensor" icon={<Gauge className="w-4 h-4" />}>
+        <Button size="sm" variant={level === 1 ? 'primary' : 'secondary'} onClick={() => setSensorLevel(nodeId, level === 1 ? 0 : 1)}>
+          {level === 1 ? 'Stop motion' : 'Wave in front of it'}
+        </Button>
+        <p className="text-xs text-fg-subtle">
+          DO is <span className="font-mono text-fg">{out ?? '?'}</span>: it outputs 1 while the PIR sensor sees motion. Real modules
+          hold the output for a few seconds; here it follows the button.
+        </p>
+      </InspectorSection>
+    );
+  }
+
+  const rule = spec.rule === 'above' ? 'above' : 'below';
+  return (
+    <InspectorSection title="Sensor" icon={<Gauge className="w-4 h-4" />}>
+      <Slider
+        label="Senses"
+        min={spec.min}
+        max={spec.max}
+        step={spec.step}
+        value={level}
+        text={formatSensorValue(spec, level)}
+        onChange={(v) => setSensorLevel(nodeId, v)}
+      />
+      <Slider
+        label="Threshold"
+        min={spec.min}
+        max={spec.max}
+        step={spec.step}
+        value={threshold}
+        text={formatSensorValue(spec, threshold)}
+        onChange={(v) => updateNodeData(nodeId, { sensorThreshold: v }, { propagate: true })}
+      />
+      <p className="text-xs text-fg-subtle">
+        DO is <span className="font-mono text-fg">{out ?? '?'}</span>: the module outputs 1 ({spec.meaning}) when the reading is {rule} the
+        threshold, which you set on a real module by turning its blue trimmer. Only this digital output is simulated.
+      </p>
+    </InspectorSection>
   );
 };

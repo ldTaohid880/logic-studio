@@ -85,6 +85,8 @@ export interface CircuitStore {
   toggleDipBit: (nodeId: string, bitIndex: number) => void;
   /** Set several switches, buttons and DIP bits at once (e.g. from a truth table row); not recorded in undo. */
   setInputLevels: (levels: { nodeId: string; bit?: number; value: 0 | 1 }[]) => void;
+  /** Change what a sensor senses (light, temperature, distance, motion); not recorded in undo. */
+  setSensorLevel: (nodeId: string, level: number) => void;
 
   // Encoder Node Manual Controls
   toggleEncoderInputPin: (nodeId: string, pinIdx: number) => void;

@@ -50,6 +50,11 @@ export type GateType =
   // Clocked and programmable parts
   | 'CLOCK'
   | 'ARDUINO_UNO'
+  // Sensor modules with a digital output
+  | 'SENSOR_LIGHT'
+  | 'SENSOR_TEMPERATURE'
+  | 'SENSOR_OBSTACLE'
+  | 'SENSOR_MOTION'
   // Arithmetic
   | 'HALF_ADDER'
   | 'FULL_ADDER'
@@ -102,6 +107,8 @@ export interface NodeData {
   clockHz?: number; // CLOCK: frequency in simulated time
   romContents?: number[]; // ROM_16X4: the 4-bit value stored at each of the 16 addresses
   firmware?: BoardFirmware; // ARDUINO_UNO: the loaded program
+  sensorLevel?: number; // Sensors: what the sensor senses now (light %, °C, cm, motion 0/1)
+  sensorThreshold?: number; // Sensors: where the module's output switches
   [key: string]: unknown;
 }
 

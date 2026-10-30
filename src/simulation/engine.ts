@@ -6,6 +6,7 @@ import { evaluateIC } from './icLogic';
 import { DEFAULT_ENCODER_CONFIG } from '../types/encoder';
 import { CustomComponentDefinition } from '../types/customComponent';
 import { evaluateCustomComponentLogic } from './customComponentLogic';
+import { isSensor, sensorOutput } from './sensors';
 
 // Nested custom components deeper than this are treated as unresolvable (guards against recursive definitions)
 export const MAX_SUBCIRCUIT_DEPTH = 16;
@@ -164,9 +165,10 @@ export function propagateSignals(
         data.gateType === 'PUSH_BUTTON' ||
         data.gateType === 'CLOCK' ||
         data.gateType === 'CONST_HIGH' ||
-        data.gateType === 'CONST_LOW'
+        data.gateType === 'CONST_LOW' ||
+        isSensor(data.gateType)
       ) {
-        const val = data.gateType === 'CONST_HIGH' ? 1 : data.gateType === 'CONST_LOW' ? 0 : (data.value ?? 0);
+        const val = data.gateType === 'CONST_HIGH' ? 1 : data.gateType === 'CONST_LOW' ? 0 : isSensor(data.gateType) ? sensorOutput(data) : (data.value ?? 0);
         data.outputs.forEach((outPin) => {
           if (outPin.value !== val) {
             outPin.value = val;

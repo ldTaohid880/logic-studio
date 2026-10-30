@@ -19,7 +19,7 @@ import { SelectionSummary } from './SelectionSummary';
 import { DEFAULT_ENCODER_CONFIG } from '../../types/encoder';
 import { DEFAULT_SEVEN_SEGMENT_CONFIG } from '../../types/sevenSegment';
 import { getComponentInfo } from '../../data/components';
-import { AluProperties, BoardProperties, ClockProperties, RamProperties, RomProperties } from './TimedPartPanels';
+import { AluProperties, BoardProperties, ClockProperties, RamProperties, RomProperties, SensorProperties } from './TimedPartPanels';
 
 import { InspectorSection } from '../ui/InspectorSection';
 import { PropertyRow } from '../ui/PropertyRow';
@@ -64,6 +64,10 @@ const TYPE_PANELS: Partial<Record<GateType, React.FC<PanelProps>>> = {
   RAM_16X4: RamProperties,
   ALU_4BIT_8FN: AluProperties,
   ARDUINO_UNO: BoardProperties,
+  SENSOR_LIGHT: SensorProperties,
+  SENSOR_TEMPERATURE: SensorProperties,
+  SENSOR_OBSTACLE: SensorProperties,
+  SENSOR_MOTION: SensorProperties,
 };
 
 const MULTI_INPUT_GATES = new Set<GateType>(['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR']);
@@ -71,7 +75,7 @@ const MULTI_INPUT_GATES = new Set<GateType>(['AND', 'OR', 'NAND', 'NOR', 'XOR', 
 const SETTINGS_TYPES = new Set<GateType>([...MULTI_INPUT_GATES, 'TUNNEL', 'TEXT_LABEL', 'DIP_SWITCH', 'BUS_MONITOR', 'OUTPUT', 'HEX_DISPLAY']);
 
 // Per-part panels built from InspectorSections (no extra padding around them)
-const SECTIONED_PANELS = new Set<GateType>(['SEVEN_SEGMENT', 'CLOCK', 'ROM_16X4', 'RAM_16X4', 'ALU_4BIT_8FN', 'ARDUINO_UNO']);
+const SECTIONED_PANELS = new Set<GateType>(['SEVEN_SEGMENT', 'CLOCK', 'ROM_16X4', 'RAM_16X4', 'ALU_4BIT_8FN', 'ARDUINO_UNO', 'SENSOR_LIGHT', 'SENSOR_TEMPERATURE', 'SENSOR_OBSTACLE', 'SENSOR_MOTION']);
 // Chips whose panel adds to the usual pin list rather than replacing it
 const PANEL_WITH_PINS = new Set<GateType>(['ROM_16X4', 'RAM_16X4', 'ALU_4BIT_8FN']);
 

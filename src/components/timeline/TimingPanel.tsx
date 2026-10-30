@@ -13,7 +13,9 @@ import { IconButton } from '../ui/IconButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 const OPEN_KEY = 'logic_studio_timing_open';
-const ROW_ORDER: Record<string, number> = { CLOCK: 0, INPUT: 1, PUSH_BUTTON: 1, OUTPUT: 2, LOGIC_PROBE: 2 };
+const ROW_ORDER: Record<string, number> = {
+  CLOCK: 0, INPUT: 1, PUSH_BUTTON: 1, SENSOR_LIGHT: 1, SENSOR_TEMPERATURE: 1, SENSOR_OBSTACLE: 1, SENSOR_MOTION: 1, OUTPUT: 2, LOGIC_PROBE: 2,
+};
 const VIEW_W = 1000;
 const ROW_H = 22;
 
@@ -195,7 +197,7 @@ const TimingPanelContent: React.FC = () => {
       {open && (
         <div className="px-2 pb-2 max-h-48 overflow-y-auto">
           {rows.length === 0 ? (
-            <p className="text-xs text-fg-subtle px-1 py-2">Clocks, switches, buttons, LEDs and probes appear here as their levels change.</p>
+            <p className="text-xs text-fg-subtle px-1 py-2">Clocks, switches, buttons, sensors, LEDs and probes appear here as their levels change.</p>
           ) : (
             <>
               {rows.map((r) => (

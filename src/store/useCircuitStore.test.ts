@@ -224,3 +224,15 @@ describe('clocks and boards', () => {
     expect(data(board.id)?.firmware?.name).toBe('echo.hex');
   });
 });
+
+describe('sensors', () => {
+  it('changes what a sensor senses without an undo step, and re-settles', () => {
+    store().addNode('SENSOR_TEMPERATURE', { x: 0, y: 0 });
+    const id = store().nodes[store().nodes.length - 1].id;
+    const undoSteps = store().historyPast.length;
+    expect(data(id)?.outputs[0].value).toBe(0);
+    store().setSensorLevel(id, 45);
+    expect(data(id)?.outputs[0].value).toBe(1);
+    expect(store().historyPast.length).toBe(undoSteps);
+  });
+});
