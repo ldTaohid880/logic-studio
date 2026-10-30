@@ -70,7 +70,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     toggleInspector,
     showToolbox,
     toggleToolbox,
-    loadCircuit,
+    openCircuitFile,
     clearCanvas,
     historyPast,
     historyFuture,
@@ -91,7 +91,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       toggleInspector: s.toggleInspector,
       showToolbox: s.showToolbox,
       toggleToolbox: s.toggleToolbox,
-      loadCircuit: s.loadCircuit,
+      openCircuitFile: s.openCircuitFile,
       clearCanvas: s.clearCanvas,
       historyPast: s.historyPast,
       historyFuture: s.historyFuture,
@@ -114,22 +114,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        if (json.nodes && json.edges) {
-          if (json.customComponents && typeof json.customComponents === 'object') {
-            useCircuitStore.setState((state) => ({
-              customComponents: { ...state.customComponents, ...json.customComponents },
-            }));
-          }
-          loadCircuit(json.nodes, json.edges);
-          showToast('Circuit loaded');
-        } else {
-          showToast('Invalid circuit file format', 'error');
-        }
-      } catch (err) {
-        showToast('Failed to parse JSON file', 'error');
-      }
+      openCircuitFile(String(event.target?.result ?? ''));
     };
     reader.readAsText(file);
     e.target.value = '';

@@ -123,3 +123,50 @@ describe('floating control pins use their documented default', () => {
     expect(evaluateGate('TRI_STATE_BUFFER', [1, 0])).toBe(-1);
   });
 });
+
+describe('circuits that never settle', () => {
+  it('reports the parts of an inverter ring as unstable', () => {
+    // A ring that starts fully floating stays unknown; one known level makes it oscillate
+    const nodes = [
+      makeNode('n1', 'NOT', {}, undefined, [{ id: 'out-0', name: 'Y', value: 0 }]),
+      makeNode('n2', 'NOT'),
+      makeNode('n3', 'NOT'),
+    ];
+    const edges = [wire('n1', 'n2'), wire('n2', 'n3'), wire('n3', 'n1')];
+    const res = propagateSignals(nodes, edges);
+    expect(res.unstableNodeIds.length).toBeGreaterThan(0);
+    expect(res.unstableNodeIds.every((id) => ['n1', 'n2', 'n3'].includes(id))).toBe(true);
+  });
+
+  it('does not flag a latch holding its state', () => {
+    // NOR SR latch with S = R = 0 after being set
+    const nodes = [
+      makeNode('s', 'INPUT', { value: 1 }, [], [{ id: 'out-0', name: 'Y', value: 1 }]),
+      makeNode('r', 'INPUT', { value: 0 }, [], [{ id: 'out-0', name: 'Y', value: 0 }]),
+      makeNode('q', 'NOR'),
+      makeNode('qn', 'NOR'),
+    ];
+    const edges = [wire('r', 'q'), wire('qn', 'q', 'out-0', 'in-1'), wire('s', 'qn'), wire('q', 'qn', 'out-0', 'in-1')];
+    const set = propagateSignals(nodes, edges);
+    expect(set.unstableNodeIds).toEqual([]);
+    expect(d(set.nodes, 'q').outputs[0].value).toBe(1);
+
+    const released = set.nodes.map((n) => (n.id === 's' ? { ...n, data: { ...n.data, value: 0 } } : n));
+    const hold = propagateSignals(released, edges);
+    expect(hold.unstableNodeIds).toEqual([]);
+    expect(d(hold.nodes, 'q').outputs[0].value).toBe(1);
+  });
+
+  it('settles a chain longer than the old 12-pass limit', () => {
+    const count = 30;
+    const nodes = [makeNode('src', 'INPUT', { value: 1 }, [], [{ id: 'out-0', name: 'Y', value: 1 }])];
+    const edges: Edge[] = [];
+    for (let i = 0; i < count; i++) {
+      nodes.push(makeNode(`b${i}`, 'NOT'));
+      edges.push(wire(i === 0 ? 'src' : `b${i - 1}`, `b${i}`));
+    }
+    const res = propagateSignals(nodes, edges);
+    expect(res.unstableNodeIds).toEqual([]);
+    expect(d(res.nodes, `b${count - 1}`).outputs[0].value).toBe(count % 2 === 0 ? 1 : 0);
+  });
+});

@@ -30,6 +30,8 @@ export interface PropagateResult {
   nodes: Node[];
   edges: Edge[];
   hasChanged: boolean;
+  /** Parts still changing when propagation gave up (oscillation, e.g. a ring of inverters). Empty once settled. */
+  unstableNodeIds: string[];
 }
 
 export function propagateSignals(
@@ -74,10 +76,17 @@ export function propagateSignals(
   let overallChanged = false;
   // Last input pattern each custom instance was evaluated with during this call
   const customEvalCache = new Map<string, string>();
-  const MAX_ITERATIONS = 12; // Multi-pass propagation for feedback loops / latches
+  // A signal moves one part per pass, so long chains need more passes than small circuits
+  const MAX_ITERATIONS = Math.min(Math.max(12, inputNodes.length + 4), 256);
+  // Parts whose outputs changed in the latest pass; if passes run out these are the ones that never settled
+  let changedThisPass = new Set<string>();
+  // Custom component instances whose own subcircuit doesn't settle
+  const unstableInside = new Set<string>();
+  let settled = false;
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     let iterChanged = false;
+    changedThisPass = new Set<string>();
 
     // Step A.1: Tunnel wireless signal propagation pass
     // Only tunnels with a wire on their input drive the label; conflicting drivers resolve to floating
@@ -98,6 +107,7 @@ export function propagateSignals(
         if (d.outputs.length > 0 && d.outputs[0].value !== matchedVal) {
           d.outputs[0].value = matchedVal;
           iterChanged = true;
+          changedThisPass.add(n.id);
         }
       }
     });
@@ -152,6 +162,7 @@ export function propagateSignals(
           if (outPin.value !== val) {
             outPin.value = val;
             iterChanged = true;
+            changedThisPass.add(node.id);
           }
         });
       } else if (data.gateType === 'DIP_SWITCH') {
@@ -161,6 +172,7 @@ export function propagateSignals(
           if (outPin.value !== expectedVal) {
             outPin.value = expectedVal;
             iterChanged = true;
+            changedThisPass.add(node.id);
           }
         });
       } else if (
@@ -174,6 +186,7 @@ export function propagateSignals(
         if (data.value !== val) {
           data.value = val;
           iterChanged = true;
+          changedThisPass.add(node.id);
         }
       } else if (data.gateType === 'ENCODER') {
         const config = data.encoderConfig || DEFAULT_ENCODER_CONFIG;
@@ -185,6 +198,7 @@ export function propagateSignals(
           if (outPin.value !== newPinVal) {
             outPin.value = newPinVal;
             iterChanged = true;
+            changedThisPass.add(node.id);
           }
         });
       } else if (data.gateType === 'CUSTOM') {
@@ -202,12 +216,15 @@ export function propagateSignals(
           );
           data.subcircuitNodeStates = evalRes.internalNodeStates;
           updatedOutputs = evalRes.updatedOutputs;
+          if (evalRes.unstable) unstableInside.add(node.id);
+          else unstableInside.delete(node.id);
         }
         data.outputs.forEach((outPin) => {
           const expectedVal = updatedOutputs[outPin.id] ?? -1;
           if (outPin.value !== expectedVal) {
             outPin.value = expectedVal;
             iterChanged = true;
+            changedThisPass.add(node.id);
           }
         });
       } else if (IC_GATE_TYPES.has(data.gateType)) {
@@ -218,6 +235,7 @@ export function propagateSignals(
           if (outPin.value !== expectedVal) {
             outPin.value = expectedVal;
             iterChanged = true;
+            changedThisPass.add(node.id);
           }
         });
       } else {
@@ -233,6 +251,7 @@ export function propagateSignals(
           if (outPin.value !== computedOutput) {
             outPin.value = computedOutput;
             iterChanged = true;
+            changedThisPass.add(node.id);
           }
         });
       }
@@ -242,9 +261,12 @@ export function propagateSignals(
       overallChanged = true;
     } else {
       // Converged! No further changes in this pass
+      settled = true;
       break;
     }
   }
+
+  const unstableNodeIds = new Set<string>([...(settled ? [] : changedThisPass), ...unstableInside]);
 
   // Step C: Update wire edge data with current signal value for animated rendering
   const updatedEdges = inputEdges.map((edge) => {
@@ -275,5 +297,6 @@ export function propagateSignals(
     nodes: Array.from(nodesMap.values()),
     edges: updatedEdges,
     hasChanged: overallChanged,
+    unstableNodeIds: Array.from(unstableNodeIds),
   };
 }

@@ -417,6 +417,13 @@
   outline-offset: 2px;
 }
 
+/* Parts that never settle (e.g. a ring of inverters): amber dashed frame, set by tickSimulation */
+.react-flow__node.ls-unstable > div {
+  outline: 2px dashed var(--signal-unknown);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 /* Handles: neutral by default; nodes color them by signal state. */
 .react-flow__handle {
   width: 8px !important;

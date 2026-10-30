@@ -1,7 +1,22 @@
+import { Node } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { propagateSignals } from '../../simulation/engine';
 import { DEFAULT_SIMULATION } from '../helpers';
 import { CircuitStore, StoreSlice } from '../types';
+
+// Class React Flow puts on a part's wrapper while it keeps changing (styled in index.css)
+const UNSTABLE_CLASS = 'ls-unstable';
+
+const markUnstable = (nodes: Node[], unstableIds: string[]): Node[] => {
+  const ids = new Set(unstableIds);
+  return nodes.map((node) => {
+    const classes = (node.className ?? '').split(' ').filter(Boolean);
+    const has = classes.includes(UNSTABLE_CLASS);
+    if (has === ids.has(node.id)) return node;
+    const next = has ? classes.filter((c) => c !== UNSTABLE_CLASS) : [...classes, UNSTABLE_CLASS];
+    return { ...node, className: next.length > 0 ? next.join(' ') : undefined };
+  });
+};
 
 // Signal propagation. There is no running clock: every edit re-settles the circuit immediately.
 export type SimulationSlice = Pick<CircuitStore, 'simulation' | 'resetSimulation' | 'tickSimulation'>;
@@ -32,7 +47,7 @@ export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => 
       data: { ...edge.data, signalValue: -1 },
     }));
 
-    set({ nodes, edges, simulation: { stepCount: 0 } });
+    set({ nodes, edges, simulation: { stepCount: 0, unstableNodeIds: [] } });
     get().tickSimulation();
   },
 
@@ -40,9 +55,13 @@ export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => 
     const { nodes, edges, customComponents, simulation } = get();
     const result = propagateSignals(nodes, edges, customComponents);
     set({
-      nodes: result.nodes,
+      nodes: markUnstable(result.nodes, result.unstableNodeIds),
       edges: result.edges,
-      simulation: { stepCount: simulation.stepCount + 1 },
+      simulation: { stepCount: simulation.stepCount + 1, unstableNodeIds: result.unstableNodeIds },
     });
+    // Tell the user once, when the circuit starts oscillating, not on every edit while it does
+    if (result.unstableNodeIds.length > 0 && simulation.unstableNodeIds.length === 0) {
+      get().showToast("The circuit doesn't settle: the parts outlined in amber keep changing", 'info');
+    }
   },
 });
