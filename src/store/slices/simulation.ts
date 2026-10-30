@@ -2,12 +2,13 @@ import { Node } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { propagateSignals } from '../../simulation/engine';
 import { DEFAULT_SIMULATION } from '../helpers';
+import { hasTimedParts, recordTraces } from '../../simulation/timeline';
 import { CircuitStore, StoreSlice } from '../types';
 
 // Class React Flow puts on a part's wrapper while it keeps changing (styled in index.css)
 const UNSTABLE_CLASS = 'ls-unstable';
 
-const markUnstable = (nodes: Node[], unstableIds: string[]): Node[] => {
+export const markUnstable = (nodes: Node[], unstableIds: string[]): Node[] => {
   const ids = new Set(unstableIds);
   return nodes.map((node) => {
     const classes = (node.className ?? '').split(' ').filter(Boolean);
@@ -18,7 +19,7 @@ const markUnstable = (nodes: Node[], unstableIds: string[]): Node[] => {
   });
 };
 
-// Signal propagation. There is no running clock: every edit re-settles the circuit immediately.
+// Signal propagation: every edit re-settles the circuit immediately. Clocks and boards move time forward in the timeline slice.
 export type SimulationSlice = Pick<CircuitStore, 'simulation' | 'resetSimulation' | 'tickSimulation'>;
 
 export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => ({
@@ -52,12 +53,14 @@ export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => 
   },
 
   tickSimulation: () => {
-    const { nodes, edges, customComponents, simulation } = get();
+    const { nodes, edges, customComponents, simulation, timeline } = get();
     const result = propagateSignals(nodes, edges, customComponents);
     set({
       nodes: markUnstable(result.nodes, result.unstableNodeIds),
       edges: result.edges,
       simulation: { stepCount: simulation.stepCount + 1, unstableNodeIds: result.unstableNodeIds },
+      // Edits made while time is paused (a switch flipped) still show up in the timing diagram
+      ...(hasTimedParts(result.nodes) ? { timeline: { ...timeline, traces: recordTraces(timeline.traces, result.nodes, timeline.time) } } : {}),
     });
     // Tell the user once, when the circuit starts oscillating, not on every edit while it does
     if (result.unstableNodeIds.length > 0 && simulation.unstableNodeIds.length === 0) {

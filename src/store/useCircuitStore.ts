@@ -8,6 +8,7 @@ import { createClipboardSlice } from './slices/clipboard';
 import { createGroupsSlice } from './slices/groups';
 import { createDevicesSlice } from './slices/devices';
 import { createSimulationSlice } from './slices/simulation';
+import { createTimelineSlice } from './slices/timeline';
 import { createProjectSlice } from './slices/project';
 import { createCustomComponentsSlice } from './slices/customComponents';
 
@@ -19,6 +20,7 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   ...createGroupsSlice(set, get),
   ...createDevicesSlice(set, get),
   ...createSimulationSlice(set, get),
+  ...createTimelineSlice(set, get),
   ...createProjectSlice(set, get),
   ...createCustomComponentsSlice(set, get),
 }));

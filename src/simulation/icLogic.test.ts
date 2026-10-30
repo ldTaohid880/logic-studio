@@ -57,9 +57,27 @@ const COMBINATIONAL: Partial<Record<GateType, (i: Bits) => Bits>> = {
       : bitsOf(a + b, 5);
   },
   DELAY_ELEMENT: ([x]) => [x],
+  ALU_4BIT_8FN: (i) => {
+    const a = num(i.slice(0, 4));
+    const b = num(i.slice(4, 8));
+    const [raw, carry] = [
+      [a + b, a + b > 15],
+      [a - b, a < b],
+      [a & b, false],
+      [a | b, false],
+      [a ^ b, false],
+      [15 - a, false],
+      [a + 1, a === 15],
+      [a - 1, a === 0],
+    ][num(i.slice(8, 11))] as [number, boolean];
+    const f = (raw + 16) % 16;
+    return [...bitsOf(f, 4), carry ? 1 : 0, f === 0 ? 1 : 0];
+  },
+  // A new ROM holds each address's own number
+  ROM_16X4: (i) => i,
 };
 
-const SEQUENTIAL: GateType[] = ['D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT'];
+const SEQUENTIAL: GateType[] = ['D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'RAM_16X4'];
 
 const outputsInPinOrder = (gateType: GateType, outputs: Record<string, SignalValue>) =>
   getDefaultICPins(gateType).outputs.map((p) => outputs[p.id]);
@@ -153,5 +171,65 @@ describe('memory ICs', () => {
     expect(step([0, 1, 0, 0, 0, -1, 0])).toBe(5);
     expect(step([0, 1, 0, 0, 1, -1, 0])).toBe(2); // floating EN counts as enabled
     expect(step([0, 1, 0, 0, 1, 1, 1])).toBe(0); // CLR
+  });
+
+  /** Steps a memory IC, carrying its state, and returns the 4-bit value on out-0..out-3 (plus out-4) after each step. */
+  const stepper = (type: GateType) => {
+    let state: Record<string, unknown> = {};
+    return (inputs: SignalValue[]) => {
+      const res = evaluateIC(type, inputs, state);
+      state = res.newState;
+      return [num([0, 1, 2, 3].map((i) => res.outputs[`out-${i}`] as number)), res.outputs['out-4']];
+    };
+  };
+
+  it('4-bit counter counts rising edges up or down, wraps and clears', () => {
+    // [CLK, EN, UP, CLR] → [count, TC]
+    const step = stepper('COUNTER_4BIT');
+    expect(step([1, 1, 1, 0])).toEqual([1, 0]); // first rising edge
+    expect(step([1, 1, 1, 0])).toEqual([1, 0]); // CLK held high
+    for (let i = 2; i <= 15; i++) {
+      step([0, 1, 1, 0]);
+      step([1, 1, 1, 0]);
+    }
+    expect(step([0, -1, -1, -1])).toEqual([15, 1]); // floating EN and UP count up; floating CLR doesn't clear; TC at 15
+    expect(step([1, 1, 1, 0])).toEqual([0, 0]); // wraps
+    step([0, 1, 0, 0]);
+    expect(step([1, 1, 0, 0])).toEqual([15, 0]); // counts down and wraps
+    step([0, 0, 1, 0]);
+    expect(step([1, 0, 1, 0])).toEqual([15, 0]); // disabled
+    expect(step([1, 1, 1, 1])).toEqual([0, 0]); // CLR
+  });
+
+  it('shift register shifts SER in at Q0 on each rising edge', () => {
+    // [SER, CLK, CLR]
+    const step = stepper('SHIFT_REG_4BIT');
+    expect(step([1, 1, 0])[0]).toBe(0b0001);
+    step([0, 0, 0]);
+    expect(step([0, 1, 0])[0]).toBe(0b0010);
+    step([1, 0, 0]);
+    expect(step([1, 1, 0])[0]).toBe(0b0101);
+    step([1, 0, 0]);
+    expect(step([1, 1, 0])[0]).toBe(0b1011);
+    step([0, 0, 0]);
+    expect(step([0, 1, 0])[0]).toBe(0b0110); // Q3 shifted out
+    expect(step([0, 1, 1])[0]).toBe(0); // CLR
+  });
+
+  it('RAM writes D on a rising edge while WE is 1 and reads the addressed word', () => {
+    // [A0..A3, D0..D3, WE, CLK]
+    const step = stepper('RAM_16X4');
+    const at = (addr: number, data: number, we: number, clk: number) => step([...bitsOf(addr, 4), ...bitsOf(data, 4), we, clk] as SignalValue[])[0];
+    expect(at(3, 9, 1, 0)).toBe(0);
+    expect(at(3, 9, 1, 1)).toBe(9); // written
+    expect(at(5, 6, 0, 0)).toBe(0);
+    expect(at(5, 6, 0, 1)).toBe(0); // WE low: not written
+    expect(at(3, 0, 0, 0)).toBe(9); // still there
+  });
+
+  it('ROM reads its stored contents', () => {
+    const contents = Array.from({ length: 16 }, (_, i) => 15 - i);
+    const { outputs } = evaluateIC('ROM_16X4', bitsOf(2, 4) as SignalValue[], {}, { romContents: contents });
+    expect(num([0, 1, 2, 3].map((i) => outputs[`out-${i}`] as number))).toBe(13);
   });
 });

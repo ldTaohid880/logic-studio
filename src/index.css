@@ -528,3 +528,8 @@
     --ink: #000000;
   }
 }
+
+/* Second handle stacked on a two-way pin (board headers): it takes wires but the visible pin is the one above it */
+.react-flow__handle.lsp-pin.lsp-pin-ghost {
+  opacity: 0;
+}

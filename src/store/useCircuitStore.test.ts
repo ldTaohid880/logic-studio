@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Node, Edge } from '@xyflow/react';
 import { useCircuitStore } from './useCircuitStore';
 import { NodeData, SignalValue } from '../types/circuit';
+import { wordsToIntelHex } from '../simulation/avr/intelHex';
 
 const store = () => useCircuitStore.getState();
 const data = (id: string) => store().nodes.find((n) => n.id === id)?.data as unknown as NodeData | undefined;
@@ -173,5 +174,65 @@ describe('sub-circuits', () => {
     const after = store().customComponents[id];
     expect(after.nodes).toHaveLength(before.nodes.length + 1);
     expect(after.updatedAt).toBeGreaterThan(before.updatedAt);
+  });
+});
+
+describe('clocks and boards', () => {
+  const clocked = () => {
+    store().addNode('CLOCK', { x: 0, y: 0 });
+    const clock = store().nodes[store().nodes.length - 1];
+    store().loadCircuit([clock, led('Y')], [{ id: 'w', source: clock.id, target: 'Y', sourceHandle: 'out-0', targetHandle: 'in-0' }]);
+    return clock.id;
+  };
+
+  it('moves a clock forward only while running, and records it in the timing diagram', () => {
+    const clockId = clocked();
+    store().setTimelineRunning(false);
+    store().advanceTimeline(600);
+    expect(data('Y')?.inputs[0].value).toBe(0);
+
+    store().setTimelineRunning(true);
+    store().advanceTimeline(100);
+    store().advanceTimeline(100);
+    store().advanceTimeline(100);
+    store().advanceTimeline(100);
+    store().advanceTimeline(100);
+    expect(store().timeline.time).toBe(500);
+    expect(data('Y')?.inputs[0].value).toBe(1);
+    expect(store().timeline.traces[clockId]).toEqual([[0, 0], [500, 1]]);
+  });
+
+  it('steps to the next clock edge and pauses; restart goes back to time 0', () => {
+    clocked();
+    store().stepTimeline();
+    expect(store().timeline.running).toBe(false);
+    expect(store().timeline.time).toBe(500);
+    store().stepTimeline();
+    expect(store().timeline.time).toBe(1000);
+    expect(data('Y')?.inputs[0].value).toBe(0);
+    store().restartTimeline();
+    expect(store().timeline.time).toBe(0);
+  });
+
+  it('rejects a file that isn’t a compiled program', () => {
+    store().addNode('ARDUINO_UNO', { x: 0, y: 0 });
+    const board = store().nodes[store().nodes.length - 1];
+    expect(store().loadBoardFirmware(board.id, 'sketch.ino', 'void setup() {}')).toBe(false);
+    expect(store().toastMessage).toMatch(/^Invalid \.hex file/);
+    expect(data(board.id)?.firmware).toBeUndefined();
+    expect(store().loadBoardFirmware(board.id, 'echo.hex', wordsToIntelHex([0xe200, 0xb904]))).toBe(true);
+    expect(data(board.id)?.firmware?.name).toBe('echo.hex');
+  });
+});
+
+describe('sensors', () => {
+  it('changes what a sensor senses without an undo step, and re-settles', () => {
+    store().addNode('SENSOR_TEMPERATURE', { x: 0, y: 0 });
+    const id = store().nodes[store().nodes.length - 1].id;
+    const undoSteps = store().historyPast.length;
+    expect(data(id)?.outputs[0].value).toBe(0);
+    store().setSensorLevel(id, 45);
+    expect(data(id)?.outputs[0].value).toBe(1);
+    expect(store().historyPast.length).toBe(undoSteps);
   });
 });

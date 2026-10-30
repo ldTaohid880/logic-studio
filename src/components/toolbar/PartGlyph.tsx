@@ -34,7 +34,63 @@ const frame = (children: React.ReactNode, viewBox = '0 0 64 40') => (
   </svg>
 );
 
+/** Sensor breakout board: module outline, the sensing element (children) and the DO lead. */
+const module = (element: React.ReactNode) =>
+  frame(
+    <>
+      <rect x={4} y={4} width={40} height={32} rx={3} {...body} />
+      {element}
+      <line x1={44} y1={20} x2={62} y2={20} {...stroke} />
+    </>
+  );
+
 const GLYPHS: Partial<Record<GateType, () => React.ReactNode>> = {
+  CLOCK: () =>
+    frame(
+      <>
+        <rect x={4} y={6} width={36} height={28} rx={3} {...body} />
+        <path d="M9 26 H15 V14 H22 V26 H29 V14 H35" {...stroke} strokeWidth={1.75} />
+        <line x1={40} y1={20} x2={62} y2={20} {...stroke} />
+      </>
+    ),
+  SENSOR_LIGHT: () =>
+    module(
+      <>
+        <circle cx={20} cy={20} r={8} {...stroke} strokeWidth={1.75} />
+        <path d="M15 17 h3 v6 h3 v-6 h3" {...stroke} strokeWidth={1.5} />
+      </>
+    ),
+  SENSOR_TEMPERATURE: () =>
+    module(
+      <>
+        <path d="M18 9 v13 M22 9 v13" {...stroke} strokeWidth={1.5} />
+        <ellipse cx={20} cy={25} rx={5} ry={6} fill="currentColor" />
+      </>
+    ),
+  SENSOR_OBSTACLE: () =>
+    module(
+      <>
+        <circle cx={16} cy={13} r={5} {...stroke} strokeWidth={1.75} />
+        <circle cx={16} cy={27} r={5} fill="currentColor" />
+      </>
+    ),
+  SENSOR_MOTION: () =>
+    module(
+      <>
+        <circle cx={22} cy={20} r={11} {...stroke} strokeWidth={1.75} />
+        <path d="M17 10 Q15 20 17 30 M27 10 Q29 20 27 30" {...stroke} strokeWidth={1.25} />
+      </>
+    ),
+  ARDUINO_UNO: () =>
+    frame(
+      <>
+        <rect x={6} y={4} width={52} height={32} rx={3} {...body} />
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <rect key={i} x={13 + i * 7} y={8} width={4} height={4} fill="currentColor" />
+        ))}
+        <rect x={22} y={19} width={20} height={10} rx={1.5} {...stroke} strokeWidth={1.5} />
+      </>
+    ),
   INPUT: () =>
     frame(
       <>

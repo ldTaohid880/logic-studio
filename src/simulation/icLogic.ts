@@ -6,6 +6,16 @@ export interface ICPins {
   outputs: PinData[];
 }
 
+/** Pins `${name}0`..`${name}${count - 1}` with ids starting at `${prefix}-${first}`. */
+const bitPins = (prefix: 'in' | 'out', first: number, name: string, count: number): PinData[] =>
+  Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${first + i}`, name: `${name}${i}`, value: 0 as SignalValue }));
+
+/** ALU operations, indexed by S2 S1 S0. */
+export const ALU_OPERATIONS = ['A + B', 'A − B', 'A AND B', 'A OR B', 'A XOR B', 'NOT A', 'A + 1', 'A − 1'] as const;
+
+/** ROM contents for a new ROM: each address holds its own number. */
+export const DEFAULT_ROM_CONTENTS = Array.from({ length: 16 }, (_, i) => i);
+
 export function getDefaultICPins(gateType: GateType): ICPins {
   switch (gateType) {
     case 'HALF_ADDER':
@@ -314,6 +324,56 @@ export function getDefaultICPins(gateType: GateType): ICPins {
         ],
       };
 
+    case 'COUNTER_4BIT':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'CLK', value: 0 },
+          { id: 'in-1', name: 'EN', value: 1 },
+          { id: 'in-2', name: 'UP', value: 1 },
+          { id: 'in-3', name: 'CLR', value: 0 },
+        ],
+        outputs: [...bitPins('out', 0, 'Q', 4), { id: 'out-4', name: 'TC', value: 0 }],
+      };
+
+    case 'SHIFT_REG_4BIT':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'SER', value: 0 },
+          { id: 'in-1', name: 'CLK', value: 0 },
+          { id: 'in-2', name: 'CLR', value: 0 },
+        ],
+        outputs: bitPins('out', 0, 'Q', 4),
+      };
+
+    case 'ALU_4BIT_8FN':
+      return {
+        inputs: [
+          ...bitPins('in', 0, 'A', 4),
+          ...bitPins('in', 4, 'B', 4),
+          { id: 'in-8', name: 'S0', value: 0 },
+          { id: 'in-9', name: 'S1', value: 0 },
+          { id: 'in-10', name: 'S2', value: 0 },
+        ],
+        outputs: [...bitPins('out', 0, 'F', 4), { id: 'out-4', name: 'C', value: 0 }, { id: 'out-5', name: 'Z', value: 1 }],
+      };
+
+    case 'RAM_16X4':
+      return {
+        inputs: [
+          ...bitPins('in', 0, 'A', 4),
+          ...bitPins('in', 4, 'D', 4),
+          { id: 'in-8', name: 'WE', value: 0 },
+          { id: 'in-9', name: 'CLK', value: 0 },
+        ],
+        outputs: bitPins('out', 0, 'Q', 4),
+      };
+
+    case 'ROM_16X4':
+      return {
+        inputs: bitPins('in', 0, 'A', 4),
+        outputs: bitPins('out', 0, 'Q', 4),
+      };
+
     case 'DELAY_ELEMENT':
       return {
         inputs: [{ id: 'in-0', name: 'In', value: 0 }],
@@ -338,10 +398,20 @@ export function floatingAs(value: SignalValue | undefined, fallback: 0 | 1): Sig
   return value === undefined || value === -1 ? fallback : value;
 }
 
+/** Number from `count` inputs starting at `first`, least significant first; floating counts as 0. */
+const readBits = (inputs: SignalValue[], first: number, count: number) =>
+  Array.from({ length: count }, (_, i) => (inputs[first + i] === 1 ? 1 << i : 0)).reduce((a, b) => a | b, 0);
+
+const writeBits = (outputs: Record<string, SignalValue>, first: number, value: number, count: number) => {
+  for (let i = 0; i < count; i++) outputs[`out-${first + i}`] = ((value >> i) & 1) as SignalValue;
+};
+
 export function evaluateIC(
   gateType: GateType,
   inputs: SignalValue[],
-  currentState: Record<string, any> = {}
+  currentState: Record<string, any> = {},
+  /** Part settings some chips read (ROM contents). */
+  data: { romContents?: number[] } = {}
 ): { outputs: Record<string, SignalValue>; newState: Record<string, any> } {
   const outputs: Record<string, SignalValue> = {};
   const newState = { ...currentState };
@@ -684,6 +754,75 @@ export function evaluateIC(
       outputs['out-2'] = ((masked >> 2) & 1) as SignalValue;
       outputs['out-3'] = ((masked >> 3) & 1) as SignalValue;
       outputs['out-4'] = isSub ? (a < b ? 1 : 0) : (res > 15 ? 1 : 0);
+      break;
+    }
+
+    case 'COUNTER_4BIT': {
+      const clk = inputs[0] === 1 ? 1 : 0;
+      const en = floatingAs(inputs[1], 1);
+      const up = floatingAs(inputs[2], 1);
+      const clr = inputs[3] === 1;
+      let count: number = currentState.count ?? 0;
+      if (clr) count = 0;
+      else if ((currentState.prevClk ?? 0) === 0 && clk === 1 && en === 1) count = (count + (up === 1 ? 1 : 15)) % 16;
+      newState.prevClk = clk;
+      newState.count = count;
+      writeBits(outputs, 0, count, 4);
+      outputs['out-4'] = en === 1 && count === (up === 1 ? 15 : 0) ? 1 : 0;
+      break;
+    }
+
+    case 'SHIFT_REG_4BIT': {
+      const ser = inputs[0] === 1 ? 1 : 0;
+      const clk = inputs[1] === 1 ? 1 : 0;
+      let q: number = currentState.qVal ?? 0;
+      if (inputs[2] === 1) q = 0;
+      else if ((currentState.prevClk ?? 0) === 0 && clk === 1) q = ((q << 1) | ser) & 15;
+      newState.prevClk = clk;
+      newState.qVal = q;
+      writeBits(outputs, 0, q, 4);
+      break;
+    }
+
+    case 'ALU_4BIT_8FN': {
+      const a = readBits(inputs, 0, 4);
+      const b = readBits(inputs, 4, 4);
+      const op = readBits(inputs, 8, 3);
+      const results: [number, boolean][] = [
+        [a + b, a + b > 15],
+        [a - b, a < b],
+        [a & b, false],
+        [a | b, false],
+        [a ^ b, false],
+        [~a, false],
+        [a + 1, a === 15],
+        [a - 1, a === 0],
+      ];
+      const [raw, carry] = results[op];
+      const f = raw & 15;
+      writeBits(outputs, 0, f, 4);
+      outputs['out-4'] = carry ? 1 : 0;
+      outputs['out-5'] = f === 0 ? 1 : 0;
+      break;
+    }
+
+    case 'RAM_16X4': {
+      const addr = readBits(inputs, 0, 4);
+      const clk = inputs[9] === 1 ? 1 : 0;
+      let mem: number[] = currentState.mem ?? new Array(16).fill(0);
+      if ((currentState.prevClk ?? 0) === 0 && clk === 1 && inputs[8] === 1) {
+        mem = mem.slice();
+        mem[addr] = readBits(inputs, 4, 4);
+      }
+      newState.prevClk = clk;
+      newState.mem = mem;
+      writeBits(outputs, 0, mem[addr] ?? 0, 4);
+      break;
+    }
+
+    case 'ROM_16X4': {
+      const contents = data.romContents ?? DEFAULT_ROM_CONTENTS;
+      writeBits(outputs, 0, contents[readBits(inputs, 0, 4)] ?? 0, 4);
       break;
     }
 

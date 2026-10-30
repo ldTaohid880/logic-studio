@@ -18,13 +18,15 @@
 
 ## What you can do
 
-- **Build circuits** from 45 parts: switches, push buttons and DIP switches; AND, OR, NOT, NAND, NOR, XOR, XNOR, buffers and tri-state buffers; multiplexers, decoders, encoders, comparators and parity chips; adders and subtractors; latches, flip-flops and a 4-bit register; LEDs, probes, 7-segment and hex displays.
+- **Build circuits** from 56 parts: switches, push buttons, DIP switches and clocks; AND, OR, NOT, NAND, NOR, XOR, XNOR, buffers and tri-state buffers; multiplexers, decoders, encoders, comparators and parity chips; adders, subtractors and a 4-bit ALU; latches, flip-flops, a register, a counter, a shift register, RAM and ROM; light, temperature, obstacle and motion sensors; LEDs, probes, 7-segment and hex displays.
+- **Grow into sequential logic.** Add a clock and run controls appear (run, pause, step one edge, speed) with a live timing diagram you can download as a VCD file for GTKWave. Circuits without a clock stay instant and simple.
+- **Program an Uno-compatible board.** Export a sketch from the Arduino IDE as a `.hex` file, drop it on the board and wire its header pins to your gates and sensors (D2–D13 and A0–A5, each usable as input or output). `digitalWrite`, `digitalRead`, `delay`, `millis` and `Serial` work, emulated in the browser with [avr8js](https://github.com/wokwi/avr8js).
 - **See signals live.** Wires and pins show 1, 0 or unknown as you edit. Unknown values are marked with `?`, hollow pins and dashed wires, so the state is readable without relying on colour.
 - **Get the truth table of any circuit**, with the row matching the canvas highlighted. Click a row to set the switches to it. Each output gets a simplified sum-of-products expression and its minterm list.
 - **Learn how each part works.** Select a part to see its expression and truth table in the inspector.
 - **Spot feedback problems.** Circuits that never settle, such as a ring of inverters, are outlined and explained.
 - **Make your own chips.** Turn a selection into a reusable component, open it to edit the inside, and nest components inside each other.
-- **Start from examples** covering gates, adders, subtractors, multiplexers, a BCD decoder, latches and flip-flops.
+- **Start from examples** covering gates, adders, subtractors, multiplexers, a BCD decoder, latches, flip-flops and a clocked counter.
 - **Keep your work.** It autosaves in the browser. You can also save and open `.json` files (custom components included) and export the canvas as a PNG.
 - **Use it your way:** light and dark themes, three interface sizes, and keyboard shortcuts for everything (press `?` in the app).
 
@@ -38,6 +40,10 @@
     <td align="center">Dark theme</td>
   </tr>
 </table>
+
+## What's next
+
+See the [roadmap](ROADMAP.md) for planned features: checking a circuit against a target table, a state machine designer, `analogRead` for sensors, gate delays and buses.
 
 ## Keyboard shortcuts
 

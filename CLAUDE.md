@@ -22,13 +22,15 @@ public/         favicon.svg (the logo; Logo.tsx draws the same mark), PNG icons,
 src/
   main.tsx      wraps App in ErrorBoundary (recovery screen: reload, download autosave, clear autosave)
   simulation/   pure logic, no React — engine.ts (propagateSignals), icLogic.ts,
-                customComponentLogic.ts, encoderLogic.ts (+ engine.test.ts)
+                customComponentLogic.ts, encoderLogic.ts (+ engine.test.ts);
+                timeline.ts (simulated time: clocks, boards, timing diagram traces);
+                avr/ (Uno-compatible board: intelHex.ts, unoBoard.ts on avr8js, boards.ts = lazy-loaded running boards)
   store/        Zustand store, split into slices
     useCircuitStore.ts   composes slices + throttled autosave
     types.ts             CircuitStore interface, StoreSlice<T>, ThemeMode/UiDensity/WireStyle
     helpers.ts           storage keys/loaders, makeId, removeUnsupportedParts, markRemovedWireTargets
     partFactory.ts       createPart: default pins, label and settings for a new part (used by addNode)
-    slices/              editor, clipboard, groups, devices, simulation, customComponents, project, history, ui
+    slices/              editor, clipboard, groups, devices, simulation, timeline, customComponents, project, history, ui
   data/components.ts     parts catalog (PARTS, PART_CATEGORIES, getComponentInfo): names, descriptions,
                          categories and part numbers used by the parts bin and the properties panel
   data/examples/         built-in example circuits, one module per category; index.ts sets the order
@@ -38,7 +40,8 @@ src/
     nodes/      one React Flow node per family; Pin.tsx (all handles), partKit.tsx (labels/leads for I/O parts),
                 ChipFrame.tsx (ICs and custom components), symbols/gateGeometry.ts (IEEE gate shapes)
     toolbar/    TopBar (File/View menus), LeftToolbox (parts bin + icon rail), PartGlyph, StatusBar
-    inspector/  InspectorPanel (picks the view), PartLiveView ("How it works"), CircuitOverview (nothing
+    timeline/   TimingPanel: run controls + timing diagram under the canvas, shown only with a clock or board
+    inspector/  InspectorPanel (picks the view), TimedPartPanels (clock, ROM/RAM, ALU, board), PartLiveView ("How it works"), CircuitOverview (nothing
                 selected), SelectionSummary (several selected), WireInspector, per-part panels
     ui/         primitives: Dialog/ModalFrame, ModalHeader, ConfirmDialog, DropdownMenu/MenuPanel, Tooltip,
                 IconButton, Button, Input, SegmentedControl, Select, TruthTable, Toast; plus dialogs.
@@ -55,14 +58,17 @@ src/
 
 - Signals are `SignalValue = 0 | 1 | -1`; **-1 means floating/unknown**, never `undefined`.
 - The store owns `nodes`/`edges` (React Flow shape). Pin values live in `node.data.inputs[]` / `node.data.outputs[]`; pin ids are `in-N` / `out-N` and must match React Flow handle ids.
-- There is no clock and no running loop. Every mutation ends with `get().tickSimulation()`, which calls `propagateSignals(nodes, edges, customComponents)` from `simulation/engine.ts` and bumps `simulation.stepCount`. The engine clones nodes, iterates until stable (at least 12 passes, up to node count + 4, capped at 256), and returns new nodes/edges — it never mutates its inputs. If it runs out of passes it returns the still-changing parts in `unstableNodeIds`; `tickSimulation` stores them in `simulation.unstableNodeIds`, adds the `ls-unstable` class (amber outline) and the status bar warns. `resetSimulation` sets inputs to 0, floats everything else and re-settles.
-- Engine dispatch: fixed ICs are in the `IC_GATE_TYPES` set; special cases are sources (INPUT, PUSH_BUTTON, CONST_*), DIP_SWITCH, displays (OUTPUT, LOGIC_PROBE, SEVEN_SEGMENT, HEX_DISPLAY, BUS_MONITOR), ENCODER, CUSTOM and TUNNEL; plain gates go through `evaluateGate` (`utils/gateLogic.ts`).
-- Memory parts keep state in `data.icState`: the D latch follows D while enabled; flip-flops and the register act on the CLK edge, which students make with a push button or switch.
+- Every mutation ends with `get().tickSimulation()`, which calls `propagateSignals(nodes, edges, customComponents)` from `simulation/engine.ts` and bumps `simulation.stepCount`. The engine clones nodes, iterates until stable (at least 12 passes, up to node count + 4, capped at 256), and returns new nodes/edges — it never mutates its inputs. If it runs out of passes it returns the still-changing parts in `unstableNodeIds`; `tickSimulation` stores them in `simulation.unstableNodeIds`, adds the `ls-unstable` class (amber outline) and the status bar warns. `resetSimulation` sets inputs to 0, floats everything else and re-settles.
+- Simulated time (`simulation/timeline.ts`, `timeline` slice) exists only while the circuit has a CLOCK or ARDUINO_UNO part ("depth on demand": circuits without them never see run controls or time). `TimingPanel` runs a requestAnimationFrame loop calling `advanceTimeline(realMs)` → `advanceCircuit`, which toggles clocks on their edges (they start low; rates in `CLOCK_RATES_HZ`), runs boards in 1 ms slices, and re-settles with `propagateSignals` after each change. Gates have no delay. Frames are capped (100 ms simulated, 25 ms wall clock; `behind` flags falling behind). Traces (`[time, level]` changes for clocks, switches, buttons, LEDs, probes) are recorded by `recordTraces`, also from `tickSimulation` so paused edits show. `loadCircuit`/`clearCanvas` reset time and restart boards. Clocks inside custom components don't tick.
+- Boards: `ARDUINO_UNO` pins (`BOARD_PINS`: D2–D13, then A0–A5 as digital pins 14–19) each have a read side (`in-N`) and a drive side (`out-N`, -1 while the sketch has the pin as input). `BoardNode` draws them as one header pin: both handles stacked at the same spot (the target one has `lsp-pin-ghost`), and React Flow picks the opposite type when handles overlap, so dragging out drives and dropping a wire in reads. The engine skips the board; `advanceCircuit` writes its outputs. Programs are compiled Intel HEX (`data.firmware`, a new `id` per load restarts the board); `loadBoardFirmware` validates with `parseIntelHex`. avr8js is dynamically imported by `simulation/avr/boards.ts` so it's only downloaded when a board runs. Only digital I/O, timers and USART (serial monitor, `boardSerial`) are wired up.
+- Sensors (`simulation/sensors.ts`, `SENSORS`): light, temperature, obstacle and motion modules with one digital output (DO = level above/below `sensorThreshold`). They're sources in the engine; `setSensorLevel` changes the reading without an undo step (like a switch); the threshold is an undoable setting. They aren't truth table inputs.
+- Engine dispatch: fixed ICs are in the `IC_GATE_TYPES` set; special cases are sources (INPUT, PUSH_BUTTON, CLOCK, sensors, CONST_*), ARDUINO_UNO, DIP_SWITCH, displays (OUTPUT, LOGIC_PROBE, SEVEN_SEGMENT, HEX_DISPLAY, BUS_MONITOR), ENCODER, CUSTOM and TUNNEL; plain gates go through `evaluateGate` (`utils/gateLogic.ts`).
+- Memory parts keep state in `data.icState`: the D latch follows D while enabled; flip-flops, the register, counter, shift register and RAM act on the rising CLK edge (from a clock, push button or switch). ROM contents live in `data.romContents` (settings, not state), passed to `evaluateIC` as its 4th argument.
 - `PinData.driven` marks pins fed by a wire; when the wire disappears the engine floats the pin to -1. Pins without the flag (e.g. encoder inputs toggled in the UI) keep manual values. When removing edges in the store, call `markRemovedWireTargets` (helpers.ts) first.
 - Unconnected control inputs use `floatingAs(value, default)` (icLogic.ts) — never `inputs[n] ?? 1`, because floating is -1, not undefined.
 - TUNNEL: only tunnels with a wired input drive their label (case-insensitive); conflicting drivers give -1. Tunnels are not evaluated as ICs.
 - Custom components: an instance caches internal state in `data.subcircuitNodeStates` tagged with `defVersion = def.updatedAt`; bump `updatedAt` whenever a definition changes so instances rebuild. Nesting is capped at `MAX_SUBCIRCUIT_DEPTH`; check `detectComponentRecursion` before inserting, pasting or importing components.
-- Removed parts (clock, oscilloscope, configurable `CFG_*`, multi-input bus, bus splitter/joiner/tap, LED matrix, RGB LED, equation generator, counters/shift registers/ALU and similar) are listed in `helpers.ts`. `removeUnsupportedParts` drops them from the autosaved circuit, opened files and loaded examples; `loadCircuit` tells the user how many were left out. Don't reintroduce those gate types without restoring their logic.
+- Removed parts (the old clock node type `clockNode`, oscilloscope, configurable `CFG_*`, multi-input bus, bus splitter/joiner/tap, LED matrix, RGB LED, equation generator, the old counters/shift registers/ALU and similar) are listed in `helpers.ts`. Their replacements use new type names (CLOCK on node type `clockSource`, COUNTER_4BIT, SHIFT_REG_4BIT, ALU_4BIT_8FN) so old saved data never meets new pin layouts. `removeUnsupportedParts` drops them from the autosaved circuit, opened files and loaded examples; `loadCircuit` tells the user how many were left out. Don't reintroduce those gate types without restoring their logic.
 
 ## Store conventions
 
@@ -71,12 +77,12 @@ src/
 - Components subscribe with selectors: `useCircuitStore(useShallow((s) => ({ a: s.a })))` or `useCircuitStore((s) => s.a)`. Never call `useCircuitStore()` without a selector (re-renders on every change). `useCircuitStore.getState()` is fine inside event handlers, not during render.
 - New ids come from `makeId(prefix)` (`utils/ids.ts`, re-exported from `store/helpers.ts`), not `Date.now()` alone.
 - Opening a circuit file goes through `openCircuitFile(text)` (project slice) → `parseCircuitFile` (`utils/circuitFile.ts`), which validates, adds bundled custom components (clashing ids become copies) and rejects recursive ones. Don't merge `customComponents` with `setState`.
-- localStorage keys: `logic_studio_circuit` (autosaved root circuit), `logic_studio_presets`, `logic_studio_custom_components`, `logic_studio_ui_prefs` (theme, density, wire style, minimap; ui slice). UI-only keys written by components: `logic_studio_recent_parts`, `logic_studio_bin_sections` (parts bin), `logic_studio_inspector_width`.
+- localStorage keys: `logic_studio_circuit` (autosaved root circuit), `logic_studio_presets`, `logic_studio_custom_components`, `logic_studio_ui_prefs` (theme, density, wire style, minimap; ui slice). UI-only keys written by components: `logic_studio_recent_parts`, `logic_studio_bin_sections` (parts bin), `logic_studio_inspector_width`, `logic_studio_timing_open`.
 - `showToast(message, variant?)` picks the error style automatically for messages starting with "Cannot", "Failed", "Invalid", etc.; pass a variant to override.
 
 ## UI conventions
 
-- Colors come from semantic tokens in `src/index.css` (`bg-surface-0..3`, `text-fg/-muted/-subtle`, `border-line(-strong)`, `accent`, `signal-high/low/unknown/bus`), defined for both `[data-theme="dark"]` and `[data-theme="light"]`. Legacy `slate-*`/`emerald-*`/`cyan-*` classes are remapped to theme variables (light theme mirrors the accent scales), but new code should use the semantic names. Avoid hard-coded hex except for the always-dark display faces (`DisplayFace` in partKit).
+- Colors come from semantic tokens in `src/index.css` (`bg-surface-0..3`, `text-fg/-muted/-subtle`, `border-line(-strong)`, `accent`, `signal-high/low/unknown/bus`), defined for both `[data-theme="dark"]` and `[data-theme="light"]`. Legacy `slate-*`/`emerald-*`/`cyan-*` classes are remapped to theme variables (light theme mirrors the accent scales), but new code should use the semantic names. Avoid hard-coded hex except for real-hardware faces that look the same in both themes: display faces (`DisplayFace` in partKit), the Uno board (`BoardNode`) and sensor modules (`SensorNode`).
 - Signal state must be readable without color: digits (1/0/?), hollow amber pins and dashed wires for floating. Use `Pin` for every handle (state via `data-signal`) and `signalColor`/`signalState` from `theme/signals.ts`.
 - Canvas parts sit on the 15px snap grid with pins on a 30px pitch. Unboxed parts (gates, switch, LED…) use the `lsp-schematic` class (no card chrome, dashed selection frame); boxed parts (chips, displays) don't.
 - Dialogs use `ModalFrame`/`Dialog` (portal, Escape closes the topmost dialog, focus trap/restore) with `ModalHeader`. Confirm destructive actions with `ConfirmDialog`, never `window.confirm`/`prompt`.
@@ -96,7 +102,8 @@ src/
 
 - Unit tests live next to the code. `src/simulation/engine.test.ts` has `makeNode` / `wire` helpers for building circuits without the UI — reuse them for new engine behaviour.
 - `icLogic.test.ts` checks every fixed IC against an independent reference model for all input combinations, and fails if a type in `IC_GATE_TYPES` has no test: add a reference (or a sequence test for memory parts) when you add an IC.
-- `utils/presets.test.ts` runs golden checks on every built-in example (supported parts, valid pins, settles, known outputs for every row).
+- `data/examples/examples.test.ts` runs golden checks on every built-in example (supported parts, valid pins, settles, known outputs for every row).
+- `simulation/timeline.test.ts` covers clocks, `advanceCircuit` and the emulator; it runs a hand-assembled AVR program (`wordsToIntelHex`), since there's no AVR compiler in CI.
 - Store tests (`store/useCircuitStore.test.ts`) drive the real store; `src/test/setup.ts` provides an in-memory `localStorage` for Node.
 - To check behaviour in the running app, start the `dev` config from `.claude/launch.json` and drive the store from the browser console: `const { useCircuitStore: s } = await import('/src/store/useCircuitStore.ts')`. Reload the page first: after hot reloads this import can return a different store instance from the one the app renders. Autosave writes your experiments to `localStorage`; remove `logic_studio_circuit` afterwards to restore the default circuit.
 - React Flow adds to a selection on Ctrl/Cmd+click and reads the modifier from key state, so synthetic multi-select needs a `keydown` for Control before the clicks.

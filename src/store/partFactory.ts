@@ -4,7 +4,9 @@ import { DEFAULT_ENCODER_CONFIG } from '../types/encoder';
 import { createEncoderPins } from '../utils/encoderPins';
 import { DEFAULT_SEVEN_SEGMENT_CONFIG } from '../types/sevenSegment';
 import { createSevenSegmentPins } from '../utils/sevenSegmentPins';
-import { getDefaultICPins } from '../simulation/icLogic';
+import { getDefaultICPins, DEFAULT_ROM_CONTENTS } from '../simulation/icLogic';
+import { BOARD_PINS, DEFAULT_CLOCK_HZ, boardPinName } from '../simulation/timeline';
+import { isSensor, SENSORS } from '../simulation/sensors';
 import { IC_GATE_TYPES } from '../simulation/engine';
 import { makeId } from '../utils/ids';
 
@@ -39,6 +41,12 @@ const SHAPES: Partial<Record<GateType, PartShape>> = {
   INPUT: { nodeType: 'digitalInput', inputCount: 0 },
   OUTPUT: { nodeType: 'digitalOutput', inputCount: 1 },
   PUSH_BUTTON: { nodeType: 'pushButton', inputCount: 0 },
+  CLOCK: { nodeType: 'clockSource', label: 'CLK', inputCount: 0 },
+  ARDUINO_UNO: { nodeType: 'boardNode', label: 'Uno', inputCount: 0 },
+  SENSOR_LIGHT: { nodeType: 'sensorModule', label: 'Light', inputCount: 0 },
+  SENSOR_TEMPERATURE: { nodeType: 'sensorModule', label: 'Temperature', inputCount: 0 },
+  SENSOR_OBSTACLE: { nodeType: 'sensorModule', label: 'Obstacle', inputCount: 0 },
+  SENSOR_MOTION: { nodeType: 'sensorModule', label: 'Motion', inputCount: 0 },
   DIP_SWITCH: { nodeType: 'dipSwitch', label: '', inputCount: 0 },
   CONST_HIGH: { nodeType: 'logicGate', label: 'Constant HIGH', inputCount: 0 },
   CONST_LOW: { nodeType: 'logicGate', label: 'Constant LOW', inputCount: 0 },
@@ -81,6 +89,12 @@ function defaultPins(gateType: GateType, shape: PartShape): { inputs: PinData[];
       return { inputs: pins('in', 4, (i) => `B${i}`), outputs: [] };
     case 'HEX_DISPLAY':
       return { inputs: pins('in', 4, (i) => `D${i}`), outputs: [] };
+    case 'ARDUINO_UNO':
+      // Each pin has a read side (input) and a drive side (output); outputs float until a program drives them
+      return {
+        inputs: BOARD_PINS.map((pin, i) => ({ id: `in-${i}`, name: boardPinName(pin), value: -1 as const })),
+        outputs: BOARD_PINS.map((pin, i) => ({ id: `out-${i}`, name: boardPinName(pin), value: -1 as const })),
+      };
     case 'TRI_STATE_BUFFER':
       return {
         inputs: [
@@ -91,10 +105,12 @@ function defaultPins(gateType: GateType, shape: PartShape): { inputs: PinData[];
       };
   }
 
+  if (isSensor(gateType)) return { inputs: [], outputs: [{ id: 'out-0', name: 'DO', value: -1 }] };
+
   const count = shape.inputCount;
   const inputs = pins('in', count, (i) => (count === 1 ? 'In' : `In ${i + 1}`), -1);
   if (gateType === 'OUTPUT' || gateType === 'LOGIC_PROBE') return { inputs, outputs: [] };
-  const outValue = gateType === 'INPUT' || gateType === 'CONST_LOW' ? 0 : gateType === 'CONST_HIGH' ? 1 : -1;
+  const outValue = gateType === 'INPUT' || gateType === 'CLOCK' || gateType === 'CONST_LOW' ? 0 : gateType === 'CONST_HIGH' ? 1 : -1;
   return { inputs, outputs: [{ id: 'out-0', name: 'Out', value: outValue }] };
 }
 
@@ -126,6 +142,9 @@ export function createPart(gateType: GateType, position: { x: number; y: number 
       ...(gateType === 'BUS_MONITOR' ? { bitWidth: 4, displayFormat: 'hex' } : {}),
       ...(gateType === 'ENCODER' ? { encoderConfig: DEFAULT_ENCODER_CONFIG } : {}),
       ...(gateType === 'SEVEN_SEGMENT' ? { sevenSegmentConfig: DEFAULT_SEVEN_SEGMENT_CONFIG } : {}),
+      ...(gateType === 'CLOCK' ? { clockHz: DEFAULT_CLOCK_HZ } : {}),
+      ...(isSensor(gateType) ? { sensorLevel: SENSORS[gateType].level, sensorThreshold: SENSORS[gateType].threshold } : {}),
+      ...(gateType === 'ROM_16X4' ? { romContents: DEFAULT_ROM_CONTENTS } : {}),
     } as unknown as Record<string, unknown>,
   };
 }

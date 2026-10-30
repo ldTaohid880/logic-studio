@@ -3,6 +3,7 @@ import { CIRCUIT_PRESETS } from '../../data/examples';
 import { getInitialPresets, savePresetsToStorage, removeUnsupportedParts, saveCustomComponentsToStorage } from '../helpers';
 import { parseCircuitFile } from '../../utils/circuitFile';
 import { CircuitStore, StoreSlice } from '../types';
+import { restartBoards } from '../../simulation/avr/boards';
 
 // Presets and whole-circuit load/clear
 export type ProjectSlice = Pick<CircuitStore,
@@ -22,16 +23,20 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
   loadCircuit: (rawNodes, rawEdges) => {
     get().saveHistory();
     const { nodes, edges, removed } = removeUnsupportedParts(rawNodes, rawEdges);
+    // A different circuit starts its own time: boards restart and the timing diagram is cleared
+    restartBoards();
     set({
       nodes,
       edges,
       selectedNodeId: null,
       selectedEdgeId: null,
+      timeline: { ...get().timeline, time: 0, traces: {}, behind: false },
+      boardSerial: {},
     });
     get().tickSimulation();
     if (removed > 0) {
       get().showToast(
-        `${removed} part${removed === 1 ? '' : 's'} left out: clocks, oscilloscopes, buses and some ICs are no longer available`,
+        `${removed} part${removed === 1 ? '' : 's'} left out: older parts such as oscilloscopes and bus splitters are no longer available`,
         'info'
       );
     }
@@ -126,11 +131,14 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
 
   clearCanvas: () => {
     get().saveHistory();
+    restartBoards();
     set({
       nodes: [],
       edges: [],
       selectedNodeId: null,
       selectedEdgeId: null,
+      timeline: { ...get().timeline, time: 0, traces: {}, behind: false },
+      boardSerial: {},
     });
   },
 

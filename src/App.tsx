@@ -4,6 +4,7 @@ import { LeftToolbox } from './components/toolbar/LeftToolbox';
 import { StatusBar } from './components/toolbar/StatusBar';
 import { CircuitCanvas } from './components/canvas/CircuitCanvas';
 import { InspectorPanel } from './components/inspector/InspectorPanel';
+import { TimingPanel } from './components/timeline/TimingPanel';
 import { PresetsModal } from './components/ui/PresetsModal';
 import { ShortcutsModal } from './components/ui/ShortcutsModal';
 import { CircuitTruthTableModal } from './components/ui/CircuitTruthTableModal';
@@ -126,13 +127,16 @@ export default function App() {
           </div>
         )}
 
-        <CircuitCanvas
-          canvasRef={canvasRef}
-          onOpenCircuitTruthTable={() => setIsCircuitTruthTableOpen(true)}
-          onOpenWizard={() => setIsWizardOpen(true)}
-          onOpenPresets={() => setIsPresetsOpen(true)}
-          onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        />
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+          <CircuitCanvas
+            canvasRef={canvasRef}
+            onOpenCircuitTruthTable={() => setIsCircuitTruthTableOpen(true)}
+            onOpenWizard={() => setIsWizardOpen(true)}
+            onOpenPresets={() => setIsPresetsOpen(true)}
+            onOpenShortcuts={() => setIsShortcutsOpen(true)}
+          />
+          <TimingPanel />
+        </div>
 
         {showInspector && (
           <div

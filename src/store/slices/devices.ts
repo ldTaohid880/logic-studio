@@ -16,6 +16,7 @@ export type DevicesSlice = Pick<CircuitStore,
   | 'setButtonPressed'
   | 'toggleDipBit'
   | 'setInputLevels'
+  | 'setSensorLevel'
 >;
 
 export const createDevicesSlice: StoreSlice<DevicesSlice> = (set, get) => ({
@@ -168,6 +169,16 @@ export const createDevicesSlice: StoreSlice<DevicesSlice> = (set, get) => ({
       set({ nodes });
     }
 
+    get().tickSimulation();
+  },
+
+  setSensorLevel: (nodeId, level) => {
+    // Like flipping a switch: a change to what the sensor senses, not an edit, so not recorded in undo
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId ? { ...node, data: { ...(node.data as unknown as NodeData), sensorLevel: level } } : node
+      ),
+    });
     get().tickSimulation();
   },
 

@@ -6,6 +6,7 @@ import { evaluateIC } from './icLogic';
 import { DEFAULT_ENCODER_CONFIG } from '../types/encoder';
 import { CustomComponentDefinition } from '../types/customComponent';
 import { evaluateCustomComponentLogic } from './customComponentLogic';
+import { isSensor, sensorOutput } from './sensors';
 
 // Nested custom components deeper than this are treated as unresolvable (guards against recursive definitions)
 export const MAX_SUBCIRCUIT_DEPTH = 16;
@@ -18,6 +19,7 @@ export const IC_GATE_TYPES = new Set<string>([
   'MUX_8TO1', 'DEMUX_1TO8', 'DECODER_3TO8', 'ENCODER_8TO3',
   'PARITY_GENERATOR', 'PARITY_CHECKER',
   'INCREMENTER_4BIT', 'DECREMENTER_4BIT', 'ADDER_SUBTRACTOR_4BIT',
+  'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'ALU_4BIT_8FN', 'RAM_16X4', 'ROM_16X4',
   'DELAY_ELEMENT',
 ]);
 
@@ -156,8 +158,17 @@ export function propagateSignals(
 
       if (data.gateType === 'TUNNEL') {
         // Tunnel outputs are resolved in the tunnel pass above
-      } else if (data.gateType === 'INPUT' || data.gateType === 'PUSH_BUTTON' || data.gateType === 'CONST_HIGH' || data.gateType === 'CONST_LOW') {
-        const val = data.gateType === 'CONST_HIGH' ? 1 : data.gateType === 'CONST_LOW' ? 0 : (data.value ?? 0);
+      } else if (data.gateType === 'ARDUINO_UNO') {
+        // Board outputs come from the emulated chip (simulation/timeline.ts), not from its inputs
+      } else if (
+        data.gateType === 'INPUT' ||
+        data.gateType === 'PUSH_BUTTON' ||
+        data.gateType === 'CLOCK' ||
+        data.gateType === 'CONST_HIGH' ||
+        data.gateType === 'CONST_LOW' ||
+        isSensor(data.gateType)
+      ) {
+        const val = data.gateType === 'CONST_HIGH' ? 1 : data.gateType === 'CONST_LOW' ? 0 : isSensor(data.gateType) ? sensorOutput(data) : (data.value ?? 0);
         data.outputs.forEach((outPin) => {
           if (outPin.value !== val) {
             outPin.value = val;
@@ -228,7 +239,7 @@ export function propagateSignals(
           }
         });
       } else if (IC_GATE_TYPES.has(data.gateType)) {
-        const icRes = evaluateIC(data.gateType, inputs, data.icState || {});
+        const icRes = evaluateIC(data.gateType, inputs, data.icState || {}, data);
         data.icState = icRes.newState;
         data.outputs.forEach((outPin) => {
           const expectedVal = icRes.outputs[outPin.id] ?? 0;
