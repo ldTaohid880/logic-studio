@@ -18,7 +18,9 @@ CI (`.github/workflows/ci.yml`) runs `npm ci`, lint, test and build on pushes to
 ## Layout
 
 ```
+public/         favicon.svg (the logo; Logo.tsx draws the same mark), PNG icons, og-image.png (link preview)
 src/
+  main.tsx      wraps App in ErrorBoundary (recovery screen: reload, download autosave, clear autosave)
   simulation/   pure logic, no React — engine.ts (propagateSignals), icLogic.ts,
                 customComponentLogic.ts, encoderLogic.ts (+ engine.test.ts)
   store/        Zustand store, split into slices
@@ -100,6 +102,9 @@ src/
 - React Flow adds to a selection on Ctrl/Cmd+click and reads the modifier from key state, so synthetic multi-select needs a `keydown` for Control before the clicks.
 
 ## Gotchas
+
+- `index.html` link-preview tags use `%SITE_URL%`, replaced at build time by a plugin in `vite.config.ts` (`SITE_URL`, else Vercel's production domain, else empty). `__APP_VERSION__` comes from `package.json`.
+- Regenerate `public/og-image.png` and the README screenshots in `.github/assets/` when the UI changes noticeably.
 
 - React Flow's built-in delete key is disabled (`deleteKeyCode={null}`); deletion goes through `useGlobalShortcuts` → `deleteSelected` so it is undoable and re-propagates.
 - `.react-flow__node > div` card defaults live in `@layer components` in `index.css` so a node's own Tailwind utilities win; unlayered rules there (selection outline, `lsp-schematic`) beat utilities.

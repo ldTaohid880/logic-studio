@@ -9,7 +9,6 @@ import {
   Redo2,
   FolderOpen,
   Keyboard,
-  Cpu,
   Layers,
   PanelRight,
   PanelLeft,
@@ -21,6 +20,7 @@ import {
   ToggleLeft,
   Monitor,
 } from 'lucide-react';
+import { Logo } from '../ui/Logo';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { useShallow } from 'zustand/react/shallow';
 import { IconButton } from '../ui/IconButton';
@@ -250,9 +250,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         onClick={toggleToolbox}
       />
       <div className="hidden sm:flex items-center gap-2 pl-1 pr-2 shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-accent text-on-accent flex items-center justify-center" aria-hidden="true">
-          <Cpu className="w-4 h-4" />
-        </div>
+        <Logo className="w-7 h-7 shrink-0" />
         <h1 className="hidden md:block text-sm font-semibold text-fg tracking-tight">Logic Studio</h1>
       </div>
 

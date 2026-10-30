@@ -1,7 +1,9 @@
 {
   "name": "logic-studio",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Build and simulate digital logic circuits in your browser.",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=18"
