@@ -41,6 +41,10 @@
   </tr>
 </table>
 
+## What's next
+
+See the [roadmap](ROADMAP.md) for planned features: checking a circuit against a target table, a state machine designer, `analogRead` for sensors, gate delays and buses.
+
 ## Keyboard shortcuts
 
 | Action | Keys |
