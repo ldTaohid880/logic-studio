@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CIRCUIT_PRESETS } from './presets';
+import { CIRCUIT_PRESETS } from '../data/examples';
 import {
   describeCircuitForTable,
   evaluateTableRow,

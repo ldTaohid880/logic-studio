@@ -1,6 +1,6 @@
 import { Node, Edge } from '@xyflow/react';
 import { NodeData, SimulationState, CircuitPreset } from '../types/circuit';
-import { CIRCUIT_PRESETS } from '../utils/presets';
+import { CIRCUIT_PRESETS } from '../data/examples';
 import { CustomComponentDefinition } from '../types/customComponent';
 import { BUILTIN_HALF_ADDER, BUILTIN_FULL_ADDER } from '../utils/builtinAdders';
 

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { CIRCUIT_PRESETS } from './presets';
-import { propagateSignals } from '../simulation/engine';
-import { removeUnsupportedParts } from '../store/helpers';
-import { describeCircuitForTable, generateCircuitTruthTable } from './circuitTruthTableEngine';
-import { NodeData } from '../types/circuit';
+import { CIRCUIT_PRESETS } from './index';
+import { propagateSignals } from '../../simulation/engine';
+import { removeUnsupportedParts } from '../../store/helpers';
+import { describeCircuitForTable, generateCircuitTruthTable } from '../../utils/circuitTruthTableEngine';
+import { NodeData } from '../../types/circuit';
 
 // Golden checks for the built-in examples: they are the first circuits students open
 describe.each(CIRCUIT_PRESETS.map((p) => [p.name, p] as const))('example "%s"', (_name, preset) => {

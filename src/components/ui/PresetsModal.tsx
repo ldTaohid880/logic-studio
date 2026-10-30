@@ -6,7 +6,7 @@ import { Input } from './Input';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { CircuitPreset } from '../../types/circuit';
 import { FolderOpen, Pencil, Trash2, RefreshCw, RotateCcw, Search, Save } from 'lucide-react';
-import { CIRCUIT_PRESETS } from '../../utils/presets';
+import { CIRCUIT_PRESETS } from '../../data/examples';
 
 interface PresetsModalProps {
   isOpen: boolean;

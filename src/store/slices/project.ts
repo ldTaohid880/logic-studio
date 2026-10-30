@@ -1,5 +1,5 @@
 import { CircuitPreset } from '../../types/circuit';
-import { CIRCUIT_PRESETS } from '../../utils/presets';
+import { CIRCUIT_PRESETS } from '../../data/examples';
 import { getInitialPresets, savePresetsToStorage, removeUnsupportedParts, saveCustomComponentsToStorage } from '../helpers';
 import { parseCircuitFile } from '../../utils/circuitFile';
 import { CircuitStore, StoreSlice } from '../types';

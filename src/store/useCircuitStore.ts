@@ -4,6 +4,8 @@ import { STORAGE_KEY_CIRCUIT } from './helpers';
 import { createUiSlice } from './slices/ui';
 import { createHistorySlice } from './slices/history';
 import { createEditorSlice } from './slices/editor';
+import { createClipboardSlice } from './slices/clipboard';
+import { createGroupsSlice } from './slices/groups';
 import { createDevicesSlice } from './slices/devices';
 import { createSimulationSlice } from './slices/simulation';
 import { createProjectSlice } from './slices/project';
@@ -13,6 +15,8 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   ...createUiSlice(set, get),
   ...createHistorySlice(set, get),
   ...createEditorSlice(set, get),
+  ...createClipboardSlice(set, get),
+  ...createGroupsSlice(set, get),
   ...createDevicesSlice(set, get),
   ...createSimulationSlice(set, get),
   ...createProjectSlice(set, get),
