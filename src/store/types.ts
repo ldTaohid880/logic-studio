@@ -71,6 +71,8 @@ export interface CircuitStore {
   toggleInputValue: (nodeId: string) => void;
   setButtonPressed: (nodeId: string, pressed: boolean) => void;
   toggleDipBit: (nodeId: string, bitIndex: number) => void;
+  /** Set several switches, buttons and DIP bits at once (e.g. from a truth table row); not recorded in undo. */
+  setInputLevels: (levels: { nodeId: string; bit?: number; value: 0 | 1 }[]) => void;
 
   // Encoder Node Manual Controls
   toggleEncoderInputPin: (nodeId: string, pinIdx: number) => void;

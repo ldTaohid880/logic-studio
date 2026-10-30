@@ -50,7 +50,7 @@ src/
 
 - Signals are `SignalValue = 0 | 1 | -1`; **-1 means floating/unknown**, never `undefined`.
 - The store owns `nodes`/`edges` (React Flow shape). Pin values live in `node.data.inputs[]` / `node.data.outputs[]`; pin ids are `in-N` / `out-N` and must match React Flow handle ids.
-- There is no clock and no running loop. Every mutation ends with `get().tickSimulation()`, which calls `propagateSignals(nodes, edges, customComponents)` from `simulation/engine.ts` and bumps `simulation.stepCount`. The engine clones nodes, iterates (max 12 passes) until stable, and returns new nodes/edges — it never mutates its inputs. `resetSimulation` sets inputs to 0, floats everything else and re-settles.
+- There is no clock and no running loop. Every mutation ends with `get().tickSimulation()`, which calls `propagateSignals(nodes, edges, customComponents)` from `simulation/engine.ts` and bumps `simulation.stepCount`. The engine clones nodes, iterates until stable (at least 12 passes, up to node count + 4, capped at 256), and returns new nodes/edges — it never mutates its inputs. If it runs out of passes it returns the still-changing parts in `unstableNodeIds`; `tickSimulation` stores them in `simulation.unstableNodeIds`, adds the `ls-unstable` class (amber outline) and the status bar warns. `resetSimulation` sets inputs to 0, floats everything else and re-settles.
 - Engine dispatch: fixed ICs are in the `IC_GATE_TYPES` set; special cases are sources (INPUT, PUSH_BUTTON, CONST_*), DIP_SWITCH, displays (OUTPUT, LOGIC_PROBE, SEVEN_SEGMENT, HEX_DISPLAY, BUS_MONITOR), ENCODER, CUSTOM and TUNNEL; plain gates go through `evaluateGate` (`utils/gateLogic.ts`).
 - Memory parts keep state in `data.icState`: the D latch follows D while enabled; flip-flops and the register act on the CLK edge, which students make with a push button or switch.
 - `PinData.driven` marks pins fed by a wire; when the wire disappears the engine floats the pin to -1. Pins without the flag (e.g. encoder inputs toggled in the UI) keep manual values. When removing edges in the store, call `markRemovedWireTargets` (helpers.ts) first.
@@ -64,7 +64,8 @@ src/
 - Put new actions in the slice that owns the domain; add the signature to `CircuitStore` in `store/types.ts` and the key to that slice's `Pick<>` type.
 - Make user-visible edits undoable: `get().saveHistory()` for discrete edits, `get().saveHistoryCoalesced(key)` for typing-style edits (same key within ~1.2s = one undo step). `updateNodeData(nodeId, patch, { propagate })` does this for simple data fields — prefer it over `useCircuitStore.setState` in components. Momentary input changes (switch flips, `setButtonPressed`, `toggleDipBit`) are deliberately not recorded. History is cleared when entering/leaving a sub-circuit.
 - Components subscribe with selectors: `useCircuitStore(useShallow((s) => ({ a: s.a })))` or `useCircuitStore((s) => s.a)`. Never call `useCircuitStore()` without a selector (re-renders on every change). `useCircuitStore.getState()` is fine inside event handlers, not during render.
-- New ids come from `makeId(prefix)`, not `Date.now()` alone.
+- New ids come from `makeId(prefix)` (`utils/ids.ts`, re-exported from `store/helpers.ts`), not `Date.now()` alone.
+- Opening a circuit file goes through `openCircuitFile(text)` (project slice) → `parseCircuitFile` (`utils/circuitFile.ts`), which validates, adds bundled custom components (clashing ids become copies) and rejects recursive ones. Don't merge `customComponents` with `setState`.
 - localStorage keys: `logic_studio_circuit` (autosaved root circuit), `logic_studio_presets`, `logic_studio_custom_components`, `logic_studio_ui_prefs` (theme, density, wire style, minimap; ui slice). UI-only keys written by components: `logic_studio_recent_parts`, `logic_studio_bin_sections` (parts bin), `logic_studio_inspector_width`.
 - `showToast(message, variant?)` picks the error style automatically for messages starting with "Cannot", "Failed", "Invalid", etc.; pass a variant to override.
 
@@ -96,7 +97,7 @@ src/
 
 - React Flow's built-in delete key is disabled (`deleteKeyCode={null}`); deletion goes through `useGlobalShortcuts` → `deleteSelected` so it is undoable and re-propagates.
 - `.react-flow__node > div` card defaults live in `@layer components` in `index.css` so a node's own Tailwind utilities win; unlayered rules there (selection outline, `lsp-schematic`) beat utilities.
-- The truth table generator (`utils/circuitTruthTableEngine.ts`) must receive `customComponents`, and resets `icState` per row.
-- Saved circuits open with floating (amber) wires until an input changes: wire `signalValue` isn't recomputed on load. Known issue in the engine/load path.
+- Circuit truth table (`utils/circuitTruthTableEngine.ts`): inputs are switches, push buttons and wired DIP bits in canvas reading order (first = MSB); outputs are wired LEDs/probes, hex displays (one digit) and 7-segment pins, falling back to unwired gate outputs. Pass `customComponents`. Rows start from `reset` (memory cleared, every signal floating) or `canvas`; tables are capped at `MAX_TABLE_INPUTS`. Expressions come from `utils/booleanMinimizer.ts` (Quine–McCluskey).
+- The store settles the restored circuit once at startup (`useCircuitStore.ts`); every other load goes through `loadCircuit`, which ticks.
 - `tsconfig` has `allowJs` and a `@` → repo-root alias; imports in `src/` use relative paths.
 - Files use LF line endings; when editing with scripts on Windows, write with `newline=''` (Python) so they don't turn into CRLF.

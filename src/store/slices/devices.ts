@@ -15,6 +15,7 @@ export type DevicesSlice = Pick<CircuitStore,
   | 'toggleInputValue'
   | 'setButtonPressed'
   | 'toggleDipBit'
+  | 'setInputLevels'
 >;
 
 export const createDevicesSlice: StoreSlice<DevicesSlice> = (set, get) => ({
@@ -209,6 +210,29 @@ export const createDevicesSlice: StoreSlice<DevicesSlice> = (set, get) => ({
         const values = [...(data.dipValues || Array(data.bitWidth || 4).fill(0))];
         values[bitIndex] = values[bitIndex] === 1 ? 0 : 1;
         return { ...n, data: { ...n.data, dipValues: values } };
+      }),
+    });
+    get().tickSimulation();
+  },
+
+  // Momentary like toggleInputValue: flipping switches isn't an undoable edit
+  setInputLevels: (levels) => {
+    const byNode = new Map<string, { bit?: number; value: 0 | 1 }[]>();
+    levels.forEach(({ nodeId, ...level }) => byNode.set(nodeId, [...(byNode.get(nodeId) ?? []), level]));
+    set({
+      nodes: get().nodes.map((n) => {
+        const nodeLevels = byNode.get(n.id);
+        if (!nodeLevels) return n;
+        const data = n.data as unknown as NodeData;
+        if (data.gateType === 'DIP_SWITCH') {
+          const values = [...(data.dipValues || Array(data.bitWidth || 4).fill(0))];
+          nodeLevels.forEach(({ bit, value }) => {
+            if (bit !== undefined) values[bit] = value;
+          });
+          return { ...n, data: { ...n.data, dipValues: values } };
+        }
+        const value = nodeLevels[0].value;
+        return { ...n, data: { ...n.data, value, outputs: data.outputs.map((p) => ({ ...p, value })) } };
       }),
     });
     get().tickSimulation();

@@ -2,7 +2,7 @@ import { Node, Edge } from '@xyflow/react';
 import { NodeData } from '../types/circuit';
 import { CustomComponentDefinition } from '../types/customComponent';
 import { detectComponentRecursion } from '../simulation/customComponentLogic';
-import { makeId } from '../store/helpers';
+import { makeId } from './ids';
 
 export type ParsedCircuitFile =
   | {

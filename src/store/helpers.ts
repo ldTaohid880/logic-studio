@@ -105,12 +105,7 @@ export const markRemovedWireTargets = (nodes: Node[], removedEdges: Edge[]): Nod
   });
 };
 
-export const makeId = (prefix: string): string => {
-  const unique = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID().slice(0, 8)
-    : Math.random().toString(36).slice(2, 10);
-  return `${prefix}-${Date.now()}-${unique}`;
-};
+export { makeId } from '../utils/ids';
 
 export const STORAGE_KEY_CIRCUIT = 'logic_studio_circuit';
 

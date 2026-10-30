@@ -1,642 +1,376 @@
-import React, { useRef, useState, useEffect, useMemo, useCallback, useId } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { toPng } from 'html-to-image';
+import { Check, Copy, Download, Image as ImageIcon, Info, Table } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { ModalFrame } from './Dialog';
 import { ModalHeader } from './ModalHeader';
 import { Button } from './Button';
-import { toPng } from 'html-to-image';
-import {
-  X,
-  Download,
-  Copy,
-  Check,
-  Table,
-  Search,
-  Filter,
-  Zap,
-  Printer,
-  Sliders,
-  AlertTriangle,
-  RotateCcw,
-  Eye,
-  EyeOff,
-  CheckSquare,
-  Square,
-  Loader2,
-} from 'lucide-react';
-
+import { SegmentedControl } from './SegmentedControl';
+import { TruthTable, TruthTableRow } from './TruthTable';
 import { useCircuitStore } from '../../store/useCircuitStore';
-import { useShallow } from 'zustand/react/shallow';
+import { resolveCssColor } from '../../theme/signals';
 import {
-  analyzeCircuitGraph,
-  generateCircuitTruthTableAsync,
-  CircuitTruthTableData,
-  CircuitSignal,
-  TruthTableRowData,
+  CircuitTableModel,
+  CircuitTableRow,
+  MAX_TABLE_INPUTS,
+  MemoryStart,
+  currentRowIndex,
+  describeCircuitForTable,
+  generateCircuitTruthTable,
+  rowInputLevels,
+  shortSignalNames,
+  tableInputsKey,
 } from '../../utils/circuitTruthTableEngine';
+import { Implicant, MAX_MINIMIZE_VARS, formatSOP, minimizeSOP } from '../../utils/booleanMinimizer';
 
 interface CircuitTruthTableModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
-  const { nodes, edges, customComponents } = useCircuitStore(useShallow((s) => ({ nodes: s.nodes, edges: s.edges, customComponents: s.customComponents })));
+export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({ isOpen, onClose }) =>
+  // Only subscribe to the circuit while the dialog is open
+  isOpen ? <CircuitTruthTableDialog onClose={onClose} /> : null;
 
+interface OutputSummary {
+  label: string;
+  name: string;
+  minterms: number[];
+  unknownRows: number[];
+  terms: Implicant[] | null;
+}
+
+/** Sum of products with complemented inputs drawn with an overbar, as in textbooks. */
+const Expression: React.FC<{ terms: Implicant[]; names: string[] }> = ({ terms, names }) => {
+  if (terms.length === 0) return <span>0</span>;
+  if (terms.some((t) => t.every((b) => b === null))) return <span>1</span>;
+  const multiChar = names.some((n) => n.length > 1);
+  return (
+    <>
+      {terms.map((bits, ti) => (
+        <React.Fragment key={ti}>
+          {ti > 0 && <span className="text-fg-subtle"> + </span>}
+          {bits.map((b, v) =>
+            b === null ? null : (
+              <React.Fragment key={v}>
+                {multiChar && bits.slice(0, v).some((x) => x !== null) && <span className="text-fg-subtle">·</span>}
+                <span className={b === 0 ? 'overline decoration-1' : undefined}>{names[v]}</span>
+              </React.Fragment>
+            )
+          )}
+        </React.Fragment>
+      ))}
+    </>
+  );
+};
+
+const formatList = (items: (number | string)[], max = 24) =>
+  items.length > max ? `${items.slice(0, max).join(', ')}, …` : items.join(', ');
+
+const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { nodes, edges, customComponents, setInputLevels } = useCircuitStore(
+    useShallow((s) => ({ nodes: s.nodes, edges: s.edges, customComponents: s.customComponents, setInputLevels: s.setInputLevels }))
+  );
   const titleId = useId();
-  const [copied, setCopied] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [followActiveRow, setFollowActiveRow] = useState(false);
-  const [initialSeqState, setInitialSeqState] = useState<number>(0);
-
-  // Column Visibility state
-  const [visibleSignalIds, setVisibleSignalIds] = useState<Set<string>>(new Set());
-  const [showColumnPicker, setShowColumnPicker] = useState(false);
-
-  // Async Generation State
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentGeneratedRow, setCurrentGeneratedRow] = useState(0);
-  const [totalRowsToGenerate, setTotalRowsToGenerate] = useState(0);
-  const [timeEstimateMs, setTimeEstimateMs] = useState(0);
-  const [truthTableData, setTruthTableData] = useState<CircuitTruthTableData | null>(null);
-
-  const cancellationRef = useRef(false);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
   const activeRowRef = useRef<HTMLTableRowElement>(null);
 
-  // Create stable topology key (gate types, IDs, labels, wire connections)
-  const topologyKey = useMemo(() => {
-    if (!isOpen) return '';
-    const nodeStr = nodes
-      .map((n) => `${n.id}:${(n.data as any).gateType}:${(n.data as any).label || ''}`)
-      .join('|');
-    const edgeStr = edges
-      .map((e) => `${e.id}:${e.source}:${e.sourceHandle}->${e.target}:${e.targetHandle}`)
-      .join('|');
-    return `${nodeStr}___${edgeStr}`;
-  }, [isOpen, nodes, edges]);
+  const [showInternal, setShowInternal] = useState(false);
+  const [memoryStart, setMemoryStart] = useState<MemoryStart>('reset');
+  const [rows, setRows] = useState<CircuitTableRow[] | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  // Analyze circuit graph only when topology changes
-  const analysis = useMemo(() => {
-    if (!isOpen) return null;
-    return analyzeCircuitGraph(nodes, edges);
-  }, [isOpen, topologyKey]);
+  const structureKey = tableInputsKey(nodes, edges, false);
+  // Recompute only when the circuit's structure changes, not on every switch flip
+  const model: CircuitTableModel = useMemo(() => describeCircuitForTable(nodes, edges), [structureKey]);
 
-  // Initialize visible signals on open/analysis
+  const tooManyInputs = model.inputs.length > MAX_TABLE_INPUTS;
+  const canBuild = model.inputs.length > 0 && model.outputs.length > 0 && !tooManyInputs;
+  // Rows that start from the canvas depend on its current values, so those must regenerate the table too
+  const fromCanvas = model.isSequential && memoryStart === 'canvas';
+  const generationKey = fromCanvas ? tableInputsKey(nodes, edges, true) : structureKey;
+
   useEffect(() => {
-    if (analysis) {
-      const allIds = new Set<string>([
-        ...analysis.inputs.map((s) => s.id),
-        ...analysis.internal.map((s) => s.id),
-        ...analysis.outputs.map((s) => s.id),
-      ]);
-      setVisibleSignalIds(allIds);
+    if (!canBuild) {
+      setRows(null);
+      return;
     }
-  }, [analysis]);
-
-  // Generate Truth Table Action
-  const runGeneration = useCallback(async (showLoader: boolean = false) => {
-    if (!analysis) return;
-
-    cancellationRef.current = false;
-    if (showLoader) {
-      setIsGenerating(true);
-      setProgress(0);
-    }
-
-    const total = Math.pow(2, analysis.inputs.length);
-    setTotalRowsToGenerate(total);
-
-    try {
-      const result = await generateCircuitTruthTableAsync(nodes, edges, analysis, {
-        initialSeqState,
-        customComponents,
-        batchSize: total > 128 ? 64 : 16,
-        onProgress: (prog, curr, tot, timeEst) => {
-          if (showLoader) {
-            setProgress(prog);
-            setCurrentGeneratedRow(curr);
-            setTimeEstimateMs(timeEst);
-          }
-        },
-        shouldCancel: () => cancellationRef.current,
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const state = useCircuitStore.getState();
+      const total = 2 ** model.inputs.length;
+      const result = await generateCircuitTruthTable(state.nodes, state.edges, model, {
+        memoryStart: model.isSequential ? memoryStart : 'reset',
+        customComponents: state.customComponents,
+        onProgress: (done) => setProgress(total > 128 && done < total ? { done, total } : null),
+        shouldCancel: () => cancelled,
       });
+      if (!cancelled && result) setRows(result);
+    }, 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [generationKey, memoryStart, customComponents, canBuild, model]);
 
-      if (!cancellationRef.current) {
-        setTruthTableData(result);
-      }
-    } catch (err) {
-      console.error('Circuit truth table generation error:', err);
-    } finally {
-      if (showLoader) {
-        setIsGenerating(false);
-      }
-    }
-  }, [analysis, nodes, edges, initialSeqState]);
+  const activeIndex = canBuild ? currentRowIndex(nodes, model) : -1;
 
-  // Run generation whenever modal is opened or initial state changed
-  const prevTopologyRef = useRef<string>('');
-  const isFirstLoadRef = useRef<boolean>(true);
-
+  // Keep the live row in view as switches change
   useEffect(() => {
-    if (isOpen && analysis) {
-      const isTopologyChanged = prevTopologyRef.current !== topologyKey;
-      prevTopologyRef.current = topologyKey;
+    activeRowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, rows]);
 
-      const shouldShowLoader = isFirstLoadRef.current || isTopologyChanged;
-      if (isFirstLoadRef.current) {
-        isFirstLoadRef.current = false;
-      }
+  const inputNames = model.inputs.map((c) => c.label);
+  const varNames = useMemo(() => shortSignalNames(inputNames), [inputNames.join('\n')]);
+  const outputVarNames = useMemo(() => shortSignalNames(model.outputs.map((c) => c.label)), [model]);
+  const renamed = varNames.some((v, i) => v !== inputNames[i]);
+  const visibleInternal = showInternal ? model.internal : [];
 
-      runGeneration(shouldShowLoader);
-    }
-  }, [isOpen, analysis, topologyKey, runGeneration]);
-
-  // Follow active row auto-scroll
-  useEffect(() => {
-    if (isOpen && followActiveRow && activeRowRef.current) {
-      setTimeout(() => {
-        activeRowRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }, 100);
-    }
-  }, [isOpen, followActiveRow, truthTableData]);
-
-  if (!isOpen || !analysis) return null;
-
-  const handleCancelGeneration = () => {
-    cancellationRef.current = true;
-    setIsGenerating(false);
-  };
-
-  const toggleSignalVisibility = (id: string) => {
-    setVisibleSignalIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const toggleAllCategory = (signals: CircuitSignal[], enable: boolean) => {
-    setVisibleSignalIds((prev) => {
-      const next = new Set(prev);
-      signals.forEach((s) => {
-        if (enable) next.add(s.id);
-        else next.delete(s.id);
+  const summaries: OutputSummary[] = useMemo(() => {
+    if (!rows) return [];
+    return model.outputs.flatMap((column, oi) => {
+      if (column.format !== 'bit') return [];
+      const minterms: number[] = [];
+      const unknownRows: number[] = [];
+      rows.forEach((r) => {
+        const v = r.outputs[oi];
+        if (v === 1) minterms.push(r.index);
+        else if (v !== 0) unknownRows.push(r.index);
       });
-      return next;
+      const terms = unknownRows.length === 0 && model.inputs.length <= MAX_MINIMIZE_VARS ? minimizeSOP(minterms, model.inputs.length) : null;
+      return [{ label: column.label, name: outputVarNames[oi], minterms, unknownRows, terms }];
     });
+  }, [rows, model, outputVarNames]);
+
+  const tableRows: TruthTableRow[] = (rows ?? []).map((r) => ({
+    key: `r${r.index}`,
+    index: r.index,
+    inputs: r.inputs,
+    internal: showInternal ? r.internal : undefined,
+    outputs: r.outputs,
+    isActive: r.index === activeIndex,
+    warning: r.unstable ? "The circuit doesn't settle for this combination" : undefined,
+  }));
+  const activeRow = tableRows.find((r) => r.isActive);
+
+  const fileBase = 'circuit-truth-table';
+  const lines = (sep: string) => {
+    const quote = (s: string) => (sep === ',' && /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+    const show = (v: number | string) => (v === -1 ? '?' : String(v));
+    return [
+      ['m', ...inputNames, ...visibleInternal.map((c) => c.label), ...model.outputs.map((c) => c.label)].map(quote).join(sep),
+      ...tableRows.map((r) => [r.index, ...r.inputs, ...(r.internal ?? []), ...r.outputs].map(show).join(sep)),
+    ];
   };
 
-  // Filtered Visible Columns
-  const visibleInputs = analysis.inputs.filter((s) => visibleSignalIds.has(s.id));
-  const visibleInternal = analysis.internal.filter((s) => visibleSignalIds.has(s.id));
-  const visibleOutputs = analysis.outputs.filter((s) => visibleSignalIds.has(s.id));
-
-  // Filtered Rows for Search
-  const filteredRows = (truthTableData?.rows || []).filter((r) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-
-    const inputMatch = r.inputsPattern.join('').includes(q);
-    const indexMatch = String(r.index).includes(q);
-    const outputVals = Object.values(r.outputsMap).join('');
-    const outputMatch = outputVals.includes(q);
-
-    return inputMatch || indexMatch || outputMatch;
-  });
-
-  const activeRow = truthTableData?.rows.find((r) => r.isActive);
-
-  // Export handlers
-  const handleCopy = () => {
-    if (!truthTableData) return;
-    const headers = [
-      'Row',
-      ...visibleInputs.map((s) => s.label),
-      ...visibleInternal.map((s) => s.label),
-      ...visibleOutputs.map((s) => s.label),
-    ].join('\t');
-
-    const rowLines = filteredRows.map((r) => {
-      const inVals = visibleInputs.map((s) => r.inputsMap[s.id] ?? 0);
-      const intVals = visibleInternal.map((s) => r.internalMap[s.id] ?? 0);
-      const outVals = visibleOutputs.map((s) => r.outputsMap[s.id] ?? 0);
-      return [r.index, ...inVals, ...intVals, ...outVals].join('\t');
-    });
-
-    navigator.clipboard.writeText([headers, ...rowLines].join('\n'));
+  const handleCopy = async () => {
+    const expressions = summaries
+      .filter((s) => s.terms)
+      .map((s) => `${s.name} = ${formatSOP(s.terms!, varNames)}`);
+    await navigator.clipboard.writeText([...lines('\t'), ...(expressions.length ? ['', ...expressions] : [])].join('\n'));
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 1800);
   };
 
-  const handleExportCSV = () => {
-    if (!truthTableData) return;
-    const headers = [
-      'Row',
-      ...visibleInputs.map((s) => `"${s.label}"`),
-      ...visibleInternal.map((s) => `"${s.label}"`),
-      ...visibleOutputs.map((s) => `"${s.label}"`),
-    ].join(',');
-
-    const rowLines = filteredRows.map((r) => {
-      const inVals = visibleInputs.map((s) => r.inputsMap[s.id] ?? 0);
-      const intVals = visibleInternal.map((s) => r.internalMap[s.id] ?? 0);
-      const outVals = visibleOutputs.map((s) => r.outputsMap[s.id] ?? 0);
-      return [r.index, ...inVals, ...intVals, ...outVals].join(',');
-    });
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rowLines].join('\n');
+  const handleCSV = () => {
     const link = document.createElement('a');
-    link.href = encodeURI(csvContent);
-    link.download = `circuit_truth_table_${Date.now()}.csv`;
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines(',').join('\n'));
+    link.download = `${fileBase}.csv`;
     link.click();
   };
 
-  const handleExportPNG = async () => {
-    if (!tableContainerRef.current) return;
-    try {
-      const dataUrl = await toPng(tableContainerRef.current, { backgroundColor: '#0b0e14' });
-      const link = document.createElement('a');
-      link.download = `circuit_truth_table_${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error('Failed to export PNG:', err);
-    }
+  const handlePNG = async () => {
+    if (!tableRef.current) return;
+    const dataUrl = await toPng(tableRef.current, { backgroundColor: resolveCssColor('--surface-1', '#ffffff') });
+    const link = document.createElement('a');
+    link.download = `${fileBase}.png`;
+    link.href = dataUrl;
+    link.click();
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const rowCount = 2 ** model.inputs.length;
+  const description = canBuild
+    ? `${model.inputs.length} input${model.inputs.length === 1 ? '' : 's'} · ${model.outputs.length} output${
+        model.outputs.length === 1 ? '' : 's'
+      } · ${rowCount} rows`
+    : 'Every input combination and what the outputs show';
+
+  const emptyMessage =
+    model.inputs.length === 0
+      ? 'Add a switch, push button or DIP switch and wire it into your circuit to build its truth table.'
+      : model.outputs.length === 0
+      ? 'Wire an LED, logic probe or display to the result you want to see. The table lists what it shows for every input combination.'
+      : tooManyInputs
+      ? `This circuit has ${model.inputs.length} inputs (${rowCount.toLocaleString()} rows). Truth tables are limited to ${MAX_TABLE_INPUTS} inputs; try a smaller part of the circuit, or turn it into a custom component and test that.`
+      : null;
 
   return (
-    <ModalFrame
-      isOpen={isOpen}
-      onClose={onClose}
-      labelledBy={titleId}
-      className="w-[96vw] max-w-[1500px] h-[92vh] print:w-full print:h-full print:border-none print:rounded-none"
-    >
-        <ModalHeader
-          titleId={titleId}
-          icon={<Table className="w-5 h-5" />}
-          title="Circuit truth table"
-          description={`Every combination of the ${analysis.inputs.length} switch${analysis.inputs.length === 1 ? '' : 'es'} and what the ${analysis.outputs.length} LED${analysis.outputs.length === 1 ? '' : 's'} show (${Math.pow(2, analysis.inputs.length)} rows)`}
-          onClose={onClose}
-          actions={
-            <>
-              <Button
-                size="sm"
-                variant={showColumnPicker ? 'secondary' : 'ghost'}
-                aria-pressed={showColumnPicker}
-                leftIcon={<Sliders className="w-4 h-4" />}
-                onClick={() => setShowColumnPicker(!showColumnPicker)}
-              >
-                <span className="hidden md:inline">Columns</span>
-              </Button>
-              <Button size="sm" variant="ghost" leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} onClick={handleCopy}>
-                <span className="hidden md:inline">{copied ? 'Copied' : 'Copy'}</span>
-              </Button>
-              <Button size="sm" variant="ghost" leftIcon={<Download className="w-4 h-4" />} onClick={handleExportCSV}>
-                <span className="hidden md:inline">CSV</span>
-              </Button>
-              <Button size="sm" variant="ghost" leftIcon={<Download className="w-4 h-4" />} onClick={handleExportPNG}>
-                <span className="hidden md:inline">Image</span>
-              </Button>
-              <Button size="sm" variant="ghost" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint}>
-                <span className="hidden md:inline">Print</span>
-              </Button>
-            </>
-          }
-        />
+    <ModalFrame isOpen onClose={onClose} labelledBy={titleId} className="w-[96vw] max-w-6xl h-[88vh] print:w-full print:h-auto">
+      <ModalHeader titleId={titleId} icon={<Table className="w-5 h-5" />} title="Circuit truth table" description={description} onClose={onClose} />
 
-        {/* ================= SEQUENTIAL LOGIC BANNER NOTICE ================= */}
-        {analysis.hasSequentialLogic && (
-          <div className="px-6 py-2.5 bg-amber-950/40 border-b border-amber-500/30 text-amber-200 text-xs font-mono flex flex-wrap items-center justify-between gap-3 print:hidden">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                <strong>Sequential Logic / Feedback Loop Detected:</strong> Truth table outcomes may depend on initial latch state (e.g. SR Latch).
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">Initial State Q:</span>
-              <button
-                onClick={() => setInitialSeqState(0)}
-                className={`px-2 py-0.5 rounded text-xs font-bold border ${
-                  initialSeqState === 0
-                    ? 'bg-amber-500 text-on-accent border-amber-400'
-                    : 'bg-slate-900 border-slate-700 text-slate-400'
-                }`}
-              >
-                Q = 0
-              </button>
-              <button
-                onClick={() => setInitialSeqState(1)}
-                className={`px-2 py-0.5 rounded text-xs font-bold border ${
-                  initialSeqState === 1
-                    ? 'bg-amber-500 text-on-accent border-amber-400'
-                    : 'bg-slate-900 border-slate-700 text-slate-400'
-                }`}
-              >
-                Q = 1
-              </button>
-            </div>
+      {emptyMessage ? (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="max-w-md text-center space-y-2">
+            <Info className="w-6 h-6 mx-auto text-fg-subtle" aria-hidden="true" />
+            <p className="text-sm text-fg-muted">{emptyMessage}</p>
           </div>
-        )}
-
-        {/* ================= SEARCH & FOLLOW ACTIVE ROW TOOLBAR ================= */}
-        <div className="px-6 py-2.5 border-b border-line bg-surface-1 flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <div className="flex items-center gap-3 flex-1 max-w-md">
-            <div className="relative flex-1">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search bit pattern or row..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-xs font-mono text-slate-200 focus:border-cyan-500"
-              />
-            </div>
-
-            <label className="flex items-center gap-2 text-xs font-mono text-slate-300 bg-surface-1 border border-slate-800 px-3 py-1 rounded-lg cursor-pointer hover:border-slate-700 select-none shrink-0">
-              <input
-                type="checkbox"
-                checked={followActiveRow}
-                onChange={(e) => setFollowActiveRow(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-700 text-cyan-500 bg-slate-950 cursor-pointer"
-              />
-              <span>Follow Active Row</span>
-            </label>
-          </div>
-
-          {activeRow && (
-            <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-lg border border-cyan-500/20">
-              <Zap className="w-3.5 h-3.5" />
-              <span>Live Active Match: Row {activeRow.index}</span>
-            </div>
-          )}
         </div>
+      ) : (
+        <>
+          {/* Live row and options */}
+          <div className="px-5 py-2.5 border-b border-line flex flex-wrap items-center gap-x-6 gap-y-2 shrink-0 print:hidden">
+            <p className="text-[13px] text-fg-muted flex-1 min-w-[240px]" aria-live="polite">
+              {activeRow ? (
+                <>
+                  On the canvas now: row <span className="font-mono text-fg">m{activeRow.index}</span>
+                  {model.outputs.length > 0 && (
+                    <>
+                      {' '}
+                      ({model.outputs.map((c, i) => `${c.label} = ${activeRow.outputs[i] === -1 ? '?' : activeRow.outputs[i]}`).join(', ')})
+                    </>
+                  )}
+                  . Click a row to set the switches to it.
+                </>
+              ) : (
+                'Click a row to set the switches on the canvas to it.'
+              )}
+            </p>
 
-        {/* ================= COLUMN SIGNAL PICKER DRAWER ================= */}
-        {showColumnPicker && (
-          <div className="px-6 py-3 border-b border-line bg-surface-1 text-xs font-mono flex flex-wrap gap-6 animate-fadeIn print:hidden">
-            {/* Inputs Column Toggle */}
-            <div className="space-y-1.5 flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between text-cyan-300 font-bold border-b border-cyan-500/30 pb-1">
-                <span>INPUT SIGNALS ({analysis.inputs.length})</span>
-                <div className="flex gap-1 text-[11px]">
-                  <button onClick={() => toggleAllCategory(analysis.inputs, true)} className="hover:underline text-cyan-400">All</button>
-                  <span>/</span>
-                  <button onClick={() => toggleAllCategory(analysis.inputs, false)} className="hover:underline text-slate-400">None</button>
-                </div>
-              </div>
-              <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
-                {analysis.inputs.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={visibleSignalIds.has(s.id)}
-                      onChange={() => toggleSignalVisibility(s.id)}
-                      className="rounded border-slate-700 text-cyan-500"
-                    />
-                    <span>{s.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            {model.internal.length > 0 && (
+              <label className="inline-flex items-center gap-2 text-[13px] text-fg-muted cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showInternal}
+                  onChange={(e) => setShowInternal(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+                />
+                Show intermediate signals ({model.internal.length})
+              </label>
+            )}
 
-            {/* Internal Signals Column Toggle */}
-            <div className="space-y-1.5 flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between text-amber-300 font-bold border-b border-amber-500/30 pb-1">
-                <span>INTERNAL SIGNALS ({analysis.internal.length})</span>
-                <div className="flex gap-1 text-[11px]">
-                  <button onClick={() => toggleAllCategory(analysis.internal, true)} className="hover:underline text-amber-400">All</button>
-                  <span>/</span>
-                  <button onClick={() => toggleAllCategory(analysis.internal, false)} className="hover:underline text-slate-400">None</button>
-                </div>
-              </div>
-              <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
-                {analysis.internal.length === 0 ? (
-                  <span className="text-slate-500 italic">No internal signals</span>
-                ) : (
-                  analysis.internal.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={visibleSignalIds.has(s.id)}
-                        onChange={() => toggleSignalVisibility(s.id)}
-                        className="rounded border-slate-700 text-amber-500"
-                      />
-                      <span>{s.label}</span>
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Output Signals Column Toggle */}
-            <div className="space-y-1.5 flex-1 min-w-[200px]">
-              <div className="flex items-center justify-between text-emerald-300 font-bold border-b border-emerald-500/30 pb-1">
-                <span>OUTPUT SIGNALS ({analysis.outputs.length})</span>
-                <div className="flex gap-1 text-[11px]">
-                  <button onClick={() => toggleAllCategory(analysis.outputs, true)} className="hover:underline text-emerald-400">All</button>
-                  <span>/</span>
-                  <button onClick={() => toggleAllCategory(analysis.outputs, false)} className="hover:underline text-slate-400">None</button>
-                </div>
-              </div>
-              <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
-                {analysis.outputs.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 text-slate-300 hover:text-white cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={visibleSignalIds.has(s.id)}
-                      onChange={() => toggleSignalVisibility(s.id)}
-                      className="rounded border-slate-700 text-emerald-500"
-                    />
-                    <span>{s.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ================= ASYNC PROGRESS BAR ================= */}
-        {isGenerating && (
-          <div className="px-6 py-3 bg-cyan-950/40 border-b border-cyan-500/30 text-xs font-mono text-cyan-200 flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
-            <div className="flex items-center gap-3">
-              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-              <span>Generating combinations... ({currentGeneratedRow} / {totalRowsToGenerate} rows • {progress}%)</span>
-            </div>
-
-            <div className="flex items-center gap-4 flex-1 max-w-xs">
-              <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-                <div
-                  className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full transition-all duration-150"
-                  style={{ width: `${progress}%` }}
+            {model.isSequential && (
+              <div className="flex items-center gap-2 text-[13px] text-fg-muted">
+                <span>Each row starts from</span>
+                <SegmentedControl<MemoryStart>
+                  ariaLabel="Each row starts from"
+                  fullWidth={false}
+                  size="xs"
+                  value={memoryStart}
+                  onChange={setMemoryStart}
+                  options={[
+                    { value: 'reset', label: 'Reset' },
+                    { value: 'canvas', label: 'Canvas state' },
+                  ]}
                 />
               </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-slate-400">Est. remaining: {(timeEstimateMs / 1000).toFixed(1)}s</span>
-              <button
-                onClick={handleCancelGeneration}
-                className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-on-accent font-bold text-xs"
-              >
-                Cancel
-              </button>
-            </div>
+            )}
           </div>
-        )}
 
-        {/* ================= MAIN TRUTH TABLE BODY ================= */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <div
-            ref={tableContainerRef}
-            className="bg-surface-0 rounded-xl border border-line shadow-2xl overflow-auto max-h-[62vh] print:max-h-none print:border-none"
-          >
-            <table className="w-full text-center text-xs font-mono border-collapse">
-              <thead>
-                <tr className="bg-slate-900 text-slate-300 border-b border-line sticky top-0 z-20">
-                  <th className="py-3 px-3 border-r border-line text-slate-400 w-16">Row #</th>
+          {(model.isSequential || model.usesFallbackOutputs) && (
+            <div className="px-5 py-2 border-b border-line bg-surface-0 text-xs text-fg-muted space-y-1 shrink-0">
+              {model.isSequential && (
+                <p>
+                  This circuit has memory (a latch, flip-flop or feedback loop), so an output can depend on earlier inputs, not only on the
+                  row. <strong className="font-medium text-fg">Reset</strong> starts every row with memory cleared; a{' '}
+                  <span className="text-signal-unknown">?</span> means the result depends on what was stored.{' '}
+                  <strong className="font-medium text-fg">Canvas state</strong> starts from what the circuit holds right now.
+                </p>
+              )}
+              {model.usesFallbackOutputs && (
+                <p>No LEDs or displays are wired, so the outputs are the gate outputs that aren't connected to anything.</p>
+              )}
+            </div>
+          )}
 
-                  {/* Inputs Group Header */}
-                  {visibleInputs.map((s) => (
-                    <th key={s.id} className="py-3 px-3 border-r border-line text-cyan-300 bg-cyan-950/40">
-                      {s.label}
-                    </th>
-                  ))}
+          {progress && (
+            <div className="h-0.5 bg-surface-2 shrink-0" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done} aria-label="Building the table">
+              <div className="h-full bg-accent transition-[width]" style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+            </div>
+          )}
 
-                  {/* Internal Group Header */}
-                  {visibleInternal.map((s) => (
-                    <th key={s.id} className="py-3 px-3 border-r border-line text-amber-300 bg-amber-950/30">
-                      {s.label}
-                    </th>
-                  ))}
-
-                  {/* Outputs Group Header */}
-                  {visibleOutputs.map((s) => (
-                    <th key={s.id} className="py-3 px-3 border-r border-line text-emerald-300 bg-emerald-950/40 font-bold">
-                      {s.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-line bg-surface-0">
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={1 + visibleInputs.length + visibleInternal.length + visibleOutputs.length}
-                      className="py-12 text-slate-500 italic text-sm"
-                    >
-                      {isGenerating ? 'Computing circuit state matrix...' : 'No combinations match the search query.'}
-                    </td>
-                  </tr>
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+            <div className="flex-1 min-h-0 min-w-0 overflow-auto px-5 py-3">
+              <div ref={tableRef} className="bg-surface-1 inline-block min-w-full">
+                {rows ? (
+                  <TruthTable
+                    caption="Truth table for the circuit on the canvas"
+                    inputHeaders={inputNames}
+                    internalHeaders={visibleInternal.map((c) => c.label)}
+                    outputHeaders={model.outputs.map((c) => c.label)}
+                    rows={tableRows}
+                    activeRowRef={activeRowRef}
+                    showMinterms
+                    onRowClick={(row) => setInputLevels(rowInputLevels(model, row.index))}
+                  />
                 ) : (
-                  filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      ref={row.isActive ? activeRowRef : null}
-                      className={`transition-colors ${
-                        row.isActive
-                          ? 'bg-cyan-600/30 border-y border-cyan-400'
-                          : 'hover:bg-surface-2/60 odd:bg-surface-2/60'
-                      }`}
-                    >
-                      {/* Row Index */}
-                      <td className="py-2.5 px-3 border-r border-line font-bold text-slate-400">
-                        {row.isActive ? (
-                          <span className="px-2 py-0.5 rounded bg-cyan-400 text-on-accent font-semibold text-[11px]">
-                            ACTIVE
-                          </span>
-                        ) : (
-                          row.index
-                        )}
-                      </td>
-
-                      {/* Input Cells */}
-                      {visibleInputs.map((s) => {
-                        const val = row.inputsMap[s.id] ?? 0;
-                        return (
-                          <td
-                            key={s.id}
-                            className={`py-2.5 px-3 border-r border-line font-bold ${
-                              val === 1 ? 'text-cyan-300 bg-cyan-500/15' : 'text-slate-500'
-                            }`}
-                          >
-                            {val}
-                          </td>
-                        );
-                      })}
-
-                      {/* Internal Cells */}
-                      {visibleInternal.map((s) => {
-                        const val = row.internalMap[s.id] ?? 0;
-                        return (
-                          <td
-                            key={s.id}
-                            className={`py-2.5 px-3 border-r border-line font-bold ${
-                              val === 1 ? 'text-amber-300 bg-amber-500/15' : 'text-slate-600'
-                            }`}
-                          >
-                            {val}
-                          </td>
-                        );
-                      })}
-
-                      {/* Output Cells */}
-                      {visibleOutputs.map((s) => {
-                        const val = row.outputsMap[s.id] ?? 0;
-                        return (
-                          <td
-                            key={s.id}
-                            className={`py-2.5 px-3 border-r border-line font-bold text-sm ${
-                              val === 1 ? 'text-emerald-400 bg-emerald-500/15' : 'text-slate-600'
-                            }`}
-                          >
-                            {val}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))
+                  <p className="py-10 text-center text-sm text-fg-subtle">Working out every combination…</p>
                 )}
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            {summaries.length > 0 && (
+              <aside
+                aria-label="Output expressions"
+                className="lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-line overflow-y-auto px-5 py-3 max-h-[35%] lg:max-h-none"
+              >
+                <h3 className="text-xs font-medium text-fg-subtle mb-2">Expressions</h3>
+                <ul className="space-y-3">
+                  {summaries.map((s) => (
+                    <li key={s.label} className="text-[13px]">
+                      <div className="font-mono text-fg break-words">
+                        <span className="font-semibold text-accent-fg" title={s.label}>{s.name}</span>
+                        <span className="text-fg-subtle"> = </span>
+                        {s.terms ? <Expression terms={s.terms} names={varNames} /> : <span className="text-fg-subtle">…</span>}
+                      </div>
+                      <div className="mt-0.5 font-mono text-xs text-fg-muted break-words">
+                        Σm({formatList(s.minterms)})
+                      </div>
+                      {s.unknownRows.length > 0 && (
+                        <p className="mt-0.5 text-xs text-signal-unknown">
+                          Unknown in {s.unknownRows.length === 1 ? 'row' : 'rows'} {formatList(s.unknownRows.map((i) => `m${i}`), 8)}, so
+                          it can't be simplified. Check for unconnected inputs{model.isSequential ? ' or memory that is never set' : ''}.
+                        </p>
+                      )}
+                      {!s.terms && s.unknownRows.length === 0 && (
+                        <p className="mt-0.5 text-xs text-fg-subtle">Simplified form is shown for up to {MAX_MINIMIZE_VARS} inputs.</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {(renamed || outputVarNames.some((v, i) => v !== model.outputs[i].label)) && (
+                  <p className="mt-3 text-xs text-fg-subtle">
+                    {[...model.inputs.map((c, i) => [varNames[i], c.label]), ...model.outputs.map((c, i) => [outputVarNames[i], c.label])]
+                      .filter(([v, label]) => v !== label)
+                      .map(([v, label]) => `${v} = ${label}`)
+                      .join(' · ')}
+                  </p>
+                )}
+                {model.isSequential && (
+                  <p className="mt-3 text-xs text-fg-subtle">With memory, these describe the table as built, not the circuit in every situation.</p>
+                )}
+              </aside>
+            )}
           </div>
-        </div>
 
-        {/* ================= FOOTER ================= */}
-        <div className="px-6 py-3 border-t border-line bg-surface-1 text-xs font-mono text-slate-400 flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <span>
-            Total Rows: {filteredRows.length} of {truthTableData?.rows.length || Math.pow(2, analysis.inputs.length)}
-          </span>
-
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-cyan-500/30 border border-cyan-400" /> Input HIGH (1)
+          <footer className="px-5 py-3 border-t border-line flex flex-wrap items-center gap-2 shrink-0 print:hidden">
+            <span className="text-xs text-fg-subtle mr-auto">
+              <span className="font-mono text-fg">1</span> high · <span className="font-mono">0</span> low ·{' '}
+              <span className="font-mono text-signal-unknown">?</span> unknown (floating or never set)
+              {tableRows.some((r) => r.warning) && <> · <span className="text-signal-unknown">⚠</span> doesn't settle</>}
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-emerald-500/30 border border-emerald-400" /> Output HIGH (1)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-amber-500/30 border border-amber-400" /> Internal High (1)
-            </span>
-          </div>
-        </div>
-
+            <Button size="sm" variant="ghost" disabled={!rows} leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} onClick={handleCopy}>
+              {copied ? 'Copied' : 'Copy'}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={!rows} leftIcon={<Download className="w-4 h-4" />} onClick={handleCSV}>
+              CSV
+            </Button>
+            <Button size="sm" variant="secondary" disabled={!rows} leftIcon={<ImageIcon className="w-4 h-4" />} onClick={handlePNG}>
+              Save image
+            </Button>
+          </footer>
+        </>
+      )}
     </ModalFrame>
   );
 };
