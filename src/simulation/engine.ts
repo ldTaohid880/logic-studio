@@ -10,7 +10,7 @@ import { evaluateCustomComponentLogic } from './customComponentLogic';
 // Nested custom components deeper than this are treated as unresolvable (guards against recursive definitions)
 export const MAX_SUBCIRCUIT_DEPTH = 16;
 
-const IC_GATE_TYPES = new Set<string>([
+export const IC_GATE_TYPES = new Set<string>([
   'HALF_ADDER', 'FULL_ADDER', 'ADDER_4BIT',
   'HALF_SUBTRACTOR', 'FULL_SUBTRACTOR', 'MUX_4TO1', 'DEMUX_1TO4',
   'PRIORITY_ENCODER', 'COMPARATOR_4BIT', 'DECODER_BCD_TO_7SEG',

@@ -1,0 +1,177 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { Node, Edge } from '@xyflow/react';
+import { useCircuitStore } from './useCircuitStore';
+import { NodeData, SignalValue } from '../types/circuit';
+
+const store = () => useCircuitStore.getState();
+const data = (id: string) => store().nodes.find((n) => n.id === id)?.data as unknown as NodeData | undefined;
+
+const sw = (id: string, value: SignalValue): Node => ({
+  id,
+  type: 'digitalInput',
+  position: { x: 0, y: 0 },
+  data: { label: id, gateType: 'INPUT', value, inputs: [], outputs: [{ id: 'out-0', name: 'Out', value }] },
+});
+const not = (id: string): Node => ({
+  id,
+  type: 'logicGate',
+  position: { x: 150, y: 0 },
+  data: { label: 'NOT', gateType: 'NOT', inputs: [{ id: 'in-0', name: 'A', value: -1 }], outputs: [{ id: 'out-0', name: 'Y', value: -1 }] },
+});
+const led = (id: string): Node => ({
+  id,
+  type: 'digitalOutput',
+  position: { x: 300, y: 0 },
+  data: { label: id, gateType: 'OUTPUT', value: -1, inputs: [{ id: 'in-0', name: 'In', value: -1 }], outputs: [] },
+});
+const wire = (id: string, source: string, target: string): Edge => ({ id, source, target, sourceHandle: 'out-0', targetHandle: 'in-0' });
+
+// Switch A (1) → NOT → LED Y
+const loadInverter = () => store().loadCircuit([sw('A', 1), not('n'), led('Y')], [wire('e1', 'A', 'n'), wire('e2', 'n', 'Y')]);
+const select = (...ids: string[]) =>
+  useCircuitStore.setState({ nodes: store().nodes.map((n) => ({ ...n, selected: ids.includes(n.id) })) });
+
+beforeEach(() => {
+  useCircuitStore.setState({
+    nodes: [],
+    edges: [],
+    historyPast: [],
+    historyFuture: [],
+    hierarchyPath: [{ id: 'root', name: 'Main Project' }],
+    rootCircuitState: null,
+    selectedNodeId: null,
+    selectedEdgeId: null,
+  });
+  loadInverter();
+  useCircuitStore.setState({ historyPast: [], historyFuture: [] });
+});
+
+describe('editing with undo and redo', () => {
+  it('settles a loaded circuit', () => {
+    expect(data('Y')?.value).toBe(0);
+  });
+
+  it('floats what a deleted part drove, and undo brings the part and its signal back', () => {
+    select('n');
+    store().deleteSelected();
+    expect(data('n')).toBeUndefined();
+    expect(store().edges).toHaveLength(0);
+    expect(data('Y')?.value).toBe(-1);
+
+    store().undo();
+    expect(data('n')).toBeDefined();
+    expect(store().edges).toHaveLength(2);
+    expect(data('Y')?.value).toBe(0);
+
+    store().redo();
+    expect(data('n')).toBeUndefined();
+    expect(data('Y')?.value).toBe(-1);
+  });
+
+  it('pastes a copy with a new id as one undo step', () => {
+    select('n');
+    store().copySelected();
+    store().pasteClipboard();
+    const nots = store().nodes.filter((n) => (n.data as unknown as NodeData).gateType === 'NOT');
+    expect(nots).toHaveLength(2);
+    expect(new Set(nots.map((n) => n.id)).size).toBe(2);
+
+    store().undo();
+    expect(store().nodes.filter((n) => (n.data as unknown as NodeData).gateType === 'NOT')).toHaveLength(1);
+  });
+
+  it('pastes a copied group with its parts in the same place inside it', () => {
+    select('A', 'n');
+    store().groupSelectedNodes('Front end');
+    const group = store().nodes.find((n) => n.type === 'groupNode')!;
+    const inside = (parentId: string) =>
+      store()
+        .nodes.filter((n) => n.parentId === parentId)
+        .map((n) => n.position)
+        .sort((p, q) => p.x - q.x);
+    const original = inside(group.id);
+
+    select(group.id, 'A', 'n');
+    store().copySelected();
+    store().pasteClipboard();
+    const copy = store().nodes.find((n) => n.type === 'groupNode' && n.id !== group.id)!;
+    expect(copy.position).toEqual({ x: group.position.x + 40, y: group.position.y + 40 });
+    expect(inside(copy.id)).toEqual(original);
+  });
+
+  it('groups a selection and undoes the grouping', () => {
+    select('A', 'n');
+    store().groupSelectedNodes('Front end');
+    const group = store().nodes.find((n) => n.type === 'groupNode');
+    expect(group).toBeDefined();
+    expect(store().nodes.filter((n) => n.parentId === group!.id).map((n) => n.id).sort()).toEqual(['A', 'n']);
+
+    store().undo();
+    expect(store().nodes.some((n) => n.type === 'groupNode')).toBe(false);
+  });
+
+  it('flipping switches is not recorded in undo history', () => {
+    store().toggleInputValue('A');
+    store().setInputLevels([{ nodeId: 'A', value: 1 }]);
+    expect(store().historyPast).toHaveLength(0);
+    expect(data('Y')?.value).toBe(0);
+    store().setInputLevels([{ nodeId: 'A', value: 0 }]);
+    expect(data('Y')?.value).toBe(1);
+  });
+});
+
+describe('oscillation', () => {
+  it('reports parts that never settle and clears the report once fixed', () => {
+    const ring = { ...not('r'), data: { ...not('r').data, outputs: [{ id: 'out-0', name: 'Y', value: 0 }] } };
+    store().loadCircuit([ring], [wire('loop', 'r', 'r')]);
+    expect(store().simulation.unstableNodeIds).toEqual(['r']);
+    expect(store().nodes[0].className).toContain('ls-unstable');
+
+    loadInverter();
+    expect(store().simulation.unstableNodeIds).toEqual([]);
+    expect(store().nodes.some((n) => n.className?.includes('ls-unstable'))).toBe(false);
+  });
+});
+
+describe('opening files', () => {
+  it('opens a valid file as one undo step', () => {
+    const file = JSON.stringify({ nodes: [sw('B', 0), led('Z')], edges: [wire('w', 'B', 'Z')] });
+    expect(store().openCircuitFile(file)).toBe(true);
+    expect(data('Z')?.value).toBe(0);
+
+    store().undo();
+    expect(data('Y')).toBeDefined();
+  });
+
+  it('refuses a file that is not JSON and keeps the circuit', () => {
+    expect(store().openCircuitFile('not json')).toBe(false);
+    expect(data('Y')).toBeDefined();
+    expect(store().toastVariant).toBe('error');
+  });
+});
+
+describe('sub-circuits', () => {
+  it('opens a custom component, saves edits to its definition and returns to the main circuit', () => {
+    const id = 'builtin_half_adder';
+    const before = store().customComponents[id];
+    store().instantiateCustomComponent(id, { x: 0, y: 200 });
+    const instance = store().nodes.find((n) => (n.data as unknown as NodeData).customComponentId === id)!;
+    const rootCount = store().nodes.length;
+
+    store().enterSubcircuitView(id, instance.id);
+    expect(store().hierarchyPath).toHaveLength(2);
+    expect(store().nodes).toHaveLength(before.nodes.length);
+    // Undo history never crosses between levels
+    expect(store().historyPast).toHaveLength(0);
+
+    store().addNode('AND', { x: 0, y: 0 });
+    store().exitSubcircuitView(0);
+    expect(store().hierarchyPath).toHaveLength(1);
+    expect(store().nodes).toHaveLength(rootCount);
+    expect(store().historyPast).toHaveLength(0);
+
+    const after = store().customComponents[id];
+    expect(after.nodes).toHaveLength(before.nodes.length + 1);
+    expect(after.updatedAt).toBeGreaterThan(before.updatedAt);
+  });
+});

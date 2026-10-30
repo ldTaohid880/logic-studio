@@ -62,6 +62,9 @@ export type EditorSlice = Pick<CircuitStore,
   | 'updatePinAlias'
 >;
 
+// Copied parts and the wires between them; in memory only, shared by every hierarchy level
+let clipboard: { nodes: Node[]; edges: Edge[] } | null = null;
+
 export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
   nodes: initialCircuit.nodes,
   edges: initialCircuit.edges,
@@ -357,7 +360,7 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
     const selectedIds = new Set(selectedNodes.map((n) => n.id));
     const internalEdges = edges.filter((e) => selectedIds.has(e.source) && selectedIds.has(e.target));
 
-    (window as any).__circuit_clipboard__ = {
+    clipboard = {
       nodes: JSON.parse(JSON.stringify(selectedNodes)),
       edges: JSON.parse(JSON.stringify(internalEdges)),
     };
@@ -372,22 +375,9 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
   },
 
   pasteClipboard: () => {
-    const clipboard = (window as any).__circuit_clipboard__ as
-      | { nodes: Node[]; edges: Edge[] }
-      | Node
-      | undefined;
     if (!clipboard) return;
-
-    const timestamp = Date.now();
+    const { nodes: rawNodes, edges: rawEdges } = clipboard;
     const idMap = new Map<string, string>();
-
-    // Support both multi-node clipboard format and single legacy node clipboard
-    const rawNodes: Node[] = Array.isArray((clipboard as any).nodes)
-      ? (clipboard as any).nodes
-      : [clipboard as Node];
-    const rawEdges: Edge[] = Array.isArray((clipboard as any).edges)
-      ? (clipboard as any).edges
-      : [];
 
     // Pasting an instance of the component being edited (or one that contains it) would make it recursive
     const currentPath = get().hierarchyPath;
@@ -406,17 +396,14 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
 
     get().saveHistory();
 
-    const newNodes: Node[] = rawNodes.map((node, index) => {
-      const newId = `${node.type || 'node'}-${timestamp}-${index}`;
-      idMap.set(node.id, newId);
-
+    rawNodes.forEach((node) => idMap.set(node.id, makeId(node.type || 'node')));
+    const newNodes: Node[] = rawNodes.map((node) => {
+      // Children of a copied group keep their place inside it; everything else shifts so the copy is visible
+      const insideCopiedGroup = !!node.parentId && idMap.has(node.parentId);
       return {
         ...node,
-        id: newId,
-        position: {
-          x: node.position.x + 40,
-          y: node.position.y + 40,
-        },
+        id: idMap.get(node.id)!,
+        position: insideCopiedGroup ? { ...node.position } : { x: node.position.x + 40, y: node.position.y + 40 },
         selected: true,
         data: JSON.parse(JSON.stringify(node.data)),
       };
@@ -432,12 +419,12 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
       }
     });
 
-    const newEdges: Edge[] = rawEdges.map((edge, index) => {
+    const newEdges: Edge[] = rawEdges.map((edge) => {
       const newSource = idMap.get(edge.source) || edge.source;
       const newTarget = idMap.get(edge.target) || edge.target;
       return {
         ...edge,
-        id: `e-${newSource}-${edge.sourceHandle || '0'}-${newTarget}-${edge.targetHandle || '0'}-${timestamp}-${index}`,
+        id: makeId('edge'),
         source: newSource,
         target: newTarget,
         type: 'signalEdge',

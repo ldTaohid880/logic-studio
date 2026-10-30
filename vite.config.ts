@@ -14,6 +14,7 @@ export default defineConfig(() => {
     test: {
       // .claude/ holds local backups and tooling, not project tests
       exclude: ['**/node_modules/**', '**/dist/**', '.claude/**'],
+      setupFiles: ['src/test/setup.ts'],
     },
   };
 });

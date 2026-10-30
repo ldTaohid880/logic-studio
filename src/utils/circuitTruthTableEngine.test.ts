@@ -72,3 +72,56 @@ describe('shortSignalNames', () => {
     expect(shortSignalNames(['In A', 'Other A'])).toEqual(['A', 'B']);
   });
 });
+
+describe('truth table with custom components', () => {
+  it('evaluates through a custom component instance', async () => {
+    const { BUILTIN_FULL_ADDER } = await import('./builtinAdders');
+    const { BUILTIN_HALF_ADDER } = await import('./builtinAdders');
+    const components = { [BUILTIN_HALF_ADDER.id]: BUILTIN_HALF_ADDER, [BUILTIN_FULL_ADDER.id]: BUILTIN_FULL_ADDER };
+    const sw = (id: string, y: number) => ({
+      id,
+      position: { x: 0, y },
+      data: { label: id, gateType: 'INPUT', value: 0, inputs: [], outputs: [{ id: 'out-0', name: 'Out', value: 0 }] },
+    });
+    const led = (id: string, y: number) => ({
+      id,
+      position: { x: 400, y },
+      data: { label: id, gateType: 'OUTPUT', value: -1, inputs: [{ id: 'in-0', name: 'In', value: -1 }], outputs: [] },
+    });
+    const nodes = [
+      sw('A', 0),
+      sw('B', 30),
+      sw('C', 60),
+      {
+        id: 'fa',
+        position: { x: 200, y: 0 },
+        data: {
+          label: 'FA',
+          gateType: 'CUSTOM',
+          customComponentId: BUILTIN_FULL_ADDER.id,
+          inputs: BUILTIN_FULL_ADDER.inputs.map((p) => ({ id: p.id, name: p.name, value: -1 })),
+          outputs: BUILTIN_FULL_ADDER.outputs.map((p) => ({ id: p.id, name: p.name, value: -1 })),
+        },
+      },
+      led('S', 0),
+      led('Co', 30),
+    ];
+    const [inA, inB, inC] = BUILTIN_FULL_ADDER.inputs.map((p) => p.id);
+    const [sum, carry] = BUILTIN_FULL_ADDER.outputs.map((p) => p.id);
+    const edges = [
+      { id: 'e1', source: 'A', sourceHandle: 'out-0', target: 'fa', targetHandle: inA },
+      { id: 'e2', source: 'B', sourceHandle: 'out-0', target: 'fa', targetHandle: inB },
+      { id: 'e3', source: 'C', sourceHandle: 'out-0', target: 'fa', targetHandle: inC },
+      { id: 'e4', source: 'fa', sourceHandle: sum, target: 'S', targetHandle: 'in-0' },
+      { id: 'e5', source: 'fa', sourceHandle: carry, target: 'Co', targetHandle: 'in-0' },
+    ];
+
+    const model = describeCircuitForTable(nodes, edges);
+    expect(model.outputs.map((c) => c.label)).toEqual(['S', 'Co']);
+    const rows = (await generateCircuitTruthTable(nodes, edges, model, { customComponents: components }))!;
+    rows.forEach((r) => {
+      const total = r.inputs.reduce<number>((a, b) => a + b, 0);
+      expect(r.outputs).toEqual([total & 1, total >> 1]);
+    });
+  });
+});

@@ -89,7 +89,10 @@ src/
 
 ## Testing
 
-- Unit tests live next to the code (`src/simulation/engine.test.ts`). It has `makeNode` / `wire` helpers for building circuits without the UI — reuse them for new engine behaviour.
+- Unit tests live next to the code. `src/simulation/engine.test.ts` has `makeNode` / `wire` helpers for building circuits without the UI — reuse them for new engine behaviour.
+- `icLogic.test.ts` checks every fixed IC against an independent reference model for all input combinations, and fails if a type in `IC_GATE_TYPES` has no test: add a reference (or a sequence test for memory parts) when you add an IC.
+- `utils/presets.test.ts` runs golden checks on every built-in example (supported parts, valid pins, settles, known outputs for every row).
+- Store tests (`store/useCircuitStore.test.ts`) drive the real store; `src/test/setup.ts` provides an in-memory `localStorage` for Node.
 - To check behaviour in the running app, start the `dev` config from `.claude/launch.json` and drive the store from the browser console: `const { useCircuitStore: s } = await import('/src/store/useCircuitStore.ts')`. Reload the page first: after hot reloads this import can return a different store instance from the one the app renders. Autosave writes your experiments to `localStorage`; remove `logic_studio_circuit` afterwards to restore the default circuit.
 - React Flow adds to a selection on Ctrl/Cmd+click and reads the modifier from key state, so synthetic multi-select needs a `keydown` for Control before the clicks.
 
