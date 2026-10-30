@@ -19,6 +19,7 @@ import { SelectionSummary } from './SelectionSummary';
 import { DEFAULT_ENCODER_CONFIG } from '../../types/encoder';
 import { DEFAULT_SEVEN_SEGMENT_CONFIG } from '../../types/sevenSegment';
 import { getComponentInfo } from '../../data/components';
+import { AluProperties, BoardProperties, ClockProperties, RamProperties, RomProperties } from './TimedPartPanels';
 
 import { InspectorSection } from '../ui/InspectorSection';
 import { PropertyRow } from '../ui/PropertyRow';
@@ -58,6 +59,11 @@ const TYPE_PANELS: Partial<Record<GateType, React.FC<PanelProps>>> = {
       onUpdateConfig={(cfg) => useCircuitStore.getState().updateSevenSegmentConfig(nodeId, cfg)}
     />
   ),
+  CLOCK: ClockProperties,
+  ROM_16X4: RomProperties,
+  RAM_16X4: RamProperties,
+  ALU_4BIT_8FN: AluProperties,
+  ARDUINO_UNO: BoardProperties,
 };
 
 const MULTI_INPUT_GATES = new Set<GateType>(['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR']);
@@ -65,7 +71,9 @@ const MULTI_INPUT_GATES = new Set<GateType>(['AND', 'OR', 'NAND', 'NOR', 'XOR', 
 const SETTINGS_TYPES = new Set<GateType>([...MULTI_INPUT_GATES, 'TUNNEL', 'TEXT_LABEL', 'DIP_SWITCH', 'BUS_MONITOR', 'OUTPUT', 'HEX_DISPLAY']);
 
 // Per-part panels built from InspectorSections (no extra padding around them)
-const SECTIONED_PANELS = new Set<GateType>(['SEVEN_SEGMENT']);
+const SECTIONED_PANELS = new Set<GateType>(['SEVEN_SEGMENT', 'CLOCK', 'ROM_16X4', 'RAM_16X4', 'ALU_4BIT_8FN', 'ARDUINO_UNO']);
+// Chips whose panel adds to the usual pin list rather than replacing it
+const PANEL_WITH_PINS = new Set<GateType>(['ROM_16X4', 'RAM_16X4', 'ALU_4BIT_8FN']);
 
 // Default display color per part, matching the node renderers
 const DEFAULT_COLOR: Partial<Record<GateType, OutputColor>> = { OUTPUT: 'red', HEX_DISPLAY: 'red', BUS_MONITOR: 'green' };
@@ -231,7 +239,7 @@ const NodeInspector: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
 
         {!TypePanel && SETTINGS_TYPES.has(gateType) && <GeneralSettings nodeId={nodeId} nodeData={nodeData} />}
 
-        {!TypePanel && (inputs.length > 0 || outputs.length > 0) && (
+        {(!TypePanel || PANEL_WITH_PINS.has(gateType)) && (inputs.length > 0 || outputs.length > 0) && (
           <InspectorSection
             title="Pins"
             icon={<Hash className="w-4 h-4" />}

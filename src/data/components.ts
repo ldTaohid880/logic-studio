@@ -4,7 +4,7 @@ import { GateType } from '../types/circuit';
  * Catalog of placeable parts, ordered the way a digital-logic course introduces them.
  * Drives the parts bin and the names shown in the properties panel.
  */
-export type PartCategory = 'Signals' | 'Gates' | 'Combinational' | 'Arithmetic' | 'Memory' | 'Displays' | 'Wiring';
+export type PartCategory = 'Signals' | 'Gates' | 'Combinational' | 'Arithmetic' | 'Memory' | 'Displays' | 'Boards' | 'Wiring';
 
 export interface PartInfo {
   type: GateType;
@@ -30,6 +30,7 @@ export const PART_CATEGORIES: CategoryInfo[] = [
   { id: 'Arithmetic', title: 'Arithmetic', layout: 'rows', defaultOpen: false },
   { id: 'Memory', title: 'Memory', layout: 'rows', defaultOpen: false },
   { id: 'Displays', title: 'Displays', layout: 'tiles', defaultOpen: true },
+  { id: 'Boards', title: 'Programmable boards', layout: 'rows', defaultOpen: false },
   { id: 'Wiring', title: 'Wiring and notes', layout: 'rows', defaultOpen: false },
 ];
 
@@ -38,6 +39,7 @@ export const PARTS: PartInfo[] = [
   { type: 'INPUT', name: 'Switch', description: 'Click to toggle between 0 and 1', category: 'Signals' },
   { type: 'PUSH_BUTTON', name: 'Push button', description: 'Outputs 1 while held down', category: 'Signals' },
   { type: 'DIP_SWITCH', name: 'DIP switch', description: 'A row of 2, 4 or 8 switches', category: 'Signals' },
+  { type: 'CLOCK', name: 'Clock', description: 'Ticks on its own; brings run controls and a timing diagram', category: 'Signals' },
   { type: 'CONST_HIGH', name: 'Logic 1', description: 'Always 1 (VCC)', category: 'Signals' },
   { type: 'CONST_LOW', name: 'Logic 0', description: 'Always 0 (GND)', category: 'Signals' },
 
@@ -73,6 +75,7 @@ export const PARTS: PartInfo[] = [
   { type: 'FULL_SUBTRACTOR', name: 'Full subtractor', description: 'Subtracts 2 bits and a borrow in', category: 'Arithmetic' },
   { type: 'ADDER_SUBTRACTOR_4BIT', name: '4-bit adder/subtractor', description: 'Adds or subtracts, chosen by a mode line', category: 'Arithmetic' },
   { type: 'INCREMENTER_4BIT', name: '4-bit incrementer', description: 'Adds 1 to a 4-bit number', category: 'Arithmetic' },
+  { type: 'ALU_4BIT_8FN', name: '4-bit ALU', description: 'Adds, subtracts, ANDs, ORs and more, picked by S2–S0', category: 'Arithmetic' },
   { type: 'DECREMENTER_4BIT', name: '4-bit decrementer', description: 'Subtracts 1 from a 4-bit number', category: 'Arithmetic' },
 
   // Memory
@@ -80,6 +83,10 @@ export const PARTS: PartInfo[] = [
   { type: 'JK_FLIPFLOP', name: 'JK flip-flop', description: 'Sets, resets or toggles on the clock edge', category: 'Memory', partNumber: '74HC109' },
   { type: 'T_FLIPFLOP', name: 'T flip-flop', description: 'Toggles on the clock edge while T is 1', category: 'Memory' },
   { type: 'REGISTER_4BIT', name: '4-bit register', description: 'Stores 4 bits on the clock edge', category: 'Memory', partNumber: '74HC173' },
+  { type: 'COUNTER_4BIT', name: '4-bit counter', description: 'Counts clock edges up or down', category: 'Memory', partNumber: '74HC193' },
+  { type: 'SHIFT_REG_4BIT', name: '4-bit shift register', description: 'Shifts a serial bit in on each clock edge', category: 'Memory', partNumber: '74HC164' },
+  { type: 'RAM_16X4', name: '16 × 4 RAM', description: 'Stores 16 four-bit words, written on the clock edge', category: 'Memory' },
+  { type: 'ROM_16X4', name: '16 × 4 ROM', description: 'Reads one of 16 four-bit words you set', category: 'Memory' },
 
   // Displays
   { type: 'OUTPUT', name: 'LED', description: 'Lights when its input is 1', category: 'Displays' },
@@ -87,6 +94,9 @@ export const PARTS: PartInfo[] = [
   { type: 'SEVEN_SEGMENT', name: '7-segment', description: 'Shows a digit from 4 input bits', category: 'Displays' },
   { type: 'HEX_DISPLAY', name: 'Hex digit', description: 'Shows 0–F from 4 input bits', category: 'Displays' },
   { type: 'BUS_MONITOR', name: 'Bus value', description: 'Shows a 2–8 bit value in hex, decimal or binary', category: 'Displays' },
+
+  // Programmable boards
+  { type: 'ARDUINO_UNO', name: 'Uno-compatible board', description: 'Runs a compiled Arduino sketch on pins D2–D13', category: 'Boards', partNumber: 'ATmega328P' },
 
   // Wiring and notes
   { type: 'TUNNEL', name: 'Tunnel', description: 'Connects to every tunnel with the same tag, without a wire', category: 'Wiring' },

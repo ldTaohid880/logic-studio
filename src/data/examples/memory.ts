@@ -1,4 +1,20 @@
-import { CircuitPreset } from '../../types/circuit';
+import { Edge } from '@xyflow/react';
+import { CircuitPreset, GateType } from '../../types/circuit';
+import { createPart } from '../../store/partFactory';
+
+/** A part as createPart makes it, with a fixed id and label so the example stays stable. */
+const placed = (id: string, gateType: GateType, x: number, y: number, data: Record<string, unknown> = {}) => {
+  const node = createPart(gateType, { x, y }, []);
+  return { ...node, id, data: { ...node.data, ...data } };
+};
+const link = (source: string, sourceHandle: string, target: string, targetHandle: string): Edge => ({
+  id: `e-${source}-${sourceHandle}-${target}-${targetHandle}`,
+  source,
+  sourceHandle,
+  target,
+  targetHandle,
+  type: 'signalEdge',
+});
 
 // Memory: latches and flip-flops
 export const MEMORY_EXAMPLES: CircuitPreset[] = [
@@ -172,6 +188,25 @@ export const MEMORY_EXAMPLES: CircuitPreset[] = [
       { id: 'e3', source: 'in-k', sourceHandle: 'out-0', target: 'jk-ic', targetHandle: 'in-2', type: 'signalEdge' },
       { id: 'e4', source: 'jk-ic', sourceHandle: 'out-0', target: 'out-q', targetHandle: 'in-0', type: 'signalEdge' },
       { id: 'e5', source: 'jk-ic', sourceHandle: 'out-1', target: 'out-qbar', targetHandle: 'in-0', type: 'signalEdge' },
+    ],
+  },
+  {
+    id: 'clocked-counter',
+    name: 'Clocked counter',
+    category: 'Memory',
+    description: 'A 2 Hz clock drives a 4-bit counter shown on a hex digit. Flip Up to count down; watch it in the timing diagram.',
+    nodes: [
+      placed('clk', 'CLOCK', 60, 105, { label: 'CLK', clockHz: 2 }),
+      placed('up', 'INPUT', 60, 180, { label: 'Up', value: 1, outputs: [{ id: 'out-0', name: 'Out', value: 1 }] }),
+      placed('counter', 'COUNTER_4BIT', 240, 90, { label: 'Counter' }),
+      placed('digit', 'HEX_DISPLAY', 480, 90, { label: 'Count' }),
+      placed('tc', 'OUTPUT', 480, 240, { label: 'TC' }),
+    ],
+    edges: [
+      link('clk', 'out-0', 'counter', 'in-0'),
+      link('up', 'out-0', 'counter', 'in-2'),
+      ...[0, 1, 2, 3].map((i) => link('counter', `out-${i}`, 'digit', `in-${i}`)),
+      link('counter', 'out-4', 'tc', 'in-0'),
     ],
   },
 ];

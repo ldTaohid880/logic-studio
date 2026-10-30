@@ -28,6 +28,8 @@ import { GroupNode } from '../nodes/GroupNode';
 import { CustomComponentNode } from '../nodes/CustomComponentNode';
 import { HierarchyBreadcrumbs } from './HierarchyBreadcrumbs';
 import { EmptyCanvas } from './EmptyCanvas';
+import { ClockNode } from '../nodes/ClockNode';
+import { BoardNode } from '../nodes/BoardNode';
 import { SignalEdge } from '../edges/SignalEdge';
 import { GateType, NodeData } from '../../types/circuit';
 import { MenuPanel, MenuEntry } from '../ui/DropdownMenu';
@@ -49,6 +51,8 @@ const nodeTypes = {
   utility: UtilityNode,
   groupNode: GroupNode,
   customNode: CustomComponentNode,
+  clockSource: ClockNode,
+  boardNode: BoardNode,
 };
 
 const edgeTypes = {

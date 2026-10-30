@@ -35,6 +35,24 @@ const frame = (children: React.ReactNode, viewBox = '0 0 64 40') => (
 );
 
 const GLYPHS: Partial<Record<GateType, () => React.ReactNode>> = {
+  CLOCK: () =>
+    frame(
+      <>
+        <rect x={4} y={6} width={36} height={28} rx={3} {...body} />
+        <path d="M9 26 H15 V14 H22 V26 H29 V14 H35" {...stroke} strokeWidth={1.75} />
+        <line x1={40} y1={20} x2={62} y2={20} {...stroke} />
+      </>
+    ),
+  ARDUINO_UNO: () =>
+    frame(
+      <>
+        <rect x={6} y={4} width={52} height={32} rx={3} {...body} />
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <rect key={i} x={13 + i * 7} y={8} width={4} height={4} fill="currentColor" />
+        ))}
+        <rect x={22} y={19} width={20} height={10} rx={1.5} {...stroke} strokeWidth={1.5} />
+      </>
+    ),
   INPUT: () =>
     frame(
       <>

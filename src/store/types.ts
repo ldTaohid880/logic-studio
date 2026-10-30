@@ -9,12 +9,24 @@ import {
 import { GateType, SimulationState, CircuitPreset } from '../types/circuit';
 import { EncoderConfig } from '../types/encoder';
 import { SevenSegmentConfig } from '../types/sevenSegment';
+import { Traces } from '../simulation/timeline';
 import { CustomComponentDefinition, CustomPinDefinition, HierarchyBreadcrumb } from '../types/customComponent';
 
 export type ThemeMode = 'light' | 'dark';
 export type UiDensity = 'compact' | 'comfortable' | 'presentation';
 export type ToastVariant = 'success' | 'error' | 'info';
 export type WireStyle = 'curved' | 'orthogonal';
+
+export interface TimelineState {
+  running: boolean;
+  /** Simulated time in ms. */
+  time: number;
+  /** Simulated ms per real ms. */
+  speed: number;
+  /** The last frame couldn't keep up with real time. */
+  behind: boolean;
+  traces: Traces;
+}
 
 export interface HistorySnapshot {
   nodes: Node[];
@@ -82,6 +94,21 @@ export interface CircuitStore {
   // Simulation: signals settle instantly; tickSimulation re-propagates the whole circuit
   resetSimulation: () => void;
   tickSimulation: (isStep?: boolean) => void;
+
+  // Simulated time, used only when the circuit has a clock or a programmed board
+  timeline: TimelineState;
+  /** Serial monitor output per board part. */
+  boardSerial: Record<string, string>;
+  setTimelineRunning: (running: boolean) => void;
+  setTimelineSpeed: (speed: number) => void;
+  /** Called every animation frame while running with the real time elapsed. */
+  advanceTimeline: (realMs: number) => void;
+  /** Pause and move to the next clock edge (or 10 ms without a clock). */
+  stepTimeline: () => void;
+  /** Back to time 0: clocks low, memory cleared, board programs start over. */
+  restartTimeline: () => void;
+  /** Check and load a compiled program (.hex text) onto a board; undoable. Returns success. */
+  loadBoardFirmware: (nodeId: string, name: string, hex: string) => boolean;
 
   // Theme, density & Toasts
   theme: ThemeMode;

@@ -14,8 +14,7 @@ import {
   Spline,
   Boxes,
   History,
-  PanelLeftClose,
-} from 'lucide-react';
+  PanelLeftClose, Cpu } from 'lucide-react';
 import { PARTS, PART_CATEGORIES, PartCategory, PartInfo } from '../../data/components';
 import { PartGlyph, ChipGlyph } from './PartGlyph';
 import { nextPlacementPosition } from '../../utils/canvasBridge';
@@ -56,6 +55,7 @@ const CATEGORY_ICON: Record<PartCategory | 'custom' | 'recent', React.ReactNode>
   Arithmetic: <Calculator className="w-[18px] h-[18px]" />,
   Memory: <MemoryStick className="w-[18px] h-[18px]" />,
   Displays: <Lightbulb className="w-[18px] h-[18px]" />,
+  Boards: <Cpu className="w-[18px] h-[18px]" />,
   Wiring: <Spline className="w-[18px] h-[18px]" />,
 };
 
