@@ -12,7 +12,7 @@
   [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
 
-<!-- Add a "Try it" link to the deployed app here. -->
+<p align="center"><strong><a href="https://logic-studio-gamma.vercel.app/">Try it now →</a></strong></p>
 
 ![Logic Studio with a full adder: switches on the left, the full adder chip in the middle, LEDs on the right and the part's truth table in the inspector](.github/assets/screenshot-light.png)
 
@@ -72,7 +72,7 @@ npm run dev        # http://localhost:3000
 | `npm run check` | Type check, tests and production build; run before opening a pull request |
 | `npm run build` | Production bundle in `dist/`, ready for any static host |
 
-The app is fully client-side, so there's no server or database to set up. On Vercel, link previews use the project's production domain automatically. On other hosts, set `SITE_URL` (for example `SITE_URL=https://logic.example.com npm run build`) so link previews get absolute URLs.
+The app is fully client-side, so there's no server or database to set up. Link previews use absolute URLs: `SITE_URL` if set (for example `SITE_URL=https://logic.example.com npm run build`), otherwise the Vercel production domain, otherwise the live demo address.
 
 ## How it's built
 

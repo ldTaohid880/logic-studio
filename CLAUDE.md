@@ -103,7 +103,7 @@ src/
 
 ## Gotchas
 
-- `index.html` link-preview tags use `%SITE_URL%`, replaced at build time by a plugin in `vite.config.ts` (`SITE_URL`, else Vercel's production domain, else empty). `__APP_VERSION__` comes from `package.json`.
+- `index.html` link-preview tags use `%SITE_URL%`, replaced at build time by a plugin in `vite.config.ts` (`SITE_URL`, else Vercel's production domain, else https://logic-studio-gamma.vercel.app, the live deployment). `__APP_VERSION__` comes from `package.json`.
 - Regenerate `public/og-image.png` and the README screenshots in `.github/assets/` when the UI changes noticeably.
 
 - React Flow's built-in delete key is disabled (`deleteKeyCode={null}`); deletion goes through `useGlobalShortcuts` → `deleteSelected` so it is undoable and re-propagates.

@@ -6,10 +6,11 @@ import {defineConfig, Plugin} from 'vite';
 
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')) as {version: string};
 
-// Link previews need absolute URLs. SITE_URL wins; on Vercel the production domain is used automatically.
+// Link previews need absolute URLs: SITE_URL, else Vercel's production domain, else the public deployment
 const siteUrl = (
   process.env.SITE_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '')
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '') ||
+  'https://logic-studio-gamma.vercel.app'
 ).replace(/\/$/, '');
 
 function absoluteSiteUrls(): Plugin {
