@@ -96,6 +96,7 @@ export interface NodeData {
 
 export interface SimulationState {
   stepCount: number; // Number of propagation passes since the last reset
+  unstableNodeIds: string[]; // Parts that never settled in the last propagation (oscillation)
 }
 
 export interface CircuitPreset {

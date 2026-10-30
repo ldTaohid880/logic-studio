@@ -1,177 +1,89 @@
 <div align="center">
-  <img src="./.github/assets/logic_studio.png" alt="Logic Studio Banner" width="100%" style="border-radius: 12px; margin-bottom: 20px;" />
+  <img src="public/favicon.svg" alt="" width="72" height="72" />
 
-  # ⚡ LOGIC STUDIO
+  # Logic Studio
 
-  ### An Advanced, Interactive Web-Based Digital Logic Circuit Simulator
-  
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-  [![React](https://img.shields.io/badge/React-19-blue.svg?logo=react)](https://react.dev/)
-  [![Vite](https://img.shields.io/badge/Vite-6-purple.svg?logo=vite)](https://vitejs.dev/)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue.svg?logo=typescript)](https://www.typescriptlang.org/)
-  [![React Flow](https://img.shields.io/badge/React%20Flow-12-orange.svg)](https://reactflow.dev/)
-  [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-38bdf8.svg?logo=tailwind-css)](https://tailwindcss.com/)
-  
-  **Logic Studio** is a modern, high-performance, and feature-rich digital logic circuit simulator designed for students, educators, and engineers. Built with a sleek dark theme and glassmorphic UI elements, it offers a real-time signal propagation engine on an infinite panning/zooming canvas. Create everything from simple logic gates to complex, hierarchical custom subcircuits.
+  **Build and simulate digital logic circuits in your browser.**
+
+  Made for engineering students: place gates and chips, wire them up, flip switches and watch the signals change.
+  Every circuit gets a truth table and simplified Boolean expressions. Free, no sign-up, and your work never leaves your computer.
+
+  [![CI](https://github.com/ldTaohid880/logic-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/ldTaohid880/logic-studio/actions/workflows/ci.yml)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
 
----
+<p align="center"><strong><a href="https://logic-studio-gamma.vercel.app/">Try it now →</a></strong></p>
 
-## 📖 Table of Contents
+![Logic Studio with a full adder: switches on the left, the full adder chip in the middle, LEDs on the right and the part's truth table in the inspector](.github/assets/screenshot-light.png)
 
-1. [Features](#-features)
-   - [Interactive Workspace](#1-interactive-workspace)
-   - [Component Library](#2-component-library)
-   - [Custom Subcircuits & Hierarchical Design](#3-custom-subcircuits--hierarchical-design)
-   - [Integrated Analysis & Instrumentation](#4-integrated-analysis--instrumentation)
-   - [User Experience & Aesthetics](#5-user-experience--aesthetics)
-2. [Technology Stack](#-technology-stack)
-3. [Getting Started](#%EF%B8%8F-getting-started)
-   - [Prerequisites](#prerequisites)
-   - [Installation](#installation)
-   - [Running Locally](#running-locally)
-   - [Building for Production](#building-for-production)
-4. [Keyboard Shortcuts & Controls](#-keyboard-shortcuts--controls)
-5. [Contributing](#-contributing)
-6. [License](#-license)
+## What you can do
 
----
+- **Build circuits** from 45 parts: switches, push buttons and DIP switches; AND, OR, NOT, NAND, NOR, XOR, XNOR, buffers and tri-state buffers; multiplexers, decoders, encoders, comparators and parity chips; adders and subtractors; latches, flip-flops and a 4-bit register; LEDs, probes, 7-segment and hex displays.
+- **See signals live.** Wires and pins show 1, 0 or unknown as you edit. Unknown values are marked with `?`, hollow pins and dashed wires, so the state is readable without relying on colour.
+- **Get the truth table of any circuit**, with the row matching the canvas highlighted. Click a row to set the switches to it. Each output gets a simplified sum-of-products expression and its minterm list.
+- **Learn how each part works.** Select a part to see its expression and truth table in the inspector.
+- **Spot feedback problems.** Circuits that never settle, such as a ring of inverters, are outlined and explained.
+- **Make your own chips.** Turn a selection into a reusable component, open it to edit the inside, and nest components inside each other.
+- **Start from examples** covering gates, adders, subtractors, multiplexers, a BCD decoder, latches and flip-flops.
+- **Keep your work.** It autosaves in the browser. You can also save and open `.json` files (custom components included) and export the canvas as a PNG.
+- **Use it your way:** light and dark themes, three interface sizes, and keyboard shortcuts for everything (press `?` in the app).
 
-## 🚀 Features
+<table>
+  <tr>
+    <td><img src=".github/assets/screenshot-truth-table.png" alt="Circuit truth table dialog with the current row highlighted" /></td>
+    <td><img src=".github/assets/screenshot-dark.png" alt="Logic Studio in the dark theme" /></td>
+  </tr>
+  <tr>
+    <td align="center">Circuit truth table</td>
+    <td align="center">Dark theme</td>
+  </tr>
+</table>
 
-### 1. Interactive Workspace
-* **Infinite Canvas**: Seamlessly pan, zoom, and navigate complex schematics using a canvas built on `@xyflow/react` (React Flow).
-* **Real-time Signal Propagation**: Signals (HIGH `1`, LOW `0`, and Floating `-1`) propagate instantly through wires and components as you edit.
-* **Smart Wiring**: Easily drag connections between pins. Click on wires to inspect their status or delete them.
+## Keyboard shortcuts
 
-### 2. Component Library
-Logic Studio features an extensive library of modular components categorized for rapid logic design:
+| Action | Keys |
+| :-- | :-- |
+| Undo / redo | `Ctrl+Z` / `Ctrl+Y` (or `Ctrl+Shift+Z`) |
+| Copy, cut, paste, duplicate | `Ctrl+C`, `Ctrl+X`, `Ctrl+V`, `Ctrl+D` |
+| Delete the selection | `Delete` |
+| Group / ungroup | `Ctrl+G` / `Ctrl+Shift+G` |
+| Save as JSON | `Ctrl+S` |
+| Find a part | `/` |
+| Show all shortcuts | `?` |
 
-* **Logic Gates**: AND, OR, NOT, NAND, NOR, XOR, XNOR, Buffer, Tri-state Buffer (with configurable inputs).
-* **Input Elements**:
-  * **Clock**: Emits periodic pulses with adjustable frequency (in milliseconds).
-  * **DIP Switches & Push Buttons**: Toggle states interactively.
-  * **Constant Nodes**: Permanent HIGH (`1`) and LOW (`0`) sources.
-* **Output & Visualization**:
-  * **Logic Probe & RGB LED**: Immediate signal state indicators.
-  * **7-Segment & Hex Display**: Visualize binary outputs as human-readable characters/numbers.
-  * **Bus Monitor**: Debug multi-bit buses.
-  * **Oscilloscope**: Visualize logic waveforms in real-time.
-  * **LED Matrix**: Program matrix designs directly.
-* **Combinational Circuits**:
-  * Multiplexers/Demultiplexers (4-to-1, 8-to-1, 1-to-4, 1-to-8).
-  * Encoders & Decoders (BCD-to-7-segment, Priority Encoders, 3-to-8, 4-to-16).
-  * Parity Generators/Checkers.
-  * Binary-to-Gray and Gray-to-Binary converters.
-* **Sequential Elements**:
-  * Latches & Flip-flops (D Latch, JK Flip-flop, T Flip-flop).
-  * Registers (4-bit, Shift Register).
-  * Counters (4-bit Up/Down, Ripple, Synchronous, Ring).
-* **Arithmetic Units**:
-  * Half Adder / Full Adder.
-  * 4-bit Adders, Subtractors, and Adder-Subtractors.
-  * 4-bit Incrementers & Decrementers.
-  * 4-bit ALU (Arithmetic Logic Unit) supporting multiple operations.
-* **Wiring & Utility**:
-  * **Buses**: Joiners, Splitters, Taps, and Bit Extractors to manage multi-bit buses cleanly.
-  * **Tunnels**: Wireless nodes that connect logic paths without cluttering the canvas with wires.
-  * **Text Labels**: Annotate your circuit designs.
+On a Mac, use `Cmd` instead of `Ctrl`. Drag from a pin to draw a wire, click a switch to toggle it, Shift-drag to box-select and right-click for the context menu.
 
-### 3. Custom Subcircuits & Hierarchical Design
-* **Custom Component Wizard**: Package any group of components on the canvas into a reusable custom chip/subcircuit. Define custom input and output pin layouts, give it a name, and save it.
-* **Subcircuit Library**: Keep a library of custom components and drag-and-drop them into parent canvases as nested nodes for complex hierarchical designs.
+## Running it locally
 
-### 4. Integrated Analysis & Instrumentation
-* **Truth Table Generator**: Generate the complete truth table for any circuit or subcircuit with one click.
-* **Boolean Equation Generator**: View the derived boolean expressions representing the logic behavior of your circuit.
-* **Interactive Inspector**: Highlight any wire or component to see its current state, pin names, descriptions, configuration variables, and custom parameters.
+You need [Node.js](https://nodejs.org/) 18 or newer.
 
-### 5. User Experience & Aesthetics
-* **Premium Theme**: A stunning, modern dark theme complete with glassmorphic modals and glowing logic signals.
-* **Keyboard Hotkeys**: Full undo/redo history, clipboard support (copy/cut/paste/duplicate), and hotkeys for lightning-fast editing.
-* **Visual Export**: Export high-quality PNG snapshots of your circuits directly from the toolbar.
-
----
-
-## 🛠️ Technology Stack
-
-* **Frontend Framework**: [React 19](https://react.dev/)
-* **Build Tool & Server**: [Vite 6](https://vite.dev/)
-* **Programming Language**: [TypeScript](https://www.typescriptlang.org/)
-* **Canvas Engine**: [React Flow (xyflow)](https://reactflow.dev/)
-* **State Management**: [Zustand](https://zustand-demo.pmnd.rs/)
-* **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-* **Icons**: [Lucide React](https://lucide.dev/)
-* **Animations**: [Motion](https://motion.dev/)
-
----
-
-## ⚙️ Getting Started
-
-### Prerequisites
-Make sure you have [Node.js](https://nodejs.org/) installed (v18+ recommended).
-
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ldTaohid880/logic-studio.git
-   cd digital-logic-simulator
-   ```
-
-2. Install the project dependencies:
-   ```bash
-   npm install
-   ```
-
-### Running Locally
-Start the development server:
 ```bash
-npm run dev
+git clone https://github.com/ldTaohid880/logic-studio.git
+cd logic-studio
+npm install
+npm run dev        # http://localhost:3000
 ```
-Open your browser and navigate to `http://localhost:3000` to start building circuits!
 
-### Building for Production
-To build a highly optimized production bundle:
-```bash
-npm run build
-```
-This generates build artifacts in the `dist` folder, which can be deployed to Vercel, Netlify, or any static hosting service.
+| Command | What it does |
+| :-- | :-- |
+| `npm run dev` | Development server with hot reload |
+| `npm test` | Unit tests (Vitest) |
+| `npm run lint` | Type check (TypeScript, strict) |
+| `npm run check` | Type check, tests and production build; run before opening a pull request |
+| `npm run build` | Production bundle in `dist/`, ready for any static host |
 
----
+The app is fully client-side, so there's no server or database to set up. Link previews use absolute URLs: `SITE_URL` if set (for example `SITE_URL=https://logic.example.com npm run build`), otherwise the Vercel production domain, otherwise the live demo address.
 
-## ⌨️ Keyboard Shortcuts & Controls
+## How it's built
 
-Use these keyboard shortcuts to speed up your design and simulation workflow:
+React 19 and TypeScript, the canvas from [React Flow](https://reactflow.dev/), state in [Zustand](https://zustand.docs.pmnd.rs/), styling with Tailwind CSS 4, built with Vite. The simulation engine (`src/simulation/`) is plain TypeScript with no React, and is covered by unit tests that check every chip against an independent reference model.
 
-| Action | Shortcut / Control |
-| :--- | :--- |
-| **Copy Component** | `Ctrl + C` / `Cmd + C` |
-| **Cut Component** | `Ctrl + X` / `Cmd + X` |
-| **Paste Component** | `Ctrl + V` / `Cmd + V` |
-| **Duplicate Component** | `Ctrl + D` / `Cmd + D` |
-| **Delete Selected** | `Delete` / `Backspace` |
-| **Undo Action** | `Ctrl + Z` / `Cmd + Z` |
-| **Redo Action** | `Ctrl + Y` / `Cmd + Shift + Z` |
-| **Toggle Input State** | Click interactively on INPUT / Switch / Button nodes |
-| **Connect Pins** | Click & drag wire from any output pin to an input pin |
-| **Inspect / Select Wire** | Left-click on any wire segment |
-| **Zoom Canvas** | Scroll wheel up/out |
-| **Pan Canvas** | Right-click + drag or Spacebar + drag |
+[`CLAUDE.md`](CLAUDE.md) is the developer guide: project layout, how the simulation works, store conventions and a checklist for adding a new part.
 
----
+## Contributing
 
-## 🤝 Contributing
+Issues and pull requests are welcome. Please run `npm run check` before opening a pull request, and keep interface text in sentence case and plain language.
 
-Contributions to Logic Studio are welcome! To contribute:
-1. Fork the project.
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
-5. Open a Pull Request.
+## License
 
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
+[MIT](LICENSE)

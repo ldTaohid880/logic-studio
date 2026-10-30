@@ -62,7 +62,7 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
         onClick={() => setIsTruthTableOpen(true)}
         className="w-full"
       >
-        View Truth Table & Logic Guide
+        Truth table
       </Button>
 
       <InspectorSection title="Settings" icon={<Settings className="w-4 h-4" />}>

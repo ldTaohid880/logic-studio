@@ -173,3 +173,45 @@ export function evaluateSevenSegment(
     isValidBcd,
   };
 }
+
+export interface SevenSegmentTableRow {
+  index: number;
+  /** Input levels in column order: D C B A for decoder modes, a–g for direct mode. */
+  inputs: number[];
+  /** Segments a–g, 1 = lit. */
+  segments: number[];
+  /** What the display shows: a digit or letter, "blank", "-" or "custom". */
+  shows: string;
+  isActive: boolean;
+}
+
+/**
+ * Every input combination of a 7-segment display in its current mode: 16 rows for the decoder modes,
+ * 128 for direct segment control. The decimal point is left out (it doesn't depend on the other inputs).
+ */
+export function buildSevenSegmentTable(
+  config: SevenSegmentConfig,
+  currentInputs: { id: string; value: SignalValue }[]
+): { inputHeaders: string[]; rows: SevenSegmentTableRow[] } {
+  const direct = config.mode === 'direct';
+  const pinIds = direct ? ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((s) => `in-${s}`) : ['in-3', 'in-2', 'in-1', 'in-0'];
+  const inputHeaders = direct ? ['a', 'b', 'c', 'd', 'e', 'f', 'g'] : ['D', 'C', 'B', 'A'];
+
+  // The canvas is on a row only when every input has a known level
+  const canvas = new Map(currentInputs.map((p) => [p.id, p.value]));
+  const known = pinIds.every((id) => canvas.get(id) === 0 || canvas.get(id) === 1);
+  const activeIndex = known ? pinIds.reduce((acc, id) => (acc << 1) | (canvas.get(id) as number), 0) : -1;
+
+  const rows = Array.from({ length: 1 << pinIds.length }, (_, index) => {
+    const inputs = pinIds.map((_, i) => (index >> (pinIds.length - 1 - i)) & 1);
+    const result = evaluateSevenSegment(
+      pinIds.map((id, i) => ({ id, value: inputs[i] as SignalValue })),
+      config
+    );
+    const { a, b, c, d, e, f, g } = result.segments;
+    const shows = result.decodedChar === ' ' ? 'blank' : result.decodedChar === 'Custom' ? 'custom' : result.decodedChar;
+    return { index, inputs, segments: [a, b, c, d, e, f, g].map(Number), shows, isActive: index === activeIndex };
+  });
+
+  return { inputHeaders, rows };
+}

@@ -1,12 +1,14 @@
 import { CircuitPreset } from '../../types/circuit';
-import { CIRCUIT_PRESETS } from '../../utils/presets';
-import { getInitialPresets, savePresetsToStorage, removeUnsupportedParts } from '../helpers';
+import { CIRCUIT_PRESETS } from '../../data/examples';
+import { getInitialPresets, savePresetsToStorage, removeUnsupportedParts, saveCustomComponentsToStorage } from '../helpers';
+import { parseCircuitFile } from '../../utils/circuitFile';
 import { CircuitStore, StoreSlice } from '../types';
 
 // Presets and whole-circuit load/clear
 export type ProjectSlice = Pick<CircuitStore,
   | 'presets'
   | 'loadCircuit'
+  | 'openCircuitFile'
   | 'loadPreset'
   | 'addPreset'
   | 'updatePreset'
@@ -33,6 +35,42 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
         'info'
       );
     }
+  },
+
+  openCircuitFile: (text) => {
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      get().showToast('Failed to read the file: it is not valid JSON', 'error');
+      return false;
+    }
+
+    const parsed = parseCircuitFile(json, get().customComponents);
+    if (!parsed.ok) {
+      get().showToast(parsed.error, 'error');
+      return false;
+    }
+
+    if (Object.keys(parsed.components).length > 0) {
+      const customComponents = { ...get().customComponents, ...parsed.components };
+      set({ customComponents });
+      saveCustomComponentsToStorage(customComponents);
+    }
+    const toastBefore = get().toastMessage;
+    get().loadCircuit(parsed.nodes, parsed.edges);
+    if (parsed.renamed > 0) {
+      get().showToast(
+        `Circuit opened. ${parsed.renamed} component${parsed.renamed === 1 ? '' : 's'} differed from your library and ${
+          parsed.renamed === 1 ? 'was' : 'were'
+        } added as a copy`,
+        'info'
+      );
+    } else if (get().toastMessage === toastBefore) {
+      // Keep loadCircuit's note about left-out parts if it showed one
+      get().showToast('Circuit opened');
+    }
+    return true;
   },
 
   loadPreset: (presetId) => {

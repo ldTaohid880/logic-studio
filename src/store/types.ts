@@ -71,6 +71,8 @@ export interface CircuitStore {
   toggleInputValue: (nodeId: string) => void;
   setButtonPressed: (nodeId: string, pressed: boolean) => void;
   toggleDipBit: (nodeId: string, bitIndex: number) => void;
+  /** Set several switches, buttons and DIP bits at once (e.g. from a truth table row); not recorded in undo. */
+  setInputLevels: (levels: { nodeId: string; bit?: number; value: 0 | 1 }[]) => void;
 
   // Encoder Node Manual Controls
   toggleEncoderInputPin: (nodeId: string, pinIdx: number) => void;
@@ -94,6 +96,8 @@ export interface CircuitStore {
   // Project management
   presets: CircuitPreset[];
   loadCircuit: (nodes: Node[], edges: Edge[]) => void;
+  /** Open a saved circuit file (JSON text): checks it, adds its custom components, loads it. Returns success. */
+  openCircuitFile: (text: string) => boolean;
   loadPreset: (presetId: string) => void;
   addPreset: (data: { name: string; category: string; description: string }) => string;
   updatePreset: (presetId: string, data: { name?: string; category?: string; description?: string; updateCircuit?: boolean }) => void;

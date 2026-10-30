@@ -1,11 +1,12 @@
 import { Node, Edge } from '@xyflow/react';
 import { NodeData, SimulationState, CircuitPreset } from '../types/circuit';
-import { CIRCUIT_PRESETS } from '../utils/presets';
+import { CIRCUIT_PRESETS } from '../data/examples';
 import { CustomComponentDefinition } from '../types/customComponent';
 import { BUILTIN_HALF_ADDER, BUILTIN_FULL_ADDER } from '../utils/builtinAdders';
 
 export const DEFAULT_SIMULATION: SimulationState = {
   stepCount: 0,
+  unstableNodeIds: [],
 };
 
 // Parts that were removed from Logic Studio. Saved circuits may still contain them.
@@ -104,12 +105,7 @@ export const markRemovedWireTargets = (nodes: Node[], removedEdges: Edge[]): Nod
   });
 };
 
-export const makeId = (prefix: string): string => {
-  const unique = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID().slice(0, 8)
-    : Math.random().toString(36).slice(2, 10);
-  return `${prefix}-${Date.now()}-${unique}`;
-};
+export { makeId } from '../utils/ids';
 
 export const STORAGE_KEY_CIRCUIT = 'logic_studio_circuit';
 

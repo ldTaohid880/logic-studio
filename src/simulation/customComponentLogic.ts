@@ -5,8 +5,8 @@ import { CustomComponentDefinition } from '../types/customComponent';
 export function evaluateCustomComponentLogic(
   data: NodeData,
   customComponentsMap: Record<string, CustomComponentDefinition>,
-  propagateSignalsFn: (nodes: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[]; hasChanged: boolean }
-): { updatedOutputs: Record<string, SignalValue>; internalNodeStates: Record<string, any>; hasChanged: boolean } {
+  propagateSignalsFn: (nodes: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[]; hasChanged: boolean; unstableNodeIds?: string[] }
+): { updatedOutputs: Record<string, SignalValue>; internalNodeStates: Record<string, any>; hasChanged: boolean; unstable?: boolean } {
   if (!data.customComponentId) {
     return { updatedOutputs: {}, internalNodeStates: {}, hasChanged: false };
   }
@@ -141,6 +141,7 @@ export function evaluateCustomComponentLogic(
     updatedOutputs,
     internalNodeStates: { nodes: evaluatedNodes, defVersion: def.updatedAt },
     hasChanged: propRes.hasChanged,
+    unstable: (propRes.unstableNodeIds?.length ?? 0) > 0,
   };
 }
 
