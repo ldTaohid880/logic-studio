@@ -1,5 +1,7 @@
-import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useRef, useState, useEffect, useMemo, useCallback, useId } from 'react';
+import { ModalFrame } from './Dialog';
+import { ModalHeader } from './ModalHeader';
+import { Button } from './Button';
 import { toPng } from 'html-to-image';
 import {
   X,
@@ -22,6 +24,7 @@ import {
 } from 'lucide-react';
 
 import { useCircuitStore } from '../../store/useCircuitStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   analyzeCircuitGraph,
   generateCircuitTruthTableAsync,
@@ -39,8 +42,9 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { nodes, edges } = useCircuitStore();
+  const { nodes, edges, customComponents } = useCircuitStore(useShallow((s) => ({ nodes: s.nodes, edges: s.edges, customComponents: s.customComponents })));
 
+  const titleId = useId();
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [followActiveRow, setFollowActiveRow] = useState(false);
@@ -108,6 +112,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
     try {
       const result = await generateCircuitTruthTableAsync(nodes, edges, analysis, {
         initialSeqState,
+        customComponents,
         batchSize: total > 128 ? 64 : 16,
         onProgress: (prog, curr, tot, timeEst) => {
           if (showLoader) {
@@ -273,85 +278,45 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
     window.print();
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-lg p-3 sm:p-6 animate-fadeIn font-sans select-none print:p-0 print:bg-white">
-      <div className="bg-[#0b0e14] border border-white/10 rounded-2xl w-[96vw] max-w-[1500px] h-[92vh] flex flex-col shadow-2xl overflow-hidden text-slate-100 print:w-full print:h-full print:border-none print:rounded-none">
-
-        {/* ================= HEADER ================= */}
-        <div className="px-6 py-4 border-b border-white/10 bg-slate-900/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 print:hidden">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-              <Table className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white tracking-wide">
-                  Circuit Truth Table Generator
-                </h2>
-                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800">
-                  {analysis.inputs.length} Inputs • {analysis.outputs.length} Outputs
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-mono">
-                Complete combinational logic truth table ({Math.pow(2, analysis.inputs.length)} rows)
-              </p>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowColumnPicker(!showColumnPicker)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
-                showColumnPicker
-                  ? 'bg-cyan-600 text-white border-cyan-400 shadow-lg shadow-cyan-900/50'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-200'
-              }`}
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Select Signals</span>
-            </button>
-
-            <button
-              onClick={handleCopy}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-colors flex items-center gap-1.5"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-
-            <button
-              onClick={handleExportCSV}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-colors flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5" />
-              CSV
-            </button>
-
-            <button
-              onClick={handleExportPNG}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-colors flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5" />
-              PNG
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-colors flex items-center gap-1.5"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              Print
-            </button>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-2"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+  return (
+    <ModalFrame
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy={titleId}
+      className="w-[96vw] max-w-[1500px] h-[92vh] print:w-full print:h-full print:border-none print:rounded-none"
+    >
+        <ModalHeader
+          titleId={titleId}
+          icon={<Table className="w-5 h-5" />}
+          title="Circuit truth table"
+          description={`Every combination of the ${analysis.inputs.length} switch${analysis.inputs.length === 1 ? '' : 'es'} and what the ${analysis.outputs.length} LED${analysis.outputs.length === 1 ? '' : 's'} show (${Math.pow(2, analysis.inputs.length)} rows)`}
+          onClose={onClose}
+          actions={
+            <>
+              <Button
+                size="sm"
+                variant={showColumnPicker ? 'secondary' : 'ghost'}
+                aria-pressed={showColumnPicker}
+                leftIcon={<Sliders className="w-4 h-4" />}
+                onClick={() => setShowColumnPicker(!showColumnPicker)}
+              >
+                <span className="hidden md:inline">Columns</span>
+              </Button>
+              <Button size="sm" variant="ghost" leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} onClick={handleCopy}>
+                <span className="hidden md:inline">{copied ? 'Copied' : 'Copy'}</span>
+              </Button>
+              <Button size="sm" variant="ghost" leftIcon={<Download className="w-4 h-4" />} onClick={handleExportCSV}>
+                <span className="hidden md:inline">CSV</span>
+              </Button>
+              <Button size="sm" variant="ghost" leftIcon={<Download className="w-4 h-4" />} onClick={handleExportPNG}>
+                <span className="hidden md:inline">Image</span>
+              </Button>
+              <Button size="sm" variant="ghost" leftIcon={<Printer className="w-4 h-4" />} onClick={handlePrint}>
+                <span className="hidden md:inline">Print</span>
+              </Button>
+            </>
+          }
+        />
 
         {/* ================= SEQUENTIAL LOGIC BANNER NOTICE ================= */}
         {analysis.hasSequentialLogic && (
@@ -367,9 +332,9 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
               <span className="text-slate-400">Initial State Q:</span>
               <button
                 onClick={() => setInitialSeqState(0)}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                className={`px-2 py-0.5 rounded text-xs font-bold border ${
                   initialSeqState === 0
-                    ? 'bg-amber-500 text-slate-950 border-amber-400'
+                    ? 'bg-amber-500 text-on-accent border-amber-400'
                     : 'bg-slate-900 border-slate-700 text-slate-400'
                 }`}
               >
@@ -377,9 +342,9 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
               </button>
               <button
                 onClick={() => setInitialSeqState(1)}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                className={`px-2 py-0.5 rounded text-xs font-bold border ${
                   initialSeqState === 1
-                    ? 'bg-amber-500 text-slate-950 border-amber-400'
+                    ? 'bg-amber-500 text-on-accent border-amber-400'
                     : 'bg-slate-900 border-slate-700 text-slate-400'
                 }`}
               >
@@ -390,7 +355,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
         )}
 
         {/* ================= SEARCH & FOLLOW ACTIVE ROW TOOLBAR ================= */}
-        <div className="px-6 py-2.5 border-b border-white/10 bg-slate-950/80 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <div className="px-6 py-2.5 border-b border-line bg-surface-1 flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div className="flex items-center gap-3 flex-1 max-w-md">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
@@ -399,16 +364,16 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search bit pattern or row..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-xs font-mono text-slate-200 focus:border-cyan-500"
               />
             </div>
 
-            <label className="flex items-center gap-2 text-xs font-mono text-slate-300 bg-slate-900/90 border border-slate-800 px-3 py-1 rounded-lg cursor-pointer hover:border-slate-700 select-none shrink-0">
+            <label className="flex items-center gap-2 text-xs font-mono text-slate-300 bg-surface-1 border border-slate-800 px-3 py-1 rounded-lg cursor-pointer hover:border-slate-700 select-none shrink-0">
               <input
                 type="checkbox"
                 checked={followActiveRow}
                 onChange={(e) => setFollowActiveRow(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-700 text-cyan-500 focus:ring-cyan-500 bg-slate-950 cursor-pointer"
+                className="w-3.5 h-3.5 rounded border-slate-700 text-cyan-500 bg-slate-950 cursor-pointer"
               />
               <span>Follow Active Row</span>
             </label>
@@ -416,7 +381,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
 
           {activeRow && (
             <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-lg border border-cyan-500/20">
-              <Zap className="w-3.5 h-3.5 animate-pulse" />
+              <Zap className="w-3.5 h-3.5" />
               <span>Live Active Match: Row {activeRow.index}</span>
             </div>
           )}
@@ -424,12 +389,12 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
 
         {/* ================= COLUMN SIGNAL PICKER DRAWER ================= */}
         {showColumnPicker && (
-          <div className="px-6 py-3 border-b border-white/10 bg-slate-900/90 text-xs font-mono flex flex-wrap gap-6 animate-fadeIn print:hidden">
+          <div className="px-6 py-3 border-b border-line bg-surface-1 text-xs font-mono flex flex-wrap gap-6 animate-fadeIn print:hidden">
             {/* Inputs Column Toggle */}
             <div className="space-y-1.5 flex-1 min-w-[200px]">
               <div className="flex items-center justify-between text-cyan-300 font-bold border-b border-cyan-500/30 pb-1">
                 <span>INPUT SIGNALS ({analysis.inputs.length})</span>
-                <div className="flex gap-1 text-[10px]">
+                <div className="flex gap-1 text-[11px]">
                   <button onClick={() => toggleAllCategory(analysis.inputs, true)} className="hover:underline text-cyan-400">All</button>
                   <span>/</span>
                   <button onClick={() => toggleAllCategory(analysis.inputs, false)} className="hover:underline text-slate-400">None</button>
@@ -454,7 +419,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
             <div className="space-y-1.5 flex-1 min-w-[200px]">
               <div className="flex items-center justify-between text-amber-300 font-bold border-b border-amber-500/30 pb-1">
                 <span>INTERNAL SIGNALS ({analysis.internal.length})</span>
-                <div className="flex gap-1 text-[10px]">
+                <div className="flex gap-1 text-[11px]">
                   <button onClick={() => toggleAllCategory(analysis.internal, true)} className="hover:underline text-amber-400">All</button>
                   <span>/</span>
                   <button onClick={() => toggleAllCategory(analysis.internal, false)} className="hover:underline text-slate-400">None</button>
@@ -483,7 +448,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
             <div className="space-y-1.5 flex-1 min-w-[200px]">
               <div className="flex items-center justify-between text-emerald-300 font-bold border-b border-emerald-500/30 pb-1">
                 <span>OUTPUT SIGNALS ({analysis.outputs.length})</span>
-                <div className="flex gap-1 text-[10px]">
+                <div className="flex gap-1 text-[11px]">
                   <button onClick={() => toggleAllCategory(analysis.outputs, true)} className="hover:underline text-emerald-400">All</button>
                   <span>/</span>
                   <button onClick={() => toggleAllCategory(analysis.outputs, false)} className="hover:underline text-slate-400">None</button>
@@ -527,7 +492,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
               <span className="text-slate-400">Est. remaining: {(timeEstimateMs / 1000).toFixed(1)}s</span>
               <button
                 onClick={handleCancelGeneration}
-                className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px]"
+                className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-on-accent font-bold text-xs"
               >
                 Cancel
               </button>
@@ -539,37 +504,37 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div
             ref={tableContainerRef}
-            className="bg-[#080b10] rounded-xl border border-white/10 shadow-2xl overflow-auto max-h-[62vh] print:max-h-none print:border-none"
+            className="bg-surface-0 rounded-xl border border-line shadow-2xl overflow-auto max-h-[62vh] print:max-h-none print:border-none"
           >
             <table className="w-full text-center text-xs font-mono border-collapse">
               <thead>
-                <tr className="bg-slate-900 text-slate-300 border-b border-white/10 sticky top-0 z-20 backdrop-blur-md">
-                  <th className="py-3 px-3 border-r border-white/10 text-slate-400 w-16">Row #</th>
+                <tr className="bg-slate-900 text-slate-300 border-b border-line sticky top-0 z-20">
+                  <th className="py-3 px-3 border-r border-line text-slate-400 w-16">Row #</th>
 
                   {/* Inputs Group Header */}
                   {visibleInputs.map((s) => (
-                    <th key={s.id} className="py-3 px-3 border-r border-white/5 text-cyan-300 bg-cyan-950/40">
+                    <th key={s.id} className="py-3 px-3 border-r border-line text-cyan-300 bg-cyan-950/40">
                       {s.label}
                     </th>
                   ))}
 
                   {/* Internal Group Header */}
                   {visibleInternal.map((s) => (
-                    <th key={s.id} className="py-3 px-3 border-r border-white/5 text-amber-300 bg-amber-950/30">
+                    <th key={s.id} className="py-3 px-3 border-r border-line text-amber-300 bg-amber-950/30">
                       {s.label}
                     </th>
                   ))}
 
                   {/* Outputs Group Header */}
                   {visibleOutputs.map((s) => (
-                    <th key={s.id} className="py-3 px-3 border-r border-white/5 text-emerald-300 bg-emerald-950/40 font-bold">
+                    <th key={s.id} className="py-3 px-3 border-r border-line text-emerald-300 bg-emerald-950/40 font-bold">
                       {s.label}
                     </th>
                   ))}
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-white/5 bg-[#080b10]">
+              <tbody className="divide-y divide-line bg-surface-0">
                 {filteredRows.length === 0 ? (
                   <tr>
                     <td
@@ -586,14 +551,14 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
                       ref={row.isActive ? activeRowRef : null}
                       className={`transition-colors ${
                         row.isActive
-                          ? 'bg-cyan-600/30 border-y border-cyan-400 shadow-[inset_0_0_15px_rgba(6,182,212,0.3)]'
-                          : 'hover:bg-white/[0.04] odd:bg-white/[0.01]'
+                          ? 'bg-cyan-600/30 border-y border-cyan-400'
+                          : 'hover:bg-surface-2/60 odd:bg-surface-2/60'
                       }`}
                     >
                       {/* Row Index */}
-                      <td className="py-2.5 px-3 border-r border-white/10 font-bold text-slate-400">
+                      <td className="py-2.5 px-3 border-r border-line font-bold text-slate-400">
                         {row.isActive ? (
-                          <span className="px-2 py-0.5 rounded bg-cyan-400 text-slate-950 font-black text-[10px] animate-pulse">
+                          <span className="px-2 py-0.5 rounded bg-cyan-400 text-on-accent font-semibold text-[11px]">
                             ACTIVE
                           </span>
                         ) : (
@@ -607,7 +572,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
                         return (
                           <td
                             key={s.id}
-                            className={`py-2.5 px-3 border-r border-white/5 font-bold ${
+                            className={`py-2.5 px-3 border-r border-line font-bold ${
                               val === 1 ? 'text-cyan-300 bg-cyan-500/15' : 'text-slate-500'
                             }`}
                           >
@@ -622,7 +587,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
                         return (
                           <td
                             key={s.id}
-                            className={`py-2.5 px-3 border-r border-white/5 font-bold ${
+                            className={`py-2.5 px-3 border-r border-line font-bold ${
                               val === 1 ? 'text-amber-300 bg-amber-500/15' : 'text-slate-600'
                             }`}
                           >
@@ -637,7 +602,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
                         return (
                           <td
                             key={s.id}
-                            className={`py-2.5 px-3 border-r border-white/5 font-bold text-sm ${
+                            className={`py-2.5 px-3 border-r border-line font-bold text-sm ${
                               val === 1 ? 'text-emerald-400 bg-emerald-500/15' : 'text-slate-600'
                             }`}
                           >
@@ -654,7 +619,7 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
         </div>
 
         {/* ================= FOOTER ================= */}
-        <div className="px-6 py-3 border-t border-white/10 bg-slate-900/90 text-xs font-mono text-slate-400 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <div className="px-6 py-3 border-t border-line bg-surface-1 text-xs font-mono text-slate-400 flex flex-wrap items-center justify-between gap-3 print:hidden">
           <span>
             Total Rows: {filteredRows.length} of {truthTableData?.rows.length || Math.pow(2, analysis.inputs.length)}
           </span>
@@ -672,8 +637,6 @@ export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({
           </div>
         </div>
 
-      </div>
-    </div>,
-    document.body
+    </ModalFrame>
   );
 };

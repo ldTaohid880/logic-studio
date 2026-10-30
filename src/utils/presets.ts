@@ -5,7 +5,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'xor-demo',
     name: 'XOR Demonstration',
-    category: 'Basic Gates',
+    category: 'Gates',
     description: 'Demonstrates Exclusive OR (XOR) logic: Output is HIGH (1) when inputs differ.',
     nodes: [
       {
@@ -48,7 +48,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'xnor-demo',
     name: 'XNOR Demonstration',
-    category: 'Basic Gates',
+    category: 'Gates',
     description: 'Demonstrates Inverted XOR (XNOR) logic: Output is HIGH (1) when inputs are identical.',
     nodes: [
       {
@@ -91,7 +91,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'nand-universal',
     name: 'NAND as Universal Gate',
-    category: 'Basic Gates',
+    category: 'Gates',
     description: 'Demonstrates building NOT, AND, and OR logic using only universal NAND gates.',
     nodes: [
       {
@@ -171,7 +171,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'nor-universal',
     name: 'NOR as Universal Gate',
-    category: 'Basic Gates',
+    category: 'Gates',
     description: 'Demonstrates building NOT and OR logic using universal NOR gates.',
     nodes: [
       {
@@ -230,7 +230,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'half-adder',
     name: 'Half Adder',
-    category: 'Combinational Logic',
+    category: 'Combinational',
     description: 'Adds two single binary digits (A and B) to produce Sum (XOR) and Carry Out (AND).',
     nodes: [
       {
@@ -280,7 +280,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'full-adder-demo',
     name: 'Full Adder',
-    category: 'Combinational Logic',
+    category: 'Combinational',
     description: '3-bit Full Adder with inputs A, B, and Cin producing Sum and Cout.',
     nodes: [
       {
@@ -337,7 +337,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'ripple-carry-adder-4bit',
     name: '4-Bit Ripple Carry Adder',
-    category: 'Combinational Logic',
+    category: 'Combinational',
     description: 'Chained 4-bit parallel adder constructed using 4 Full Adders (FA0..FA3).',
     nodes: [
       {
@@ -423,7 +423,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'half-subtractor-demo',
     name: 'Half Subtractor',
-    category: 'Combinational Logic',
+    category: 'Combinational',
     description: 'Subtracts Input B from Input A producing Difference (D = A ⊕ B) and Borrow (Bout = A\'B).',
     nodes: [
       {
@@ -472,7 +472,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'full-subtractor-demo',
     name: 'Full Subtractor',
-    category: 'Combinational Logic',
+    category: 'Combinational',
     description: 'Full 3-input binary subtractor taking A, B, and Borrow In (Bin).',
     nodes: [
       {
@@ -528,7 +528,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'mux-4to1-demo',
     name: '4:1 Multiplexer',
-    category: 'Combinational Logic',
+    category: 'Combinational',
     description: 'Selects 1 of 4 inputs (I0..I3) using 2 select lines (S1, S0).',
     nodes: [
       {
@@ -585,7 +585,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'bcd-to-7seg-demo',
     name: 'BCD to 7-Segment Decoder',
-    category: 'Combinational Logic',
+    category: 'Combinational',
     description: 'Decodes a 4-bit Binary Coded Decimal (BCD) input into 7-segment display driver signals.',
     nodes: [
       {
@@ -653,7 +653,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'sr-latch',
     name: 'SR Latch',
-    category: 'Sequential Logic',
+    category: 'Memory',
     description: 'Bistable memory element using cross-coupled NOR gates for Set (S) and Reset (R).',
     nodes: [
       {
@@ -717,7 +717,7 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'd-latch-demo',
     name: 'D Latch',
-    category: 'Sequential Logic',
+    category: 'Memory',
     description: 'Level-sensitive D Latch IC holding data when Enable is LOW and tracking Data when Enable is HIGH.',
     nodes: [
       {
@@ -766,8 +766,8 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
   {
     id: 'jk-flipflop-demo',
     name: 'JK Flip-Flop',
-    category: 'Sequential Logic',
-    description: 'Edge-triggered JK Flip-Flop: J=1,K=0 Sets; J=0,K=1 Resets; J=1,K=1 Toggles on active clock tick.',
+    category: 'Memory',
+    description: 'Edge-triggered JK Flip-Flop: J=1,K=0 Sets; J=0,K=1 Resets; J=1,K=1 Toggles. Press the clock button to make a clock edge.',
     nodes: [
       {
         id: 'in-j',
@@ -777,9 +777,9 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
       },
       {
         id: 'clk-gen',
-        type: 'clockNode',
+        type: 'pushButton',
         position: { x: 80, y: 180 },
-        data: { label: 'Clock', gateType: 'CLOCK', value: 0, inputs: [], outputs: [{ id: 'out-0', name: 'Out', value: 0 }] },
+        data: { label: 'Clock (press)', gateType: 'PUSH_BUTTON', value: 0, inputs: [], outputs: [{ id: 'out-0', name: 'Out', value: 0 }] },
       },
       {
         id: 'in-k',
@@ -823,134 +823,9 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
     ],
   },
   {
-    id: 'counter-4bit-demo',
-    name: '4-Bit Counter',
-    category: 'Sequential Logic',
-    description: '4-bit binary up counter driven by clock generator, displaying count on Hex Display & Bus Monitor.',
-    nodes: [
-      {
-        id: 'clk-gen',
-        type: 'clockNode',
-        position: { x: 80, y: 120 },
-        data: { label: 'Clock Source', gateType: 'CLOCK', value: 0, inputs: [], outputs: [{ id: 'out-0', name: 'Out', value: 0 }] },
-      },
-      {
-        id: 'counter-ic',
-        type: 'icComponent',
-        position: { x: 300, y: 100 },
-        data: {
-          label: '4-Bit Counter',
-          gateType: 'UP_COUNTER_4BIT',
-          inputs: [{ id: 'in-0', name: 'CLK', value: 0 }, { id: 'in-1', name: 'CLR', value: 0 }, { id: 'in-2', name: 'EN', value: 1 }],
-          outputs: [
-            { id: 'out-0', name: 'Q0 (LSB)', value: 0 },
-            { id: 'out-1', name: 'Q1', value: 0 },
-            { id: 'out-2', name: 'Q2', value: 0 },
-            { id: 'out-3', name: 'Q3 (MSB)', value: 0 },
-          ],
-        },
-      },
-      {
-        id: 'hex-out',
-        type: 'hexDisplay',
-        position: { x: 560, y: 80 },
-        data: {
-          label: 'Hex Readout',
-          gateType: 'HEX_DISPLAY',
-          inputs: [
-            { id: 'in-0', name: 'D0', value: 0 }, { id: 'in-1', name: 'D1', value: 0 },
-            { id: 'in-2', name: 'D2', value: 0 }, { id: 'in-3', name: 'D3', value: 0 },
-          ],
-          outputs: [],
-        },
-      },
-      {
-        id: 'bus-mon',
-        type: 'busMonitor',
-        position: { x: 560, y: 240 },
-        data: {
-          label: 'Bus Monitor',
-          gateType: 'BUS_MONITOR',
-          bitWidth: 4,
-          displayFormat: 'hex',
-          inputs: [
-            { id: 'in-0', name: 'B0', value: 0 }, { id: 'in-1', name: 'B1', value: 0 },
-            { id: 'in-2', name: 'B2', value: 0 }, { id: 'in-3', name: 'B3', value: 0 },
-          ],
-          outputs: [],
-        },
-      },
-    ],
-    edges: [
-      { id: 'e0', source: 'clk-gen', sourceHandle: 'out-0', target: 'counter-ic', targetHandle: 'in-0', type: 'signalEdge' },
-
-      { id: 'eh0', source: 'counter-ic', sourceHandle: 'out-0', target: 'hex-out', targetHandle: 'in-0', type: 'signalEdge' },
-      { id: 'eh1', source: 'counter-ic', sourceHandle: 'out-1', target: 'hex-out', targetHandle: 'in-1', type: 'signalEdge' },
-      { id: 'eh2', source: 'counter-ic', sourceHandle: 'out-2', target: 'hex-out', targetHandle: 'in-2', type: 'signalEdge' },
-      { id: 'eh3', source: 'counter-ic', sourceHandle: 'out-3', target: 'hex-out', targetHandle: 'in-3', type: 'signalEdge' },
-
-      { id: 'eb0', source: 'counter-ic', sourceHandle: 'out-0', target: 'bus-mon', targetHandle: 'in-0', type: 'signalEdge' },
-      { id: 'eb1', source: 'counter-ic', sourceHandle: 'out-1', target: 'bus-mon', targetHandle: 'in-1', type: 'signalEdge' },
-      { id: 'eb2', source: 'counter-ic', sourceHandle: 'out-2', target: 'bus-mon', targetHandle: 'in-2', type: 'signalEdge' },
-      { id: 'eb3', source: 'counter-ic', sourceHandle: 'out-3', target: 'bus-mon', targetHandle: 'in-3', type: 'signalEdge' },
-    ],
-  },
-  {
-    id: 'traffic-light-controller',
-    name: 'Traffic Light Controller',
-    category: 'Real-World Systems',
-    description: 'Sequences Red, Yellow, and Green traffic signals automatically using a Ring Counter.',
-    nodes: [
-      {
-        id: 'clk-traffic',
-        type: 'clockNode',
-        position: { x: 80, y: 150 },
-        data: { label: 'Clock Source', gateType: 'CLOCK', value: 0, inputs: [], outputs: [{ id: 'out-0', name: 'Out', value: 0 }] },
-      },
-      {
-        id: 'ring-traffic',
-        type: 'icComponent',
-        position: { x: 280, y: 120 },
-        data: {
-          label: 'Ring Sequencer',
-          gateType: 'RING_COUNTER',
-          inputs: [{ id: 'in-0', name: 'CLK', value: 0 }, { id: 'in-1', name: 'CLR', value: 0 }, { id: 'in-2', name: 'EN', value: 1 }],
-          outputs: [
-            { id: 'out-0', name: 'Q0', value: 1 }, { id: 'out-1', name: 'Q1', value: 0 },
-            { id: 'out-2', name: 'Q2', value: 0 }, { id: 'out-3', name: 'Q3', value: 0 },
-          ],
-        },
-      },
-      {
-        id: 'red-light',
-        type: 'digitalOutput',
-        position: { x: 540, y: 80 },
-        data: { label: 'Red Light (Stop)', gateType: 'OUTPUT', value: 1, inputs: [{ id: 'in-0', name: 'In', value: 1 }], outputs: [] },
-      },
-      {
-        id: 'yellow-light',
-        type: 'digitalOutput',
-        position: { x: 540, y: 180 },
-        data: { label: 'Yellow Light (Caution)', gateType: 'OUTPUT', value: 0, inputs: [{ id: 'in-0', name: 'In', value: 0 }], outputs: [] },
-      },
-      {
-        id: 'green-light',
-        type: 'digitalOutput',
-        position: { x: 540, y: 280 },
-        data: { label: 'Green Light (Go)', gateType: 'OUTPUT', value: 0, inputs: [{ id: 'in-0', name: 'In', value: 0 }], outputs: [] },
-      },
-    ],
-    edges: [
-      { id: 'e-clk', source: 'clk-traffic', sourceHandle: 'out-0', target: 'ring-traffic', targetHandle: 'in-0', type: 'signalEdge' },
-      { id: 'e-red', source: 'ring-traffic', sourceHandle: 'out-0', target: 'red-light', targetHandle: 'in-0', type: 'signalEdge' },
-      { id: 'e-yel', source: 'ring-traffic', sourceHandle: 'out-1', target: 'yellow-light', targetHandle: 'in-0', type: 'signalEdge' },
-      { id: 'e-grn', source: 'ring-traffic', sourceHandle: 'out-2', target: 'green-light', targetHandle: 'in-0', type: 'signalEdge' },
-    ],
-  },
-  {
     id: 'digital-door-lock',
     name: 'Digital Security Door Lock',
-    category: 'Real-World Systems',
+    category: 'Projects',
     description: 'Requires correct 4-bit PIN match on Comparator to unlock door solenoid.',
     nodes: [
       {
@@ -996,57 +871,6 @@ export const CIRCUIT_PRESETS: CircuitPreset[] = [
       { id: 'e-b2', source: 'pin-secret', sourceHandle: 'out-2', target: 'comp-lock', targetHandle: 'in-6', type: 'signalEdge' },
       { id: 'e-b3', source: 'pin-secret', sourceHandle: 'out-3', target: 'comp-lock', targetHandle: 'in-7', type: 'signalEdge' },
       { id: 'e-lock', source: 'comp-lock', sourceHandle: 'out-1', target: 'door-solenoid', targetHandle: 'in-0', type: 'signalEdge' },
-    ],
-  },
-  {
-    id: 'ring-counter-demo',
-    name: '4-Bit Ring Counter',
-    category: 'Sequential Logic',
-    description: 'Circulates a single HIGH bit through 4 flip-flop stages on each clock pulse.',
-    nodes: [
-      {
-        id: 'clk-ring',
-        type: 'clockNode',
-        position: { x: 80, y: 140 },
-        data: { label: 'Clock', gateType: 'CLOCK', value: 0, inputs: [], outputs: [{ id: 'out-0', name: 'Out', value: 0 }] },
-      },
-      {
-        id: 'ring-ic',
-        type: 'icComponent',
-        position: { x: 300, y: 100 },
-        data: {
-          label: 'Ring Counter',
-          gateType: 'RING_COUNTER',
-          inputs: [{ id: 'in-0', name: 'CLK', value: 0 }, { id: 'in-1', name: 'CLR', value: 0 }, { id: 'in-2', name: 'EN', value: 1 }],
-          outputs: [
-            { id: 'out-0', name: 'Q0', value: 1 }, { id: 'out-1', name: 'Q1', value: 0 },
-            { id: 'out-2', name: 'Q2', value: 0 }, { id: 'out-3', name: 'Q3', value: 0 },
-          ],
-        },
-      },
-      {
-        id: 'bus-ring',
-        type: 'busMonitor',
-        position: { x: 560, y: 120 },
-        data: {
-          label: 'State Monitor',
-          gateType: 'BUS_MONITOR',
-          bitWidth: 4,
-          displayFormat: 'bin',
-          inputs: [
-            { id: 'in-0', name: 'B0', value: 0 }, { id: 'in-1', name: 'B1', value: 0 },
-            { id: 'in-2', name: 'B2', value: 0 }, { id: 'in-3', name: 'B3', value: 0 },
-          ],
-          outputs: [],
-        },
-      },
-    ],
-    edges: [
-      { id: 'e-rclk', source: 'clk-ring', sourceHandle: 'out-0', target: 'ring-ic', targetHandle: 'in-0', type: 'signalEdge' },
-      { id: 'e-rq0', source: 'ring-ic', sourceHandle: 'out-0', target: 'bus-ring', targetHandle: 'in-0', type: 'signalEdge' },
-      { id: 'e-rq1', source: 'ring-ic', sourceHandle: 'out-1', target: 'bus-ring', targetHandle: 'in-1', type: 'signalEdge' },
-      { id: 'e-rq2', source: 'ring-ic', sourceHandle: 'out-2', target: 'bus-ring', targetHandle: 'in-2', type: 'signalEdge' },
-      { id: 'e-rq3', source: 'ring-ic', sourceHandle: 'out-3', target: 'bus-ring', targetHandle: 'in-3', type: 'signalEdge' },
     ],
   },
 ];

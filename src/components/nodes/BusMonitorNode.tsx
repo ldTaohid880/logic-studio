@@ -1,77 +1,72 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
-import { MonitorCheck } from 'lucide-react';
+import { outputColor } from '../../theme/outputColors';
+import { Pin, pinDisplayName } from './Pin';
+import { DisplayFace, PartLabel, PITCH } from './partKit';
 
-export const BusMonitorNode: React.FC<NodeProps> = memo(({ id, data: nodeData, selected }) => {
+const W = 150;
+
+/**
+ * Bus value: reads 2–8 input bits (B0 least significant) as hex, decimal or binary, with one lamp
+ * per bit underneath (most significant on the left, as the number is written).
+ */
+export const BusMonitorNode: React.FC<NodeProps> = memo(({ data: nodeData }) => {
   const data = nodeData as unknown as NodeData;
   const bitWidth = data.bitWidth || 4;
   const inputs = data.inputs || [];
+  const format = data.displayFormat || 'hex';
+  const col = outputColor(data.displayColor, 'green');
+  const H = Math.max(bitWidth, 3) * PITCH;
 
-  let numericVal = 0;
-  for (let i = 0; i < bitWidth; i++) {
-    if (inputs[i]?.value === 1) {
-      numericVal |= (1 << i);
-    }
-  }
+  const bits = Array.from({ length: bitWidth }, (_, i) => inputs[i]?.value ?? -1);
+  const known = bits.every((v) => v === 0 || v === 1);
+  const num = bits.reduce<number>((acc, v, i) => acc | ((v === 1 ? 1 : 0) << i), 0);
 
-  const binStr = numericVal.toString(2).padStart(bitWidth, '0');
-  const hexStr = numericVal.toString(16).toUpperCase().padStart(Math.ceil(bitWidth / 4), '0');
+  const text = !known
+    ? '?'
+    : format === 'dec'
+    ? String(num)
+    : format === 'bin'
+    ? num.toString(2).padStart(bitWidth, '0')
+    : '0x' + num.toString(16).toUpperCase().padStart(Math.ceil(bitWidth / 4), '0');
 
   return (
-    <div
-      className={`min-w-[170px] bg-slate-900/95 border rounded-xl p-3 shadow-2xl backdrop-blur-md transition-all ${
-        selected ? 'border-cyan-400 ring-2 ring-cyan-400/30' : 'border-slate-800'
-      }`}
-    >
-      <div className="flex items-center gap-1.5 mb-2.5 pb-1.5 border-b border-slate-800">
-        <MonitorCheck className="w-3.5 h-3.5 text-cyan-400" />
-        <span className="text-xs font-mono font-bold text-slate-100 truncate">
-          {data.label || `${bitWidth}-Bit Bus Monitor`}
+    <div className="relative rounded-md border-[1.5px] border-line-strong bg-surface-1" style={{ width: W, height: H }}>
+      <PartLabel text={data.label} />
+      {bits.map((v, i) => {
+        const pin = inputs[i] ?? { id: `in-${i}`, name: `B${i}`, value: -1 as const };
+        return (
+          <div key={pin.id} className="absolute left-0 flex items-center pl-2.5" style={{ top: i * PITCH, height: PITCH }}>
+            <span className="text-[11px] font-mono text-fg-muted">{pinDisplayName(pin, data.pinAliases, 4)}</span>
+            <Pin type="target" position={Position.Left} id={pin.id} value={v} label={pin.name} style={{ top: 15 }} />
+          </div>
+        );
+      })}
+      <DisplayFace className="right-1.5 left-[42px] top-1/2 -translate-y-1/2 h-[64px] flex flex-col items-end justify-center gap-1.5 px-2">
+        <span
+          className="font-mono text-[18px] font-semibold leading-none tabular-nums"
+          style={{ color: known ? col.on : '#f5b14c', textShadow: known ? `0 0 8px ${col.glow}` : undefined }}
+        >
+          {text}
         </span>
-      </div>
-
-      <div className="flex justify-between gap-3 relative">
-        {/* Input Pin list */}
-        <div className="flex flex-col gap-1.5">
-          {Array.from({ length: bitWidth }).map((_, idx) => {
-            const isHigh = inputs[idx]?.value === 1;
-            return (
-              <div key={idx} className="relative flex items-center gap-1.5">
-                <Handle
-                  type="target"
-                  position={Position.Left}
-                  id={`in-${idx}`}
-                  className={`!w-3 !h-3 !-left-[12px] !border-2 !transition-all ${
-                    isHigh
-                      ? '!bg-cyan-400 !border-cyan-200 !shadow-[0_0_8px_rgba(34,211,238,0.8)]'
-                      : '!bg-slate-800 !border-slate-600'
-                  }`}
-                />
-                <span className={`text-[10px] font-mono ${isHigh ? 'text-cyan-300 font-bold' : 'text-slate-400'}`}>
-                  B{idx}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Readout panel for Bin, Dec, Hex */}
-        <div className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2 flex flex-col justify-center gap-1 font-mono text-[10px]">
-          <div className="flex items-center justify-between text-slate-400">
-            <span>HEX:</span>
-            <span className="text-cyan-300 font-bold">0x{hexStr}</span>
-          </div>
-          <div className="flex items-center justify-between text-slate-400">
-            <span>DEC:</span>
-            <span className="text-emerald-300 font-bold">{numericVal}</span>
-          </div>
-          <div className="flex items-center justify-between text-slate-400">
-            <span>BIN:</span>
-            <span className="text-amber-300 font-bold">{binStr}</span>
-          </div>
-        </div>
-      </div>
+        <span className="flex gap-[3px]" aria-hidden="true">
+          {bits
+            .slice()
+            .reverse()
+            .map((v, i) => (
+              <span
+                key={i}
+                className="w-[7px] h-[7px] rounded-full"
+                style={{
+                  backgroundColor: v === 1 ? col.on : v === 0 ? col.off : 'transparent',
+                  border: v === -1 ? '1px dashed #f5b14c' : undefined,
+                }}
+              />
+            ))}
+        </span>
+        <span className="sr-only">{known ? `Value ${num}` : 'Some bits are floating'}</span>
+      </DisplayFace>
     </div>
   );
 });

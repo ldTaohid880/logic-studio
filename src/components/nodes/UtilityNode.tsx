@@ -43,9 +43,8 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
           position={Position.Left}
           id="in-0"
           style={{left:"0px!important"}}
-          className={`!w-3 !h-3 !border-2 !transition-all ${
-            isHigh ? '!bg-cyan-400 !border-cyan-200 !shadow-[0_0_8px_rgba(34,211,238,0.8)]' : '!bg-slate-800 !border-slate-600'
-          }`}
+          className="lsp-pin"
+                  data-signal={isHigh ? 'high' : 'low'}
         />
 
         <div className="flex items-center gap-1.5">
@@ -60,9 +59,8 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
           position={Position.Right}
           id="out-0"
           style={{right:"0px!important"}}
-          className={`!w-3 !h-3  !border-2 !transition-all ${
-            isHigh ? '!bg-cyan-400 !border-cyan-200 !shadow-[0_0_8px_rgba(34,211,238,0.8)]' : '!bg-slate-800 !border-slate-600'
-          }`}
+          className="lsp-pin"
+                  data-signal={isHigh ? 'high' : 'low'}
         />
       </div>
     );
@@ -90,9 +88,8 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
                   type="target"
                   position={Position.Left}
                   id={pin.id}
-                  className={`!w-3 !h-3 !-left-[12px] !border-2 ${
-                    isHigh ? '!bg-emerald-400 !border-emerald-200' : '!bg-slate-800 !border-slate-600'
-                  }`}
+                  className="lsp-pin !-left-[12px]"
+                  data-signal={isHigh ? 'high' : 'low'}
                 />
                 <span className="text-[9px] font-mono text-slate-400">{pin.name}</span>
               </div>
@@ -110,9 +107,8 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
                   type="source"
                   position={Position.Right}
                   id={pin.id}
-                  className={`!w-3 !h-3 !-right-[12px] !border-2 ${
-                    isHigh ? '!bg-emerald-400 !border-emerald-200' : '!bg-slate-800 !border-slate-600'
-                  }`}
+                  className="lsp-pin !-right-[12px]"
+                  data-signal={isHigh ? 'high' : 'low'}
                 />
               </div>
             );

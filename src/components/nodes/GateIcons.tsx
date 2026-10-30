@@ -70,13 +70,6 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
         </svg>
       );
 
-    case 'CLOCK':
-      return (
-        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M 6 28 L 6 12 L 18 12 L 18 28 L 30 28 L 30 12 L 34 12" fill="none" />
-        </svg>
-      );
-
     case 'INPUT':
       return (
         <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -108,17 +101,6 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
           <path d="M 12 12 L 20 20 L 12 28" />
           <path d="M 24 14 L 28 14 M 24 20 L 28 20 M 24 26 L 28 26" />
           <circle cx="20" cy="20" r="2" fill="currentColor" />
-        </svg>
-      );
-
-    case 'MULTI_INPUT':
-      return (
-        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="6" y="6" width="28" height="28" rx="6" fill="currentColor" fillOpacity="0.15" />
-          <path d="M 12 13 H 28 M 12 20 H 28 M 12 27 H 28" strokeWidth="2.5" />
-          <circle cx="14" cy="13" r="2" fill="currentColor" />
-          <circle cx="14" cy="20" r="2" fill="currentColor" />
-          <circle cx="14" cy="27" r="2" fill="currentColor" />
         </svg>
       );
 
@@ -172,15 +154,6 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
         </svg>
       );
 
-    case 'RGB_LED':
-      return (
-        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <circle cx="20" cy="20" r="13" fill="currentColor" fillOpacity="0.15" />
-          <circle cx="20" cy="20" r="6" fill="#a855f7" />
-          <path d="M 12 28 L 28 12 M 12 12 L 28 28" strokeWidth="1" opacity="0.4" />
-        </svg>
-      );
-
     case 'LOGIC_PROBE':
       return (
         <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -205,29 +178,6 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
         </svg>
       );
 
-    case 'OSCILLOSCOPE':
-      return (
-        <svg viewBox="0 0 50 40" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="4" y="5" width="42" height="30" rx="5" fill="currentColor" fillOpacity="0.15" />
-          <path d="M 9 27 H 18 V 13 H 29 V 27 H 41" stroke="#22d3ee" strokeWidth="2.5" />
-        </svg>
-      );
-    case 'LED_MATRIX':
-      return (
-        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="6" y="6" width="28" height="28" rx="4" fill="currentColor" fillOpacity="0.15" />
-          <circle cx="13" cy="13" r="2" fill="currentColor" />
-          <circle cx="20" cy="13" r="2" fill="currentColor" />
-          <circle cx="27" cy="13" r="2" fill="currentColor" />
-          <circle cx="13" cy="20" r="2" fill="currentColor" />
-          <circle cx="20" cy="20" r="2" fill="currentColor" />
-          <circle cx="27" cy="20" r="2" fill="currentColor" />
-          <circle cx="13" cy="27" r="2" fill="currentColor" />
-          <circle cx="20" cy="27" r="2" fill="currentColor" />
-          <circle cx="27" cy="27" r="2" fill="currentColor" />
-        </svg>
-      );
-
     case 'HALF_SUBTRACTOR':
     case 'FULL_SUBTRACTOR':
     case 'MUX_4TO1':
@@ -238,42 +188,11 @@ export const GateIcon: React.FC<GateIconProps> = ({ type, className = 'w-10 h-10
     case 'D_LATCH':
     case 'JK_FLIPFLOP':
     case 'REGISTER_4BIT':
-    case 'SHIFT_REGISTER_4BIT':
-    case 'UP_COUNTER_4BIT':
-    case 'DOWN_COUNTER_4BIT':
       return (
         <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="6" y="6" width="28" height="28" rx="5" fill="currentColor" fillOpacity="0.15" />
           <path d="M 12 12 H 16 M 12 20 H 16 M 12 28 H 16" />
           <path d="M 24 12 H 28 M 24 20 H 28 M 24 28 H 28" />
-        </svg>
-      );
-
-    case 'BOOLEAN_EQUATION_GENERATOR':
-      return (
-        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="6" y="6" width="28" height="28" rx="6" fill="#22d3ee" fillOpacity="0.15" stroke="#22d3ee" strokeWidth="2" />
-          <path d="M 12 15 L 18 15 M 15 15 L 15 25 L 20 25 M 24 15 L 28 25 M 28 15 L 24 25" stroke="#22d3ee" strokeWidth="2" />
-        </svg>
-      );
-
-
-    case 'CFG_ENCODER':
-    case 'CFG_DECODER':
-    case 'CFG_MUX':
-    case 'CFG_DEMUX':
-    case 'CFG_COMPARATOR':
-    case 'CFG_REGISTER':
-    case 'CFG_SHIFT_REGISTER':
-    case 'CFG_COUNTER':
-    case 'CFG_CONSTANT':
-    case 'CFG_BUS_SPLITTER':
-    case 'CFG_BUS_JOINER':
-      return (
-        <svg viewBox="0 0 40 40" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="6" y="6" width="28" height="28" rx="6" fill="#c084fc" fillOpacity="0.2" stroke="#c084fc" strokeWidth="2" />
-          <circle cx="20" cy="20" r="4" fill="none" stroke="#c084fc" strokeWidth="2" />
-          <path d="M 20 10 V 14 M 20 26 V 30 M 10 20 H 14 M 26 20 H 30" stroke="#c084fc" strokeWidth="2" />
         </svg>
       );
 

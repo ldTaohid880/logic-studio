@@ -1,79 +1,50 @@
 import React from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
+import { Pin } from './Pin';
+import { Lead, PartLabel, PartSvg } from './partKit';
 
-export const DigitalInputNode = React.memo(({ id, data, selected }: NodeProps) => {
+const W = 75;
+const H = 30;
+
+/** Switch: a slide toggle; click (or Space/Enter when focused) flips it between 0 and 1. */
+export const DigitalInputNode = React.memo(({ id, data }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, value = 0 } = nodeData;
   const toggleInputValue = useCircuitStore((state) => state.toggleInputValue);
-
   const isHigh = value === 1;
 
-  const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleInputValue(id);
-  };
-
   return (
-    <div
-      className="relative min-w-[130px] p-3 rounded-xl transition-all duration-200 border border-slate-800 bg-slate-900/95 backdrop-blur-md shadow-md"
-    >
-      <div className="flex flex-col items-center gap-2">
-        {/* Label */}
-        <span className="text-xs font-semibold text-slate-300 tracking-wide font-mono">
-          {label}
-        </span>
+    <div className="lsp-schematic relative" style={{ width: W, height: H }}>
+      <PartLabel text={label} />
+      <PartSvg width={W} height={H}>
+        <Lead x1={44} x2={W} y={15} value={value} />
+      </PartSvg>
 
-        {/* Large Interactive Toggle Switch */}
-        <button
-          onClick={handleToggle}
-          type="button"
-          className={`relative w-16 h-10 rounded-full p-1 transition-all duration-300 cursor-pointer flex items-center border ${
-            isHigh
-              ? 'bg-emerald-600/80 border-emerald-500 shadow-sm'
-              : 'bg-slate-800 border-slate-700'
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isHigh}
+        aria-label={`${label || 'Switch'}: ${isHigh ? '1' : '0'}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleInputValue(id);
+        }}
+        className={`nodrag absolute left-0 top-[3px] w-[44px] h-6 rounded-full border-[1.5px] transition-colors cursor-pointer ${
+          isHigh ? 'bg-signal-high border-signal-high' : 'bg-surface-2 border-line-strong hover:border-fg-subtle'
+        }`}
+      >
+        <span
+          className={`absolute top-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-surface-1 shadow-sm flex items-center justify-center font-mono text-[11px] font-bold transition-[left] duration-150 ${
+            isHigh ? 'left-[21px] text-signal-high' : 'left-[2px] text-fg-muted'
           }`}
         >
-          {/* Flat Switch Button Knob */}
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm font-mono transition-transform duration-300 shadow-sm ${
-              isHigh
-                ? 'translate-x-6 bg-white text-emerald-600'
-                : 'translate-x-0 bg-slate-400 text-slate-950'
-            }`}
-          >
-            {value}
-          </div>
-        </button>
+          {isHigh ? '1' : '0'}
+        </span>
+      </button>
 
-        {/* LED Indicator Status Text */}
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span
-            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              isHigh
-                ? 'bg-emerald-500'
-                : 'bg-slate-700'
-            }`}
-          />
-          <span className="text-[10px] font-mono font-medium text-slate-400 uppercase">
-            {isHigh ? 'HIGH (1)' : 'LOW (0)'}
-          </span>
-        </div>
-      </div>
-
-      {/* Output Pin Handle (Right Side) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="out-0"
-        style={{ right: '0px', top: '50%' }}
-        className={`!w-3.5 !h-3.5 !border-2 !rounded-full ${
-          isHigh
-            ? '!bg-emerald-500 !border-emerald-250'
-            : '!bg-slate-800 !border-slate-600'
-        }`}
-      />
+      <Pin type="source" position={Position.Right} id="out-0" value={value} label={label || 'Switch'} style={{ top: 15 }} />
     </div>
   );
 });

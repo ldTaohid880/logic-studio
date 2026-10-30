@@ -15,7 +15,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full space-y-1">
         {label && (
-          <label className="block text-[11px] font-mono font-medium text-slate-400">
+          <label className="block text-xs font-mono font-medium text-slate-400">
             {label}
           </label>
         )}
@@ -28,7 +28,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             value={value}
-            className={`w-full bg-slate-900/90 border border-slate-800 rounded-xl py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 transition-all duration-150 focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-700/50 disabled:opacity-50 disabled:bg-slate-950 ${
+            className={`w-full h-8 bg-surface-0 border border-line rounded-lg text-[13px] text-fg placeholder:text-fg-subtle transition-colors duration-150 hover:border-line-strong focus:outline-none focus-visible:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:opacity-50 ${
               leftIcon ? 'pl-8' : 'pl-3'
             } ${rightIcon || onClear ? 'pr-8' : 'pr-3'} ${
               error ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/50' : ''
@@ -39,7 +39,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             <button
               type="button"
               onClick={onClear}
-              className="absolute right-2.5 p-0.5 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+              aria-label="Clear"
+              className="absolute right-2 p-0.5 rounded-md text-fg-subtle hover:text-fg hover:bg-surface-2 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -51,9 +52,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error ? (
-          <p className="text-[10px] text-rose-400 font-mono mt-0.5">{error}</p>
+          <p className="text-[11px] text-rose-400 font-mono mt-0.5">{error}</p>
         ) : helperText ? (
-          <p className="text-[10px] text-slate-500 font-mono mt-0.5">{helperText}</p>
+          <p className="text-[11px] text-slate-500 font-mono mt-0.5">{helperText}</p>
         ) : null}
       </div>
     );

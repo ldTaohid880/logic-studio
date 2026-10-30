@@ -1,8 +1,52 @@
-import React from 'react';
-import { BaseEdge, EdgeProps, getBezierPath } from '@xyflow/react';
+import React, { useEffect, useRef, useState } from 'react';
+import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath, getSmoothStepPath } from '@xyflow/react';
 import { SignalValue } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { getWireColors } from '../../utils/colorUtils';
+import { signalColor, signalState, wireDashArray, wireStrokeWidth } from '../../theme/signals';
+
+/** Inline editor shown on the wire while it is being renamed (double-click a wire). */
+const WireLabelEditor: React.FC<{ edgeId: string; initial: string; x: number; y: number }> = ({ edgeId, initial, x, y }) => {
+  const [value, setValue] = useState(initial);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  const finish = (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    const store = useCircuitStore.getState();
+    if (save && value.trim() !== initial.trim()) store.updateEdgeLabel(edgeId, value.trim());
+    store.setEditingEdgeId(null);
+  };
+
+  return (
+    <div
+      className="nodrag nopan absolute pointer-events-auto"
+      style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
+    >
+      <input
+        ref={inputRef}
+        value={value}
+        aria-label="Wire name"
+        placeholder="Wire name"
+        maxLength={24}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') finish(true);
+          if (e.key === 'Escape') finish(false);
+          e.stopPropagation();
+        }}
+        onBlur={() => finish(true)}
+        className="w-36 h-7 px-2 rounded-md bg-surface-1 border border-accent text-xs font-mono text-fg shadow-lg outline-none ring-2 ring-accent/25"
+      />
+    </div>
+  );
+};
 
 export const SignalEdge: React.FC<EdgeProps> = ({
   id,
@@ -15,135 +59,91 @@ export const SignalEdge: React.FC<EdgeProps> = ({
   selected,
   data,
 }) => {
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-
+  const wireStyle = useCircuitStore((s) => s.wireStyle);
   const showWireLabels = useCircuitStore((s) => s.showWireLabels);
+  const isEditing = useCircuitStore((s) => s.editingEdgeId === id);
 
+  const pathParams = { sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition };
+  const [edgePath, labelX, labelY] =
+    wireStyle === 'orthogonal'
+      ? getSmoothStepPath({ ...pathParams, borderRadius: 6, offset: 15 })
+      : getBezierPath(pathParams);
 
   const signalValue = (data?.signalValue ?? -1) as SignalValue;
-
   const isHigh = signalValue === 1;
-  const isLow = signalValue === 0;
-
+  const state = signalState(signalValue);
   const customColor = data?.color as string | undefined;
 
-  let strokeColor = '#f97316'; // Default: Unknown/Floating
-  let pulseColor = '#a7f3d0';  // Default pulse
-  let glowColor = '';
+  let strokeColor: string = signalColor(signalValue);
+  let pulseColor = 'color-mix(in srgb, var(--signal-high) 35%, white)';
 
   if (customColor) {
     const colors = getWireColors(customColor);
-    if (isHigh) {
-      strokeColor = colors.high;
-      pulseColor = colors.anim;
-      glowColor = colors.high;
-    } else {
-      // For LOW (0) or UNKNOWN (-1)
-      strokeColor = colors.low;
-    }
-  } else {
-    if (isHigh) {
-      strokeColor = '#22c55e'; // Bright Green for HIGH
-      pulseColor = '#a7f3d0';  // Default pulse
-      glowColor = '#22c55e';
-    } else if (isLow) {
-      strokeColor = '#64748b'; // Slate Gray for LOW
-    } else {
-      strokeColor = '#f97316'; // Orange for Unknown/Floating
-    }
+    strokeColor = isHigh ? colors.high : colors.low;
+    pulseColor = colors.anim;
   }
 
-  const wireLabel = data?.label as string | undefined;
+  const wireLabel = ((data?.label as string | undefined) ?? '').trim();
 
   return (
     <>
-      {/* Subtle Glow Path behind main path when HIGH */}
-      {isHigh && glowColor && (
+      {/* Selection halo: accent colored so it is never confused with a logic level */}
+      {selected && (
         <path
           d={edgePath}
           fill="none"
-          stroke={glowColor}
-          strokeWidth={selected ? 5.5 : 4.5}
-          style={{
-            opacity: 0.12,
-            filter: 'blur(1.5px)',
-            transition: 'stroke 0.2s ease',
-          }}
+          strokeWidth={8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ stroke: 'var(--accent)', opacity: 0.35 }}
         />
       )}
 
-      {/* Main Connection Wire Base Path */}
       <BaseEdge
         id={id}
         path={edgePath}
+        interactionWidth={16}
         style={{
-          stroke: selected ? '#64748b' : strokeColor,
-          strokeWidth: 2.5,
+          stroke: strokeColor,
+          strokeWidth: wireStrokeWidth(state),
+          strokeDasharray: wireDashArray(state),
+          strokeLinejoin: 'round',
+          transition: 'stroke 0.15s ease',
         }}
       />
 
-      {/* Animated Flowing Signal Pulses on HIGH Wires */}
+      {/* Flowing pulse on HIGH wires (disabled by prefers-reduced-motion) */}
       {isHigh && (
         <path
           d={edgePath}
           fill="none"
-          stroke={pulseColor}
-          strokeWidth={2.5}
+          strokeWidth={1.5}
           strokeDasharray="6 12"
-          className="animate-[wireFlow_1s_linear_infinite]"
+          className="animate-wire-flow pointer-events-none"
+          style={{ stroke: pulseColor, opacity: 0.8 }}
         />
       )}
 
-      {/* Edge label display */}
-      {showWireLabels && wireLabel && wireLabel.trim() !== '' && (
-        <g transform={`translate(${labelX}, ${labelY})`}>
-          {/* Background pill */}
-          <rect
-            x={-((wireLabel.length * 6 + 10) / 2)}
-            y={-8}
-            width={wireLabel.length * 6 + 10}
-            height={16}
-            rx={4}
-            fill="#0b0f19"
-            stroke={selected ? '#a855f7' : (customColor || '#334155')}
-            strokeWidth={1}
-            className="filter drop-shadow-md"
-          />
-          {/* Label Text */}
-          <text
-            textAnchor="middle"
-            y={3}
-            className="text-[9px] font-mono font-bold pointer-events-none select-none fill-slate-250"
-          >
-            {wireLabel}
-          </text>
-        </g>
-      )}
-
-      {/* Selected wire indicator ring or button at midpoint (fallback if no label) */}
-      {selected && (!showWireLabels || !wireLabel || wireLabel.trim() === '') && (
-        <g transform={`translate(${labelX}, ${labelY})`}>
-          <circle
-            r={8}
-            className="fill-slate-900 stroke-purple-500 stroke-2 cursor-pointer shadow-md"
-          />
-          <text
-            y={3}
-            textAnchor="middle"
-            className="text-[9px] font-mono font-bold fill-purple-300 pointer-events-none"
-          >
-            x
-          </text>
-        </g>
-      )}
+      <EdgeLabelRenderer>
+        {isEditing ? (
+          <WireLabelEditor edgeId={id} initial={wireLabel} x={labelX} y={labelY} />
+        ) : (
+          showWireLabels &&
+          wireLabel && (
+            <div
+              className={`absolute px-1.5 py-px rounded-md border bg-surface-1 text-[11px] font-mono font-medium text-fg whitespace-nowrap pointer-events-none ${
+                selected ? 'border-accent' : 'border-line-strong'
+              }`}
+              style={{
+                transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+                borderColor: !selected && customColor ? customColor : undefined,
+              }}
+            >
+              {wireLabel}
+            </div>
+          )
+        )}
+      </EdgeLabelRenderer>
     </>
   );
 };
-

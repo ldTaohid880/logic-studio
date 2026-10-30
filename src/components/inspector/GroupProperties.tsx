@@ -22,20 +22,7 @@ export const GroupProperties: React.FC<GroupPropertiesProps> = ({
   const ungroupNode = useCircuitStore((s) => s.ungroupNode);
 
   const handleColorChange = (colorKey: string) => {
-    const nodes = useCircuitStore.getState().nodes;
-    useCircuitStore.setState({
-      nodes: nodes.map((n) =>
-        n.id === nodeId
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                color: colorKey,
-              },
-            }
-          : n
-      ),
-    });
+    useCircuitStore.getState().updateNodeData(nodeId, { color: colorKey });
   };
 
   const colors = [
@@ -50,25 +37,19 @@ export const GroupProperties: React.FC<GroupPropertiesProps> = ({
 
   return (
     <div className="space-y-4 font-sans text-xs">
-      <InspectorSection title="Group Settings" icon={<Layers className="w-4 h-4 text-purple-400" />}>
-        <PropertyRow label="Group Label" hint="Name tag for this node container">
-          <Input
-            value={label}
-            onChange={(e) => updateNodeLabel(nodeId, e.target.value)}
-            placeholder="Logic Group..."
-            className="w-36 font-bold"
-          />
-        </PropertyRow>
+      <InspectorSection title="Frame" icon={<Layers className="w-4 h-4 text-purple-400" />}>
 
-        <PropertyRow label="Accent Theme" hint="Border and background color scheme">
+        <PropertyRow label="Frame color" hint="Border and background color scheme">
           <div className="flex items-center gap-1.5 flex-wrap">
             {colors.map((c) => (
               <button
                 key={c.key}
                 onClick={() => handleColorChange(c.key)}
                 title={c.label}
+                aria-label={c.label}
+                aria-pressed={color === c.key}
                 className={`w-5 h-5 rounded-full ${c.bg} transition-all cursor-pointer ${
-                  color === c.key ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-110' : 'opacity-60 hover:opacity-100'
+                  color === c.key ? 'ring-2 ring-accent ring-offset-2 ring-offset-surface-1 scale-110' : 'opacity-60 hover:opacity-100'
                 }`}
               />
             ))}
@@ -76,7 +57,7 @@ export const GroupProperties: React.FC<GroupPropertiesProps> = ({
         </PropertyRow>
       </InspectorSection>
 
-      <InspectorSection title="Group Operations" icon={<Unlink className="w-4 h-4 text-amber-400" />}>
+      <InspectorSection title="Actions" icon={<Unlink className="w-4 h-4 text-amber-400" />}>
         <Button
           variant="outline"
           size="sm"

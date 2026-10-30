@@ -1,131 +1,178 @@
 import React from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
-import { GateIcon } from './GateIcons';
+import { Pin, pinDisplayName } from './Pin';
+import { gateGeometry } from './symbols/gateGeometry';
+import { signalColor, signalState } from '../../theme/signals';
 
-export const LogicGateNode = React.memo(({ id, data, selected }: NodeProps) => {
+const LEVEL_GLYPH = { high: '1', low: '0', unknown: '?' } as const;
+
+// Default labels add nothing next to a schematic symbol, so only custom labels are printed
+const DEFAULT_LABEL = /^(and|or|not|nand|nor|xor|xnor|buffer|tri-state buffer)( gate)?$/i;
+
+/** Constant HIGH/LOW source drawn as a small labelled terminal. */
+const ConstantNode: React.FC<{ nodeData: NodeData; isHigh: boolean }> = ({ nodeData, isHigh }) => {
+  const out = nodeData.outputs[0];
+  return (
+    <div className="lsp-schematic relative bg-transparent border-0 shadow-none rounded-none" style={{ width: 60, height: 30 }}>
+      <svg width={60} height={30} className="overflow-visible" aria-hidden="true">
+        <rect x={1} y={4} width={38} height={22} rx={4} className="lsp-symbol-body" />
+        <text
+          x={20}
+          y={19.5}
+          textAnchor="middle"
+          className="font-mono text-[12px] font-semibold"
+          style={{ fill: signalColor(isHigh ? 1 : 0) }}
+        >
+          {isHigh ? 'VCC' : 'GND'}
+        </text>
+        <line x1={39} y1={15} x2={60} y2={15} className="lsp-symbol-lead" style={{ stroke: signalColor(out?.value) }} />
+      </svg>
+      {out && (
+        <Pin type="source" position={Position.Right} id={out.id} value={out.value} label="Out" style={{ top: 15 }} />
+      )}
+    </div>
+  );
+};
+
+export const LogicGateNode = React.memo(({ data }: NodeProps) => {
   const nodeData = data as unknown as NodeData;
   const { label, gateType, inputs = [], outputs = [] } = nodeData;
-
-  const primaryOutputVal = outputs[0]?.value ?? -1;
-
-  // LED Glow state
-  const isHigh = primaryOutputVal === 1;
-  const isLow = primaryOutputVal === 0;
-
   const pinAliases = nodeData.pinAliases || {};
-  const getPinDisplayName = (pin: { id: string; name: string }) => {
-    const alias = pinAliases[pin.id];
-    if (!alias) return pin.name;
-    return alias.length > 8 ? alias.substring(0, 8) + '…' : alias;
-  };
+
+  if (gateType === 'CONST_HIGH' || gateType === 'CONST_LOW') {
+    return <ConstantNode nodeData={nodeData} isHigh={gateType === 'CONST_HIGH'} />;
+  }
+
+  const geo = gateGeometry(gateType, inputs.length);
+  const out = outputs[0];
+  const outState = signalState(out?.value);
+  const leftInputs = gateType === 'TRI_STATE_BUFFER' ? inputs.slice(0, 1) : inputs;
+  const enablePin = gateType === 'TRI_STATE_BUFFER' ? inputs[1] : undefined;
+  const showLabel = label && !DEFAULT_LABEL.test(label.trim());
 
   return (
     <div
-      className={`relative min-w-[140px] px-3 py-2.5 rounded-xl transition-all duration-200 border backdrop-blur-md shadow-md group ${
-        selected
-          ? 'border-emerald-400/80 ring-1 ring-emerald-500/40 bg-slate-900/90'
-          : 'border-slate-700/60 hover:border-slate-500/80 bg-slate-900/80'
-      }`}
+      className="lsp-schematic relative bg-transparent border-0 shadow-none rounded-none"
+      style={{ width: geo.width, height: geo.height }}
     >
-      {/* Small LED status indicator at top-right */}
-      <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
-        <span
-          className={`w-2 h-2 rounded-full transition-all duration-300 ${
-            isHigh
-              ? 'bg-emerald-400'
-              : isLow
-              ? 'bg-slate-600'
-              : 'bg-amber-500/80'
-          }`}
+      <svg width={geo.width} height={geo.height} className="overflow-visible block" aria-hidden="true">
+        {/* Input leads, colored by the level on each pin */}
+        {leftInputs.map((pin, i) => {
+          const g = geo.inputs[i];
+          if (!g) return null;
+          return (
+            <line
+              key={pin.id}
+              x1={0}
+              y1={g.y}
+              x2={g.leadEnd + 1}
+              y2={g.y}
+              className="lsp-symbol-lead"
+              style={{ stroke: signalColor(pin.value) }}
+            />
+          );
+        })}
+        {geo.enable && enablePin && (
+          <line
+            x1={geo.enable.x}
+            y1={geo.height}
+            x2={geo.enable.x}
+            y2={geo.enable.leadEnd}
+            className="lsp-symbol-lead"
+            style={{ stroke: signalColor(enablePin.value) }}
+          />
+        )}
+
+        {/* Output lead */}
+        <line
+          x1={geo.output.leadStart}
+          y1={geo.output.y}
+          x2={geo.width}
+          y2={geo.output.y}
+          className="lsp-symbol-lead"
+          style={{ stroke: signalColor(out?.value) }}
         />
-      </div>
 
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-2 pr-4">
-        <div className={`${isHigh ? 'text-emerald-400' : 'text-cyan-400'}`}>
-          <GateIcon type={gateType} className="w-8 h-8" />
+        {/* Body */}
+        <path d={geo.body} className="lsp-symbol-body" />
+        {geo.extras.map((d) => (
+          <path key={d} d={d} className="lsp-symbol-body" style={{ fill: 'none' }} />
+        ))}
+        {geo.bubble && (
+          <circle cx={geo.bubble.cx} cy={geo.bubble.cy} r={geo.bubble.r} className="lsp-symbol-body" />
+        )}
+
+        {/* Output level as text, so the state is readable without color */}
+        <text
+          x={geo.width - 4}
+          y={geo.output.y - 5}
+          textAnchor="end"
+          className="font-mono text-[10px] font-semibold"
+          style={{ fill: signalColor(out?.value) }}
+        >
+          {LEVEL_GLYPH[outState]}
+        </text>
+
+        {enablePin && geo.enable && (
+          <text x={geo.enable.x + 5} y={geo.height - 3} className="font-mono text-[9px]" style={{ fill: 'var(--fg-subtle)' }}>
+            EN
+          </text>
+        )}
+
+        {/* Aliased pin names */}
+        {leftInputs.map((pin, i) =>
+          pinAliases[pin.id] && geo.inputs[i] ? (
+            <text
+              key={`alias-${pin.id}`}
+              x={2}
+              y={geo.inputs[i].y - 4}
+              className="font-mono text-[9px]"
+              style={{ fill: 'var(--fg-subtle)' }}
+            >
+              {pinDisplayName(pin, pinAliases, 6)}
+            </text>
+          ) : null
+        )}
+      </svg>
+
+      {leftInputs.map((pin, i) => (
+        <Pin
+          key={pin.id}
+          type="target"
+          position={Position.Left}
+          id={pin.id}
+          value={pin.value}
+          label={pinDisplayName(pin, pinAliases, 16)}
+          style={{ top: geo.inputs[i]?.y ?? geo.height / 2 }}
+        />
+      ))}
+      {enablePin && geo.enable && (
+        <Pin
+          type="target"
+          position={Position.Bottom}
+          id={enablePin.id}
+          value={enablePin.value}
+          label="Enable"
+          style={{ left: geo.enable.x }}
+        />
+      )}
+      {out && (
+        <Pin
+          type="source"
+          position={Position.Right}
+          id={out.id}
+          value={out.value}
+          label={pinDisplayName(out, pinAliases, 16)}
+          style={{ top: geo.output.y }}
+        />
+      )}
+
+      {showLabel && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-0.5 text-[11px] font-medium text-fg-muted whitespace-nowrap pointer-events-none">
+          {label}
         </div>
-        <div className="flex flex-col">
-          <span className="text-xs font-semibold text-slate-200 tracking-wide font-mono">
-            {label}
-          </span>
-          <span className="text-[10px] text-slate-400 font-sans">
-            {inputs.length} IN • 1 OUT
-          </span>
-        </div>
-      </div>
-
-      {/* Input Handles (Left Side) */}
-      <div className="flex flex-col justify-around py-1 gap-3.5 my-1">
-        {inputs.map((pin, index) => {
-          const pinHigh = pin.value === 1;
-          const pinLow = pin.value === 0;
-          const topPercent = inputs.length === 1 ? 50 : 25 + index * (50 / (inputs.length - 1));
-
-          return (
-            <div key={pin.id} className="relative flex items-center">
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={pin.id}
-                style={{
-                  top: `${topPercent}%`,
-                  left: '-12px',
-                }}
-                className={`!w-3 !h-3 !border-2 !rounded-full transition-all duration-200 ${
-                  pinHigh
-                    ? '!bg-emerald-400 !border-emerald-200'
-                    : pinLow
-                    ? '!bg-slate-700 !border-slate-400'
-                    : '!bg-amber-500 !border-amber-300'
-                }`}
-              />
-              <span
-                className="text-[10px] text-slate-400 font-mono pl-1"
-                title={pinAliases[pin.id] ? `${pin.name} (${pinAliases[pin.id]})` : pin.name}
-              >
-                {getPinDisplayName(pin)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Output Handles (Right Side) */}
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center">
-        {outputs.map((pin) => {
-          const pinHigh = pin.value === 1;
-          const pinLow = pin.value === 0;
-
-          return (
-            <React.Fragment key={pin.id}>
-              <span
-                className="text-[10px] text-slate-400 font-mono pr-2"
-                title={pinAliases[pin.id] ? `${pin.name} (${pinAliases[pin.id]})` : pin.name}
-              >
-                {getPinDisplayName(pin)}
-              </span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={pin.id}
-                style={{
-                  right: '0px',
-                  top: '50%',
-                }}
-                className={`!w-3 !h-3 !border-2 !rounded-full transition-all duration-200 ${
-                  pinHigh
-                    ? '!bg-emerald-400 !border-emerald-200'
-                    : pinLow
-                    ? '!bg-slate-700 !border-slate-400'
-                    : '!bg-amber-500 !border-amber-300'
-                }`}
-              />
-            </React.Fragment>
-          );
-        })}
-      </div>
+      )}
     </div>
   );
 });

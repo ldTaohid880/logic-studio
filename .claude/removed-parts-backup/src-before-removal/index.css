@@ -1,0 +1,520 @@
+@import "tailwindcss";
+
+/*
+ * Theme architecture
+ * ------------------
+ * 1. Semantic tokens (--surface-*, --fg-*, --line-*, --accent, --signal-*) are defined per theme
+ *    on :root[data-theme="dark" | "light"].
+ * 2. @theme exposes them as Tailwind colors with semantic names (bg-surface-1, text-fg-muted,
+ *    border-line, text-signal-high, ...). New code should use these names.
+ * 3. Legacy palette names (slate-*, emerald-*, cyan-*, ...) used throughout older components are
+ *    remapped onto per-theme variables so they follow the active theme. In the light theme the
+ *    accent scales are mirrored (e.g. 300 -> dark shade) so "light text on dark tint" becomes
+ *    "dark text on light tint" without touching component code.
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Semantic colors */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-canvas: var(--canvas-bg);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-on-accent: #ffffff;
+  --color-focus: var(--focus);
+  --color-signal-high: var(--signal-high);
+  --color-signal-low: var(--signal-low);
+  --color-signal-unknown: var(--signal-unknown);
+  --color-signal-bus: var(--signal-bus);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+
+  /* "white" follows the theme's high-contrast ink so overlay tints (bg-white/5, border-white/10)
+     and headings keep working in light mode. Use text-on-accent for text on saturated fills. */
+  --color-white: var(--ink);
+
+  /* Legacy neutral scale -> semantic tokens */
+  --color-slate-950: var(--surface-0);
+  --color-slate-900: var(--surface-1);
+  --color-slate-850: var(--surface-2);
+  --color-slate-800: var(--line);
+  --color-slate-750: var(--line);
+  --color-slate-700: var(--line-strong);
+  --color-slate-650: var(--line-strong);
+  --color-slate-600: var(--line-strong);
+  --color-slate-500: var(--fg-subtle);
+  --color-slate-450: var(--fg-subtle);
+  --color-slate-400: var(--fg-muted);
+  --color-slate-350: var(--fg-muted);
+  --color-slate-300: var(--fg-muted);
+  --color-slate-250: var(--fg);
+  --color-slate-200: var(--fg);
+  --color-slate-100: var(--fg);
+  --color-slate-50: var(--fg);
+
+  /* Legacy accent scales -> per-theme variables (defined below) */
+  --color-emerald-50: var(--em-50);
+  --color-emerald-100: var(--em-100);
+  --color-emerald-200: var(--em-200);
+  --color-emerald-250: var(--em-200);
+  --color-emerald-300: var(--em-300);
+  --color-emerald-400: var(--em-400);
+  --color-emerald-450: var(--em-400);
+  --color-emerald-500: var(--em-500);
+  --color-emerald-550: var(--em-550);
+  --color-emerald-600: var(--em-600);
+  --color-emerald-700: var(--em-700);
+  --color-emerald-750: var(--em-700);
+  --color-emerald-800: var(--em-800);
+  --color-emerald-900: var(--em-900);
+  --color-emerald-950: var(--em-950);
+
+  --color-cyan-200: var(--cy-200);
+  --color-cyan-300: var(--cy-300);
+  --color-cyan-400: var(--cy-400);
+  --color-cyan-500: var(--cy-500);
+  --color-cyan-600: var(--cy-600);
+  --color-cyan-700: var(--cy-700);
+  --color-cyan-800: var(--cy-800);
+  --color-cyan-900: var(--cy-900);
+  --color-cyan-950: var(--cy-950);
+
+  --color-blue-200: var(--cy-200);
+  --color-blue-300: var(--cy-300);
+  --color-blue-400: var(--cy-400);
+  --color-blue-500: var(--cy-500);
+  --color-blue-600: var(--cy-600);
+  --color-blue-900: var(--cy-900);
+  --color-blue-950: var(--cy-950);
+
+  --color-purple-300: var(--pu-300);
+  --color-purple-400: var(--pu-400);
+  --color-purple-500: var(--pu-500);
+  --color-purple-600: var(--pu-600);
+  --color-purple-800: var(--pu-800);
+  --color-purple-900: var(--pu-900);
+  --color-purple-950: var(--pu-950);
+
+  --color-amber-200: var(--am-200);
+  --color-amber-300: var(--am-300);
+  --color-amber-400: var(--am-400);
+  --color-amber-500: var(--am-500);
+  --color-amber-600: var(--am-600);
+  --color-amber-800: var(--am-800);
+  --color-amber-900: var(--am-900);
+  --color-amber-950: var(--am-950);
+
+  --color-rose-200: var(--ro-200);
+  --color-rose-300: var(--ro-300);
+  --color-rose-400: var(--ro-400);
+  --color-rose-500: var(--ro-500);
+  --color-rose-600: var(--ro-600);
+  --color-rose-800: var(--ro-800);
+  --color-rose-950: var(--ro-950);
+  --color-red-400: var(--ro-400);
+  --color-red-950: var(--ro-950);
+
+  --animate-fade-in: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pop-in: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@layer base {
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #0e0f12;   /* app chrome */
+    --surface-1: #15171b;   /* panels, cards */
+    --surface-2: #1d2025;   /* hover / raised */
+    --surface-3: #262a30;   /* pressed / inset */
+    --canvas-bg: #101114;
+    --canvas-grid: #2b2e35;
+    --line: #2a2d33;
+    --line-strong: #3b3f47;
+    --fg: #f1f2f4;
+    --fg-muted: #b9bdc6;
+    --fg-subtle: #858a95;
+    --ink: #ffffff;
+    --accent: #6d8cff;
+    --accent-hover: #86a0ff;
+    --accent-soft: rgb(109 140 255 / 0.14);
+    --accent-fg: #a9bbff;
+    --focus: #8aa2ff;
+    --signal-high: #22c55e;
+    --signal-low: #5b6270;
+    --signal-unknown: #f59e0b;
+    --signal-bus: #a78bfa;
+    --danger: #f43f5e;
+    --warning: #f59e0b;
+    --success: #22c55e;
+    --shadow-panel: 0 8px 24px -8px rgb(0 0 0 / 0.5);
+
+    --em-50: #ecfdf5; --em-100: #d1fae5; --em-200: #a7f3d0; --em-300: #6ee7b7; --em-400: #34d399;
+    --em-500: #10b981; --em-550: #0ea371; --em-600: #059669; --em-700: #047857; --em-800: #065f46;
+    --em-900: #064e3b; --em-950: #022c22;
+
+    --cy-200: #bfdbfe; --cy-300: #93c5fd; --cy-400: #60a5fa; --cy-500: #3b82f6; --cy-600: #2563eb;
+    --cy-700: #1d4ed8; --cy-800: #1e40af; --cy-900: #1e3a8a; --cy-950: #172554;
+
+    --pu-300: #c4b5fd; --pu-400: #a78bfa; --pu-500: #8b5cf6; --pu-600: #7c3aed; --pu-800: #5b21b6;
+    --pu-900: #4c1d95; --pu-950: #2e1065;
+
+    --am-200: #fde68a; --am-300: #fcd34d; --am-400: #fbbf24; --am-500: #f59e0b; --am-600: #d97706;
+    --am-800: #92400e; --am-900: #78350f; --am-950: #451a03;
+
+    --ro-200: #fecdd3; --ro-300: #fda4af; --ro-400: #fb7185; --ro-500: #f43f5e; --ro-600: #e11d48;
+    --ro-800: #9f1239; --ro-950: #4c0519;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --surface-0: #f4f5f7;
+    --surface-1: #ffffff;
+    --surface-2: #eef0f3;
+    --surface-3: #e3e6eb;
+    --canvas-bg: #fafbfc;
+    --canvas-grid: #cfd4dc;
+    --line: #dde1e7;
+    --line-strong: #c3c9d2;
+    --fg: #14161a;
+    --fg-muted: #3d424b;
+    --fg-subtle: #69707c;
+    --ink: #0b0c0e;
+    --accent: #3b5bdb;
+    --accent-hover: #2f4ac0;
+    --accent-soft: rgb(59 91 219 / 0.1);
+    --accent-fg: #2f4ac0;
+    --focus: #3b5bdb;
+    --signal-high: #16a34a;
+    --signal-low: #8b929e;
+    --signal-unknown: #d97706;
+    --signal-bus: #7c3aed;
+    --danger: #e11d48;
+    --warning: #d97706;
+    --success: #16a34a;
+    --shadow-panel: 0 8px 24px -10px rgb(15 23 42 / 0.18);
+
+    /* Mirrored accent scales: light shades become dark text, dark shades become soft tints */
+    --em-50: #064e3b; --em-100: #064e3b; --em-200: #065f46; --em-300: #065f46; --em-400: #047857;
+    --em-500: #059669; --em-550: #047857; --em-600: #059669; --em-700: #047857; --em-800: #a7f3d0;
+    --em-900: #d1fae5; --em-950: #d1fae5;
+
+    --cy-200: #1e3a8a; --cy-300: #1e40af; --cy-400: #1d4ed8; --cy-500: #2563eb; --cy-600: #2563eb;
+    --cy-700: #1d4ed8; --cy-800: #bfdbfe; --cy-900: #dbeafe; --cy-950: #dbeafe;
+
+    --pu-300: #5b21b6; --pu-400: #6d28d9; --pu-500: #7c3aed; --pu-600: #7c3aed; --pu-800: #ddd6fe;
+    --pu-900: #ede9fe; --pu-950: #ede9fe;
+
+    --am-200: #78350f; --am-300: #92400e; --am-400: #b45309; --am-500: #d97706; --am-600: #d97706;
+    --am-800: #fde68a; --am-900: #fef3c7; --am-950: #fef3c7;
+
+    --ro-200: #881337; --ro-300: #9f1239; --ro-400: #be123c; --ro-500: #e11d48; --ro-600: #e11d48;
+    --ro-800: #fecdd3; --ro-950: #ffe4e6;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--surface-0);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  button:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* Density: chrome panels scale with --ui-zoom; the canvas keeps its own zoom. */
+:root {
+  --ui-zoom: 1;
+  --wire-scale: 1;
+}
+:root[data-density="compact"] {
+  --ui-zoom: 0.92;
+}
+:root[data-density="presentation"] {
+  --ui-zoom: 1.2;
+  --wire-scale: 1.6;
+}
+.ui-scale {
+  zoom: var(--ui-zoom);
+}
+
+@keyframes wireFlow {
+  from {
+    stroke-dashoffset: 18;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes drawerIn {
+  from {
+    transform: translateX(var(--drawer-from, -16px));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-wire-flow {
+  animation: wireFlow 0.8s linear infinite;
+}
+
+.animate-fadeIn,
+.animate-in {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-popIn {
+  animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-drawer {
+  animation: drawerIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.glass-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-panel);
+}
+
+.glass-card {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  transition: all 0.15s ease-in-out;
+}
+
+.glass-card:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--fg-subtle);
+}
+
+/* ---------------------------------------------------------------------------
+ * React Flow
+ * Node card defaults live in @layer components so that a node's own Tailwind
+ * utilities (background, border, radius, selection styles) take precedence.
+ * ------------------------------------------------------------------------- */
+.react-flow {
+  --xy-background-color: var(--canvas-bg);
+  --xy-minimap-background-color: var(--surface-1);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--surface-0) 70%, transparent);
+  --xy-minimap-node-background-color: var(--line-strong);
+  --xy-selection-background-color: var(--accent-soft);
+  --xy-selection-border: 1px dashed var(--accent);
+  --xy-attribution-background-color: transparent;
+}
+
+.react-flow__node {
+  background: transparent;
+  border-radius: 8px;
+}
+
+@layer components {
+  .react-flow__node > div {
+    background-color: var(--surface-1);
+    border: 1.5px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px -4px rgb(0 0 0 / 0.16);
+    transition: border-color 0.15s ease, outline-color 0.15s ease;
+  }
+
+  .react-flow__node > div:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+/* Selection: one accent outline for every node type, never a signal color. */
+.react-flow__node.selected > div {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Handles: neutral by default; nodes color them by signal state. */
+.react-flow__handle {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 9999px !important;
+  border: 1.5px solid var(--surface-1) !important;
+  background-color: var(--line-strong) !important;
+}
+
+.react-flow__handle:hover {
+  background-color: var(--accent) !important;
+}
+
+/*
+ * Pins (class "lsp-pin", state in data-signal). Shape encodes state as well as color:
+ * HIGH = filled green, LOW = filled gray, UNKNOWN/floating = hollow amber ring.
+ */
+.react-flow__handle.lsp-pin {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid var(--surface-1) !important;
+  background-color: var(--signal-low) !important;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.react-flow__handle.lsp-pin[data-signal="high"] {
+  background-color: var(--signal-high) !important;
+}
+.react-flow__handle.lsp-pin[data-signal="unknown"] {
+  background-color: var(--surface-1) !important;
+  border-color: var(--signal-unknown) !important;
+}
+.react-flow__handle.lsp-pin:hover,
+.react-flow__handle.lsp-pin.connectingto,
+.react-flow__handle.lsp-pin.valid {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1.5px var(--accent);
+}
+.react-flow__handle.lsp-pin:hover {
+  background-color: var(--accent) !important;
+}
+
+/* Bigger hit targets on touch screens */
+@media (pointer: coarse) {
+  .react-flow__handle.lsp-pin {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+
+/* Schematic symbols: drawn with theme tokens */
+.lsp-symbol-body {
+  fill: var(--surface-1);
+  stroke: var(--fg-muted);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.lsp-symbol-lead {
+  fill: none;
+  stroke-width: calc(2px * var(--wire-scale, 1));
+  stroke-linecap: round;
+  transition: stroke 0.15s ease;
+}
+/* Schematic nodes show selection on the symbol stroke, not as a card outline */
+.react-flow__node > div.lsp-schematic,
+.react-flow__node > div.lsp-schematic:hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.react-flow__node.selected > div.lsp-schematic {
+  outline: none;
+}
+.react-flow__node.selected .lsp-symbol-body {
+  filter: drop-shadow(0 0 3px var(--accent-soft));
+  stroke: var(--accent);
+}
+.react-flow__node:hover .lsp-symbol-body {
+  stroke: var(--fg);
+}
+
+/* Neon glows from older node styles are suppressed until nodes are redrawn. */
+.react-flow__node [class*="shadow-[0_0_"],
+.react-flow__node [class*="shadow-[inset_0_0_"],
+.react-flow__node [class*="!shadow-[0_0_"] {
+  box-shadow: none !important;
+}
+
+.react-flow__node [class*="drop-shadow-[0_0_"] {
+  filter: none !important;
+}
+
+/* Monospace font for circuit logic values */
+.font-mono-code {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero" 1, "tnum" 1;
+}
+
+@media print {
+  :root {
+    --ink: #000000;
+  }
+}

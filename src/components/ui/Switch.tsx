@@ -22,7 +22,7 @@ export const Switch: React.FC<SwitchProps> = ({
       {(label || description) && (
         <div className="flex flex-col pr-2">
           {label && <span className="text-xs font-mono font-medium text-slate-200">{label}</span>}
-          {description && <span className="text-[10px] font-sans text-slate-400">{description}</span>}
+          {description && <span className="text-[11px] font-sans text-slate-400">{description}</span>}
         </div>
       )}
       <button
@@ -31,7 +31,7 @@ export const Switch: React.FC<SwitchProps> = ({
         aria-checked={checked}
         disabled={disabled}
         onClick={() => !disabled && onChange(!checked)}
-        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500/40 ${
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200 ease-in-out ${
           checked
             ? 'bg-emerald-600 border-emerald-550 shadow-sm'
             : 'bg-slate-800 border-slate-750'

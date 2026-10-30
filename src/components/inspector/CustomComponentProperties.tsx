@@ -1,6 +1,7 @@
 import React from 'react';
 import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Layers, ExternalLink, Sparkles, Edit3 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -14,8 +15,13 @@ export const CustomComponentProperties: React.FC<CustomComponentPropertiesProps>
   nodeId,
   data,
 }) => {
-  const { customComponents, updateNodeLabel, updateCustomComponent, enterSubcircuitView, showToast } =
-    useCircuitStore();
+  const {
+    customComponents,
+    updateNodeLabel,
+    updateCustomComponent,
+    enterSubcircuitView,
+    showToast,
+  } = useCircuitStore(useShallow((s) => ({ customComponents: s.customComponents, updateNodeLabel: s.updateNodeLabel, updateCustomComponent: s.updateCustomComponent, enterSubcircuitView: s.enterSubcircuitView, showToast: s.showToast })));
 
   const customComponentId = data.customComponentId;
   const def = customComponentId ? customComponents[customComponentId] : undefined;
@@ -31,7 +37,7 @@ export const CustomComponentProperties: React.FC<CustomComponentPropertiesProps>
   return (
     <div className="space-y-4 text-xs">
       {/* Component Title & Edit Subcircuit Action */}
-      <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+      <div className="p-3 rounded-xl bg-surface-0 border border-slate-800 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div
@@ -42,10 +48,10 @@ export const CustomComponentProperties: React.FC<CustomComponentPropertiesProps>
             </div>
             <div>
               <span className="font-bold font-mono text-slate-100">{def.name}</span>
-              <span className="block text-[10px] text-slate-400 font-mono">{def.category}</span>
+              <span className="block text-[11px] text-slate-400 font-mono">{def.category}</span>
             </div>
           </div>
-          <span className="px-2 py-0.5 text-[9px] font-mono font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+          <span className="px-2 py-0.5 text-[11px] font-mono font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
             CUSTOM
           </span>
         </div>
@@ -61,27 +67,15 @@ export const CustomComponentProperties: React.FC<CustomComponentPropertiesProps>
         </Button>
       </div>
 
-      {/* Instance Label Input */}
-      <div className="space-y-1.5">
-        <label className="block text-[11px] font-mono font-bold text-slate-400">
-          Instance Label
-        </label>
-        <Input
-          value={data.label || ''}
-          onChange={(e) => updateNodeLabel(nodeId, e.target.value)}
-          placeholder={def.name}
-          className="w-full bg-slate-950 border-slate-800"
-        />
-      </div>
 
       {/* Component Details */}
       <div className="space-y-2 border-t border-slate-800 pt-3">
-        <label className="block text-[11px] font-mono font-bold text-slate-400">
+        <label className="block text-xs font-mono font-bold text-slate-400">
           Subcircuit Metadata
         </label>
 
         <div className="space-y-1.5">
-          <span className="text-[10px] text-slate-500 font-mono">Component Name</span>
+          <span className="text-[11px] text-slate-500 font-mono">Component Name</span>
           <Input
             value={def.name}
             onChange={(e) => updateCustomComponent(def.id, { name: e.target.value })}
@@ -90,7 +84,7 @@ export const CustomComponentProperties: React.FC<CustomComponentPropertiesProps>
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-[10px] text-slate-500 font-mono">Category</span>
+          <span className="text-[11px] text-slate-500 font-mono">Category</span>
           <Input
             value={def.category}
             onChange={(e) => updateCustomComponent(def.id, { category: e.target.value })}
@@ -101,12 +95,12 @@ export const CustomComponentProperties: React.FC<CustomComponentPropertiesProps>
 
       {/* Pin Information List */}
       <div className="space-y-2 border-t border-slate-800 pt-3">
-        <label className="block text-[11px] font-mono font-bold text-slate-400">
+        <label className="block text-xs font-mono font-bold text-slate-400">
           Pin Specifications
         </label>
 
-        <div className="space-y-2 font-mono text-[11px]">
-          <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+        <div className="space-y-2 font-mono text-xs">
+          <div className="bg-surface-0 p-2 rounded-xl border border-slate-800">
             <span className="text-cyan-400 font-bold block mb-1">
               Inputs ({def.inputs.length}):
             </span>
@@ -122,7 +116,7 @@ export const CustomComponentProperties: React.FC<CustomComponentPropertiesProps>
             </div>
           </div>
 
-          <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+          <div className="bg-surface-0 p-2 rounded-xl border border-slate-800">
             <span className="text-emerald-400 font-bold block mb-1">
               Outputs ({def.outputs.length}):
             </span>

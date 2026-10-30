@@ -34,12 +34,12 @@ export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
   return (
     <>
       <div
-        className={`relative min-w-[220px] rounded-2xl bg-[#151a23]/95 backdrop-blur-xl border-2 transition-all duration-200 select-none shadow-xl overflow-visible ${
+        className={`relative min-w-[220px] rounded-2xl bg-surface-2/95 backdrop-blur-xl border-2 transition-all duration-200 select-none shadow-xl overflow-visible ${
           hasError
             ? 'border-rose-500/90 shadow-[0_0_20px_rgba(244,63,94,0.4)] bg-rose-950/20'
             : selected
             ? 'border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]'
-            : 'border-[#2D3748] hover:border-slate-500'
+            : 'border-line-strong hover:border-slate-500'
         }`}
       >
         {/* Header */}
@@ -65,6 +65,7 @@ export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
             }}
             className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-white/10 transition-colors cursor-pointer"
             title="Open Truth Table & Logic Guide"
+            aria-label="Open Truth Table & Logic Guide"
           >
             <Table className="w-3.5 h-3.5" />
           </button>
@@ -81,7 +82,7 @@ export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
           )}
 
           {/* Mode & Output Status Display */}
-          <div className="bg-[#0b0e14] p-2 rounded-xl border border-slate-800 space-y-1 font-mono">
+          <div className="bg-surface-1 p-2 rounded-xl border border-slate-800 space-y-1 font-mono">
             <div className="flex items-center justify-between text-[10px]">
               <span className="text-slate-400">Input Logic:</span>
               <span className="text-emerald-400 font-bold uppercase">
@@ -159,19 +160,8 @@ export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
                       position={Position.Left}
                       id={pin.id}
                       style={{ left: '-12px', top: '50%' }}
-                      className={`!w-3 !h-3 !border-2 !border-[#151a23] !transition-all ${
-                        isEiPin
-                          ? (isActive
-                              ? '!bg-cyan-400 shadow-[0_0_8px_#22d3ee]'
-                              : pin.value === -1
-                              ? '!bg-amber-500'
-                              : '!bg-slate-600')
-                          : (isActive
-                              ? '!bg-emerald-400 shadow-[0_0_8px_#4ade80]'
-                              : pin.value === -1
-                              ? '!bg-amber-500'
-                              : '!bg-slate-600')
-                      }`}
+                      className="lsp-pin"
+                      data-signal={isActive ? 'high' : pin.value === -1 ? 'unknown' : 'low'}
                     />
                     <div className="flex items-center gap-1.5 pl-1">
                       <span
@@ -232,13 +222,8 @@ export const EncoderNode = memo(({ id, data, selected }: NodeProps) => {
                       position={Position.Right}
                       id={pin.id}
                       style={{ right: '-12px', top: '50%' }}
-                      className={`!w-3 !h-3 !border-2 !border-[#151a23] !transition-all ${
-                        isHigh
-                          ? '!bg-emerald-400 shadow-[0_0_8px_#4ade80]'
-                          : pin.value === -1
-                          ? '!bg-amber-500'
-                          : '!bg-slate-600'
-                      }`}
+                      className="lsp-pin"
+                  data-signal={isHigh ? 'high' : pin.value === -1 ? 'unknown' : 'low'}
                     />
                   </div>
                 );

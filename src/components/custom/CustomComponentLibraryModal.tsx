@@ -1,5 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useId } from 'react';
+import { ModalFrame } from '../ui/Dialog';
+import { ModalHeader } from '../ui/ModalHeader';
 import { useCircuitStore } from '../../store/useCircuitStore';
+import { useShallow } from 'zustand/react/shallow';
 import { CustomComponentDefinition } from '../../types/customComponent';
 import {
   X,
@@ -16,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 interface CustomComponentLibraryModalProps {
   isOpen: boolean;
@@ -29,9 +33,11 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
   onOpenWizard,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'name' | 'date'>('date');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const {
     customComponents,
@@ -42,7 +48,7 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
     importCustomComponentJSON,
     exportCustomComponentJSON,
     showToast,
-  } = useCircuitStore();
+  } = useCircuitStore(useShallow((s) => ({ customComponents: s.customComponents, deleteCustomComponent: s.deleteCustomComponent, toggleFavoriteCustomComponent: s.toggleFavoriteCustomComponent, instantiateCustomComponent: s.instantiateCustomComponent, enterSubcircuitView: s.enterSubcircuitView, importCustomComponentJSON: s.importCustomComponentJSON, exportCustomComponentJSON: s.exportCustomComponentJSON, showToast: s.showToast })));
 
   if (!isOpen) return null;
 
@@ -106,64 +112,41 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn select-none">
-      <div className="relative w-full max-w-4xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl text-slate-100 overflow-hidden flex flex-col h-[80vh]">
-        {/* Top Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-slate-950 shadow-lg">
-              <Layers className="w-5 h-5 stroke-[2.5]" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold font-mono tracking-wide">
-                Custom Component Library
-              </h2>
-              <p className="text-xs text-slate-400">
-                Manage, edit, export, and instantiate reusable subcircuits
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="xs"
-              leftIcon={<Upload className="w-3.5 h-3.5 text-cyan-400" />}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Import JSON
-            </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImportFile}
-              accept=".json"
-              className="hidden"
-            />
-
-            <Button
-              variant="emerald"
-              size="xs"
-              leftIcon={<Plus className="w-3.5 h-3.5" />}
-              onClick={() => {
-                onClose();
-                onOpenWizard();
-              }}
-            >
-              New Subcircuit
-            </Button>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ml-2"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+    <ModalFrame
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy={titleId}
+      className="w-full max-w-4xl h-[80vh]"
+    >
+        <ModalHeader
+          titleId={titleId}
+          icon={<Layers className="w-5 h-5" />}
+          title="My components"
+          description="Subcircuits you built. Place them like any other part, or open one to edit its inside."
+          onClose={onClose}
+          actions={
+            <>
+              <Button variant="ghost" size="sm" leftIcon={<Upload className="w-4 h-4" />} onClick={() => fileInputRef.current?.click()}>
+                <span className="hidden sm:inline">Import</span>
+              </Button>
+              <input type="file" ref={fileInputRef} onChange={handleImportFile} accept=".json" className="hidden" />
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<Plus className="w-4 h-4" />}
+                onClick={() => {
+                  onClose();
+                  onOpenWizard();
+                }}
+              >
+                <span className="hidden sm:inline">New component</span>
+              </Button>
+            </>
+          }
+        />
 
         {/* Search & Category Filter Toolbar */}
-        <div className="p-4 bg-slate-950/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 bg-surface-0/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
             <Input
@@ -179,7 +162,7 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
               onClick={() => setSelectedCategory('All')}
               className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors ${
                 selectedCategory === 'All'
-                  ? 'bg-emerald-500 text-slate-950 font-bold'
+                  ? 'bg-emerald-500 text-on-accent font-bold'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
@@ -191,7 +174,7 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors ${
                   selectedCategory === cat
-                    ? 'bg-emerald-500 text-slate-950 font-bold'
+                    ? 'bg-emerald-500 text-on-accent font-bold'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
@@ -216,7 +199,7 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
               {filtered.map((comp) => (
                 <div
                   key={comp.id}
-                  className="group relative rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 p-4 transition-all duration-200 hover:shadow-xl flex flex-col justify-between"
+                  className="group relative rounded-2xl bg-surface-1 border border-slate-800 hover:border-emerald-500/50 p-4 transition-all duration-200 hover:shadow-xl flex flex-col justify-between"
                 >
                   {/* Card Header */}
                   <div>
@@ -232,7 +215,7 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
                           <h3 className="text-sm font-bold font-mono tracking-tight truncate text-slate-100">
                             {comp.name}
                           </h3>
-                          <span className="text-[10px] font-mono text-slate-400">
+                          <span className="text-[11px] font-mono text-slate-400">
                             {comp.category}
                           </span>
                         </div>
@@ -255,7 +238,7 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
                     )}
 
                     {/* Pin Summary Badge */}
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400 mb-4 bg-slate-900/60 p-2 rounded-xl border border-slate-850">
+                    <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 mb-4 bg-slate-900/60 p-2 rounded-xl border border-slate-850">
                       <span className="text-cyan-400 font-bold">{comp.inputs.length} Inputs</span>
                       <span>•</span>
                       <span className="text-emerald-400 font-bold">{comp.outputs.length} Outputs</span>
@@ -286,6 +269,7 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
                         }}
                         title="Edit Internal Schematic"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+                        aria-label="Edit Internal Schematic"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </button>
@@ -294,17 +278,14 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
                         onClick={() => handleExport(comp)}
                         title="Export JSON"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors"
+                        aria-label="Export JSON"
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
 
                       <button
-                        onClick={() => {
-                          if (window.confirm(`Delete custom component "${comp.name}"?`)) {
-                            deleteCustomComponent(comp.id);
-                            showToast(`Deleted "${comp.name}"`);
-                          }
-                        }}
+                        onClick={() => setPendingDelete({ id: comp.id, name: comp.name })}
+                        aria-label={`Delete ${comp.name}`}
                         title="Delete Subcircuit"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
                       >
@@ -317,7 +298,28 @@ export const CustomComponentLibraryModal: React.FC<CustomComponentLibraryModalPr
             </div>
           )}
         </div>
-      </div>
-    </div>
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        title="Delete component?"
+        message={
+          <>
+            <strong className="text-fg">{pendingDelete?.name}</strong> will be removed from your library. Parts already
+            placed on a canvas must be deleted first.
+          </>
+        }
+        confirmLabel="Delete"
+        destructive
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) {
+            deleteCustomComponent(pendingDelete.id);
+            if (!useCircuitStore.getState().customComponents[pendingDelete.id]) {
+              showToast(`Deleted "${pendingDelete.name}"`);
+            }
+          }
+          setPendingDelete(null);
+        }}
+      />
+    </ModalFrame>
   );
 };

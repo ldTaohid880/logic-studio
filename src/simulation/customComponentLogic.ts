@@ -5,8 +5,7 @@ import { CustomComponentDefinition } from '../types/customComponent';
 export function evaluateCustomComponentLogic(
   data: NodeData,
   customComponentsMap: Record<string, CustomComponentDefinition>,
-  propagateSignalsFn: (nodes: Node[], edges: Edge[], clockTick?: boolean) => { nodes: Node[]; edges: Edge[]; hasChanged: boolean },
-  clockTick: boolean = false
+  propagateSignalsFn: (nodes: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[]; hasChanged: boolean }
 ): { updatedOutputs: Record<string, SignalValue>; internalNodeStates: Record<string, any>; hasChanged: boolean } {
   if (!data.customComponentId) {
     return { updatedOutputs: {}, internalNodeStates: {}, hasChanged: false };
@@ -21,17 +20,28 @@ export function evaluateCustomComponentLogic(
   let internalNodes: Node[] = [];
   const existingStates = data.subcircuitNodeStates;
 
-  if (existingStates && existingStates.nodes && Array.isArray(existingStates.nodes)) {
+  if (existingStates && Array.isArray(existingStates.nodes) && existingStates.defVersion === def.updatedAt) {
     internalNodes = existingStates.nodes.map((n: Node) => ({
       ...n,
-      data: JSON.parse(JSON.stringify(n.data)),
+      data: structuredClone(n.data),
     }));
   } else {
-    // Clone template nodes from definition
-    internalNodes = def.nodes.map((n) => ({
-      ...n,
-      data: JSON.parse(JSON.stringify(n.data)),
-    }));
+    // Clone template nodes from definition (first use, or the definition was edited since the last evaluation)
+    const previousById = new Map<string, NodeData>(
+      Array.isArray(existingStates?.nodes)
+        ? existingStates!.nodes.map((n: Node) => [n.id, n.data as unknown as NodeData])
+        : []
+    );
+    internalNodes = def.nodes.map((n) => {
+      const nodeData = structuredClone(n.data) as unknown as NodeData;
+      // Keep sequential memory of nodes that survived the edit unchanged in type
+      const previous = previousById.get(n.id);
+      if (previous && previous.gateType === nodeData.gateType) {
+        if (previous.icState) nodeData.icState = previous.icState;
+        if (previous.subcircuitNodeStates) nodeData.subcircuitNodeStates = previous.subcircuitNodeStates;
+      }
+      return { ...n, data: nodeData as unknown as Record<string, unknown> };
+    });
   }
 
   const internalEdges = def.edges || [];
@@ -39,7 +49,7 @@ export function evaluateCustomComponentLogic(
   // Filter internal input nodes
   const internalInputNodes = internalNodes.filter((n) => {
     const nd = n.data as unknown as NodeData;
-    return ['INPUT', 'PUSH_BUTTON', 'CLOCK', 'CONST_HIGH', 'CONST_LOW'].includes(nd.gateType);
+    return ['INPUT', 'PUSH_BUTTON', 'CONST_HIGH', 'CONST_LOW'].includes(nd.gateType);
   });
 
   // Map instance input pin values to internal subcircuit input nodes
@@ -50,8 +60,7 @@ export function evaluateCustomComponentLogic(
     const targetInternalNode =
       internalNodes.find((n) => pinDef?.internalNodeId && n.id === pinDef.internalNodeId) ||
       internalNodes.find((n) => (n.data as unknown as NodeData).label === inPin.name || (n.data as unknown as NodeData).label === pinDef?.name) ||
-      internalInputNodes[pinIdx] ||
-      internalNodes[0];
+      internalInputNodes[pinIdx];
 
     if (targetInternalNode) {
       const nd = targetInternalNode.data as unknown as NodeData;
@@ -65,7 +74,7 @@ export function evaluateCustomComponentLogic(
       }
 
       // If it's a source node (INPUT, etc.), update its value and outputs
-      if (['INPUT', 'PUSH_BUTTON', 'CLOCK', 'CONST_HIGH', 'CONST_LOW'].includes(nd.gateType)) {
+      if (['INPUT', 'PUSH_BUTTON', 'CONST_HIGH', 'CONST_LOW'].includes(nd.gateType)) {
         nd.value = inPin.value;
         if (nd.outputs && nd.outputs.length > 0) {
           nd.outputs.forEach((out) => {
@@ -77,7 +86,7 @@ export function evaluateCustomComponentLogic(
   });
 
   // Execute signal propagation inside the subcircuit
-  const propRes = propagateSignalsFn(internalNodes, internalEdges, clockTick);
+  const propRes = propagateSignalsFn(internalNodes, internalEdges);
   const evaluatedNodes = propRes.nodes;
 
   // Extract internal output node values back to instance output pins
@@ -85,7 +94,7 @@ export function evaluateCustomComponentLogic(
 
   const internalOutputNodes = evaluatedNodes.filter((n) => {
     const nd = n.data as unknown as NodeData;
-    return ['OUTPUT', 'LOGIC_PROBE', 'RGB_LED', 'SEVEN_SEGMENT', 'HEX_DISPLAY'].includes(nd.gateType);
+    return ['OUTPUT', 'LOGIC_PROBE', 'SEVEN_SEGMENT', 'HEX_DISPLAY'].includes(nd.gateType);
   });
 
   data.outputs.forEach((outPin, pinIdx) => {
@@ -95,9 +104,7 @@ export function evaluateCustomComponentLogic(
     const sourceInternalNode =
       evaluatedNodes.find((n) => pinDef?.internalNodeId && n.id === pinDef.internalNodeId) ||
       evaluatedNodes.find((n) => (n.data as unknown as NodeData).label === outPin.name || (n.data as unknown as NodeData).label === pinDef?.name) ||
-      internalOutputNodes[pinIdx] ||
-      evaluatedNodes[evaluatedNodes.length - 1 - pinIdx] ||
-      evaluatedNodes[0];
+      internalOutputNodes[pinIdx];
 
     if (sourceInternalNode) {
       const nd = sourceInternalNode.data as unknown as NodeData;
@@ -116,7 +123,7 @@ export function evaluateCustomComponentLogic(
         updatedOutputs[outPin.id] = targetPin ? targetPin.value : (nd.value !== undefined ? nd.value : 0);
       } else {
         // Standard mapping logic
-        if (['OUTPUT', 'LOGIC_PROBE', 'RGB_LED'].includes(nd.gateType)) {
+        if (['OUTPUT', 'LOGIC_PROBE'].includes(nd.gateType)) {
           updatedOutputs[outPin.id] = nd.value !== undefined ? nd.value : (nd.inputs[0]?.value ?? 0);
         } else if (nd.outputs && nd.outputs.length > 0) {
           updatedOutputs[outPin.id] = nd.outputs[0]?.value ?? 0;
@@ -125,13 +132,14 @@ export function evaluateCustomComponentLogic(
         }
       }
     } else {
-      updatedOutputs[outPin.id] = 0;
+      // No internal node backs this pin: report it as floating instead of reading an unrelated node
+      updatedOutputs[outPin.id] = -1;
     }
   });
 
   return {
     updatedOutputs,
-    internalNodeStates: { nodes: evaluatedNodes },
+    internalNodeStates: { nodes: evaluatedNodes, defVersion: def.updatedAt },
     hasChanged: propRes.hasChanged,
   };
 }

@@ -1,9 +1,10 @@
 import React from 'react';
 import { useCircuitStore } from '../../store/useCircuitStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ChevronRight, Home, ArrowLeft, Layers } from 'lucide-react';
 
 export const HierarchyBreadcrumbs: React.FC = () => {
-  const { hierarchyPath, exitSubcircuitView } = useCircuitStore();
+  const { hierarchyPath, exitSubcircuitView } = useCircuitStore(useShallow((s) => ({ hierarchyPath: s.hierarchyPath, exitSubcircuitView: s.exitSubcircuitView })));
 
   if (!hierarchyPath || hierarchyPath.length <= 1) {
     return null;

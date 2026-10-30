@@ -46,7 +46,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
   return (
     <div className={`w-full space-y-1 ${className}`}>
       {label && (
-        <label className="block text-[11px] font-mono font-medium text-slate-400">
+        <label className="block text-xs font-mono font-medium text-slate-400">
           {label}
         </label>
       )}
@@ -69,9 +69,9 @@ export const NumberInput: React.FC<NumberInputProps> = ({
             step={step}
             disabled={disabled}
             onChange={handleInputChange}
-            className="w-full text-center bg-transparent text-xs font-mono font-bold text-slate-100 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-full text-center bg-transparent text-xs font-mono font-bold text-slate-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
-          {unit && <span className="text-[10px] font-mono text-slate-500">{unit}</span>}
+          {unit && <span className="text-[11px] font-mono text-slate-500">{unit}</span>}
         </div>
 
         <button

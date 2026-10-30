@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success' | 'emerald' | 'cyan';
   size?: 'xs' | 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
@@ -17,41 +17,40 @@ export const Button: React.FC<ButtonProps> = ({
   rightIcon,
   className = '',
   disabled,
+  type = 'button',
   ...props
 }) => {
   const baseClasses =
-    'inline-flex items-center justify-center font-sans font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-slate-700/50 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer';
+    'inline-flex items-center justify-center font-sans font-medium whitespace-nowrap transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer';
 
   const sizeClasses = {
-    xs: 'px-2 py-1 text-[11px] gap-1 rounded-lg',
-    sm: 'px-3 py-1.5 text-xs gap-1.5 rounded-lg',
-    md: 'px-4 py-2 text-sm gap-2 rounded-lg',
-    lg: 'px-5 py-2.5 text-base gap-2.5 rounded-xl',
+    xs: 'h-7 px-2 text-xs gap-1.5 rounded-md',
+    sm: 'h-8 px-3 text-[13px] gap-1.5 rounded-lg',
+    md: 'h-9 px-4 text-sm gap-2 rounded-lg',
+    lg: 'h-11 px-5 text-base gap-2.5 rounded-xl',
   };
 
   const variantClasses = {
-    primary:
-      'bg-emerald-600 hover:bg-emerald-550 active:bg-emerald-750 text-white font-medium shadow-sm border border-emerald-550/20 focus:ring-emerald-500/40',
-    secondary:
-      'bg-slate-800/90 hover:bg-slate-850 text-slate-100 border border-slate-800 focus:ring-slate-700/40 shadow-sm',
-    outline:
-      'bg-transparent hover:bg-slate-850 text-slate-200 border border-slate-800 focus:ring-slate-700/40',
-    ghost:
-      'bg-transparent hover:bg-slate-850 text-slate-300 hover:text-slate-100 focus:ring-slate-700/40',
-    danger:
-      'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 focus:ring-rose-500/40',
-    success:
-      'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 focus:ring-emerald-500/40',
+    primary: 'bg-accent hover:bg-accent-hover text-on-accent shadow-sm',
+    secondary: 'bg-surface-2 hover:bg-surface-3 text-fg border border-line',
+    outline: 'bg-transparent hover:bg-surface-2 text-fg border border-line',
+    ghost: 'bg-transparent hover:bg-surface-2 text-fg-muted hover:text-fg',
+    danger: 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25',
+    success: 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/25',
+    emerald: 'bg-emerald-600 hover:bg-emerald-700 text-on-accent shadow-sm',
+    cyan: 'bg-cyan-600 hover:bg-cyan-700 text-on-accent shadow-sm',
   };
 
   return (
     <button
+      type={type}
       className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
       disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
     >
       {isLoading ? (
-        <svg className="animate-spin w-3.5 h-3.5 text-current" viewBox="0 0 24 24" fill="none">
+        <svg className="animate-spin w-3.5 h-3.5 text-current" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path
             className="opacity-75"

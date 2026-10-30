@@ -13,9 +13,6 @@ export function evaluateGate(
     case 'OUTPUT':
       return inputs[0] ?? -1;
 
-    case 'CLOCK':
-      return extraData?.value ?? 0;
-
     case 'NOT': {
       const in0 = inputs[0] ?? -1;
       if (in0 === 1) return 0;
@@ -71,7 +68,7 @@ export function evaluateGate(
 
     case 'TRI_STATE_BUFFER': {
       const dataIn = inputs[0] ?? -1;
-      const enable = inputs[1] ?? 1; // Default to active high enable if unconnected
+      const enable = inputs[1] === undefined || inputs[1] === -1 ? 1 : inputs[1]; // Default to active high enable if unconnected
       if (enable === 1) return dataIn;
       return -1; // Floating / High Impedance Z
     }

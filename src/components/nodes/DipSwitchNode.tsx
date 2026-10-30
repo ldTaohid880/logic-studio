@@ -1,91 +1,77 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
-import { Sliders } from 'lucide-react';
+import { Pin } from './Pin';
+import { Lead, PartLabel, PartSvg, PITCH } from './partKit';
 
-export const DipSwitchNode: React.FC<NodeProps> = memo(({ id, data: nodeData, selected }) => {
+const W = 90;
+const BODY = 60;
+
+/** DIP switch: one slide switch per output, stacked on the pin pitch. */
+export const DipSwitchNode: React.FC<NodeProps> = memo(({ id, data: nodeData }) => {
   const data = nodeData as unknown as NodeData;
   const bitWidth = data.bitWidth || 4;
   const dipValues = data.dipValues || Array(bitWidth).fill(0);
   const outputs = data.outputs || [];
-
-  const updateNodeData = useCircuitStore((s) => s.updateNodeLabel); // We will add toggleDipSwitch to store or handle in store
+  const H = bitWidth * PITCH;
 
   const toggleBit = (idx: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const newVals = [...dipValues];
-    newVals[idx] = newVals[idx] === 1 ? 0 : 1;
-
-    // Save directly into node data
-    const nodes = useCircuitStore.getState().nodes;
-    useCircuitStore.setState({
-      nodes: nodes.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                dipValues: newVals,
-              },
-            }
-          : n
-      ),
-    });
-
-    useCircuitStore.getState().tickSimulation(true);
+    useCircuitStore.getState().toggleDipBit(id, idx);
   };
 
   return (
-    <div
-      className={`min-w-[140px] bg-slate-900/95 border rounded-xl p-3 shadow-2xl backdrop-blur-md transition-all ${
-        selected ? 'border-cyan-400 ring-2 ring-cyan-400/30' : 'border-slate-800'
-      }`}
-    >
-      <div className="flex items-center gap-1.5 mb-2.5 pb-1.5 border-b border-slate-800">
-        <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-        <span className="text-xs font-mono font-bold text-slate-100 truncate">
-          {data.label || `${bitWidth}-Bit DIP Switch`}
-        </span>
-      </div>
+    <div className="lsp-schematic relative" style={{ width: W, height: H }}>
+      <PartLabel text={data.label} />
+      <PartSvg width={W} height={H}>
+        {Array.from({ length: bitWidth }, (_, i) => (
+          <Lead key={i} x1={BODY} x2={W} y={i * PITCH + 15} value={dipValues[i] === 1 ? 1 : 0} />
+        ))}
+      </PartSvg>
 
-      <div className="flex flex-col gap-2">
-        {Array.from({ length: bitWidth }).map((_, idx) => {
-          const isHigh = dipValues[idx] === 1;
-          const pinId = `out-${idx}`;
+      <div className="absolute left-0 top-0 rounded-md border-[1.5px] border-line-strong bg-surface-1" style={{ width: BODY, height: H }}>
+        {Array.from({ length: bitWidth }, (_, i) => {
+          const on = dipValues[i] === 1;
           return (
-            <div key={idx} className="flex items-center justify-between gap-3 relative">
-              <span className="text-[10px] font-mono text-slate-400">SW{idx + 1}</span>
-
-              {/* Toggle switch button */}
+            <div key={i} className="flex items-center gap-1.5 pl-1.5" style={{ height: PITCH }}>
+              <span className="w-3 text-[10px] font-mono text-fg-subtle text-right">{i + 1}</span>
               <button
                 type="button"
-                onClick={(e) => toggleBit(idx, e)}
-                className={`w-9 h-5 rounded-full p-0.5 transition-colors relative cursor-pointer ${
-                  isHigh ? 'bg-cyan-500' : 'bg-slate-800 border border-slate-700'
+                role="switch"
+                aria-checked={on}
+                aria-label={`Switch ${i + 1}: ${on ? '1' : '0'}`}
+                onClick={(e) => toggleBit(i, e)}
+                className={`nodrag relative w-[30px] h-4 rounded-[3px] border cursor-pointer transition-colors ${
+                  on ? 'bg-signal-high/25 border-signal-high' : 'bg-surface-2 border-line-strong hover:border-fg-subtle'
                 }`}
               >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white shadow-md transition-transform ${
-                    isHigh ? 'translate-x-4' : 'translate-x-0'
+                <span
+                  className={`absolute top-[1px] w-3 h-3 rounded-[2px] transition-[left] duration-150 ${
+                    on ? 'left-[15px] bg-signal-high' : 'left-[1px] bg-fg-subtle'
                   }`}
                 />
               </button>
-
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={pinId}
-                className={`!w-3 !h-3 !-right-[12px] !border-2 !transition-all ${
-                  isHigh
-                    ? '!bg-cyan-400 !border-cyan-200 !shadow-[0_0_8px_rgba(34,211,238,0.8)]'
-                    : '!bg-slate-800 !border-slate-600'
-                }`}
-              />
             </div>
           );
         })}
       </div>
+
+      {Array.from({ length: bitWidth }, (_, i) => {
+        const pinId = `out-${i}`;
+        const pin = outputs.find((p) => p.id === pinId);
+        return (
+          <Pin
+            key={pinId}
+            type="source"
+            position={Position.Right}
+            id={pinId}
+            value={pin?.value ?? (dipValues[i] === 1 ? 1 : 0)}
+            label={pin?.name || `SW${i + 1}`}
+            style={{ top: i * PITCH + 15 }}
+          />
+        );
+      })}
     </div>
   );
 });

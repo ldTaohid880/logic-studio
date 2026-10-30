@@ -110,11 +110,11 @@ export const GroupNode: React.FC<NodeProps> = memo(({ id, data: nodeData, select
                 onChange={(e) => setTempLabel(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSaveLabel()}
                 autoFocus
-                className="w-full bg-slate-950 text-white font-mono text-xs font-bold px-1.5 py-0.5 rounded border border-purple-500 focus:outline-none"
+                className="w-full bg-slate-950 text-white font-mono text-xs font-bold px-1.5 py-0.5 rounded border border-purple-500"
               />
               <button
                 onClick={handleSaveLabel}
-                className="p-1 rounded bg-purple-600 text-white hover:bg-purple-500"
+                className="p-1 rounded bg-purple-600 text-on-accent hover:bg-purple-500"
               >
                 <Check className="w-3 h-3" />
               </button>
@@ -131,6 +131,7 @@ export const GroupNode: React.FC<NodeProps> = memo(({ id, data: nodeData, select
                 }}
                 className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-white transition-opacity text-slate-400"
                 title="Edit Group Name"
+                aria-label="Edit Group Name"
               >
                 <Edit2 className="w-3 h-3" />
               </button>
@@ -151,6 +152,7 @@ export const GroupNode: React.FC<NodeProps> = memo(({ id, data: nodeData, select
             }}
             title="Ungroup nodes (Ctrl+Shift+G)"
             className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-white/10 transition-colors"
+            aria-label="Ungroup nodes (Ctrl+Shift+G)"
           >
             <X className="w-3.5 h-3.5" />
           </button>

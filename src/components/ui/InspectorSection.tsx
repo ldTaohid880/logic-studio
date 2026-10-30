@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import React, { useId, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 
 export interface InspectorSectionProps {
   title: string;
@@ -10,6 +10,7 @@ export interface InspectorSectionProps {
   className?: string;
 }
 
+/** Collapsible panel section; same header treatment as the parts bin on the left. */
 export const InspectorSection: React.FC<InspectorSectionProps> = ({
   title,
   icon,
@@ -19,30 +20,37 @@ export const InspectorSection: React.FC<InspectorSectionProps> = ({
   className = '',
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const contentId = useId();
 
   return (
-    <div className={`border border-slate-800/80 rounded-2xl bg-slate-900/50 overflow-hidden transition-colors ${className}`}>
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        aria-expanded={isExpanded}
-        className="w-full px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-800/40 transition-colors select-none cursor-pointer"
-      >
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-emerald-400">{icon}</span>}
-          <span className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">
-            {title}
-          </span>
+    <section className={`px-2 py-1 border-b border-line last:border-b-0 ${className}`}>
+      <h3>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          aria-expanded={isExpanded}
+          aria-controls={contentId}
+          className="w-full flex items-center gap-2 pl-2 pr-2.5 h-9 rounded-lg hover:bg-surface-2 transition-colors cursor-pointer"
+        >
+          {icon && (
+            <span className="text-fg-subtle [&_svg]:!text-current" aria-hidden="true">
+              {icon}
+            </span>
+          )}
+          <span className="text-[13px] font-semibold text-fg flex-1 text-left">{title}</span>
           {badge}
-        </div>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-            isExpanded ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
+          <ChevronRight
+            className={`w-4 h-4 text-fg-subtle transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`}
+            aria-hidden="true"
+          />
+        </button>
+      </h3>
 
-      {isExpanded && <div className="p-3.5 pt-1 border-t border-slate-800/60 space-y-3">{children}</div>}
-    </div>
+      {isExpanded && (
+        <div id={contentId} className="px-2 pt-1 pb-3 space-y-3">
+          {children}
+        </div>
+      )}
+    </section>
   );
 };

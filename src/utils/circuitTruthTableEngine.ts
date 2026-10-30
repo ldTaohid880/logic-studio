@@ -1,6 +1,7 @@
 import { Node, Edge } from '@xyflow/react';
 import { NodeData, SignalValue } from '../types/circuit';
 import { propagateSignals } from '../simulation/engine';
+import { CustomComponentDefinition } from '../types/customComponent';
 
 export interface CircuitSignal {
   id: string;
@@ -100,10 +101,7 @@ export function analyzeCircuitGraph(nodes: Node[], edges: Edge[]): CircuitAnalys
     const data = node.data as unknown as NodeData;
     const nodeLabel = data.label || `${data.gateType || 'Component'} (${node.id.slice(0, 4)})`;
 
-    if (data.gateType === 'INPUT' || data.gateType === 'CLOCK') {
-      if (data.gateType === 'CLOCK') {
-        hasSequentialLogic = true;
-      }
+    if (data.gateType === 'INPUT') {
       inputs.push({
         id: node.id,
         nodeId: node.id,
@@ -186,6 +184,7 @@ export async function generateCircuitTruthTableAsync(
     batchSize?: number;
     onProgress?: (progress: number, current: number, total: number, timeEstMs: number) => void;
     shouldCancel?: () => boolean;
+    customComponents?: Record<string, CustomComponentDefinition>;
   } = {}
 ): Promise<CircuitTruthTableData> {
   const { inputs, internal, outputs, hasSequentialLogic } = analysis;
@@ -227,6 +226,10 @@ export async function generateCircuitTruthTableAsync(
       data.inputs = data.inputs ? data.inputs.map((p) => ({ ...p })) : [];
       data.outputs = data.outputs ? data.outputs.map((p) => ({ ...p })) : [];
 
+      // Every row starts from the same sequential state, not from whatever the canvas currently holds
+      delete data.icState;
+      delete data.subcircuitNodeStates;
+
       // Check if node is one of the input signals
       const matchIdx = inputs.findIndex((inp) => inp.nodeId === node.id && !inp.pinId);
       if (matchIdx !== -1) {
@@ -259,7 +262,7 @@ export async function generateCircuitTruthTableAsync(
     });
 
     // Run circuit signal propagation
-    const propRes = propagateSignals(clonedNodes, edges, false);
+    const propRes = propagateSignals(clonedNodes, edges, options.customComponents ?? {});
     const resultMap = new Map<string, Node>(propRes.nodes.map((n) => [n.id, n]));
 
     // Map Inputs

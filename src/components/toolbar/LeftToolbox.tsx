@@ -1,312 +1,443 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GateType } from '../../types/circuit';
-import { GateIcon } from '../nodes/GateIcons';
 import { useCircuitStore } from '../../store/useCircuitStore';
-import { ToggleLeft, Monitor, Cpu, Plus, Search } from 'lucide-react';
-import { Input } from '../ui/Input';
-import { Badge } from '../ui/Badge';
-import { SegmentedControl } from '../ui/SegmentedControl';
+import { useShallow } from 'zustand/react/shallow';
+import {
+  Search,
+  X,
+  ChevronRight,
+  ToggleLeft,
+  GitMerge,
+  Calculator,
+  MemoryStick,
+  Lightbulb,
+  Spline,
+  Boxes,
+  History,
+  PanelLeftClose,
+} from 'lucide-react';
+import { PARTS, PART_CATEGORIES, PartCategory, PartInfo } from '../../data/components';
+import { PartGlyph, ChipGlyph } from './PartGlyph';
+import { nextPlacementPosition } from '../../utils/canvasBridge';
+import { getDefaultICPins } from '../../simulation/icLogic';
+import { Tooltip } from '../ui/Tooltip';
 
-interface ToolboxItem {
-  type: GateType;
-  name: string;
-  description: string;
-  category: 'Inputs' | 'Logic Gates' | 'Combinational' | 'Sequential' | 'Arithmetic' | 'Outputs' | 'Utility';
-  isConfigurable?: boolean;
-  badgeTag?: string;
+const RECENT_KEY = 'logic_studio_recent_parts';
+const RECENT_MAX = 6;
+const OPEN_KEY = 'logic_studio_bin_sections';
+
+function readJSON<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-const TOOLBOX_ITEMS: ToolboxItem[] = [
-  // Inputs
-  { type: 'INPUT', name: 'Digital Input', description: 'Static toggle switch (0 or 1)', category: 'Inputs', badgeTag: 'Fixed IC' },
-  { type: 'PUSH_BUTTON', name: 'Push Button', description: 'Momentary active-high push button', category: 'Inputs', badgeTag: 'Fixed IC' },
-  { type: 'DIP_SWITCH', name: 'DIP Switch', description: 'Multi-bit toggle switch array (2/4/8-bit)', category: 'Inputs', badgeTag: 'Fixed IC' },
-  { type: 'CLOCK', name: 'Clock Generator', description: 'Configurable periodic pulse generator', category: 'Inputs', badgeTag: 'Fixed IC' },
-  { type: 'CONST_HIGH', name: 'Constant HIGH', description: 'Fixed HIGH (1 / VCC) logic level', category: 'Inputs', badgeTag: 'Fixed IC' },
-  { type: 'CONST_LOW', name: 'Constant LOW', description: 'Fixed LOW (0 / GND) logic level', category: 'Inputs', badgeTag: 'Fixed IC' },
-  { type: 'MULTI_INPUT', name: 'Multi-Input Bus', description: 'Grouped 1-32 bit bus toggles', category: 'Inputs', badgeTag: 'Fixed IC' },
-  { type: 'CFG_CONSTANT', name: 'Constant', description: 'Multi-bit custom constant value generator', category: 'Inputs', isConfigurable: true, badgeTag: 'Configurable' },
+function writeJSON(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage unavailable: preference lasts for this session only
+  }
+}
 
-  // Logic Gates
-  { type: 'AND', name: 'AND Gate', description: 'HIGH if all inputs are HIGH', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'OR', name: 'OR Gate', description: 'HIGH if any input is HIGH', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'NOT', name: 'NOT Inverter', description: 'Inverts signal (0 -> 1, 1 -> 0)', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'NAND', name: 'NAND Gate', description: 'Inverted AND logic', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'NOR', name: 'NOR Gate', description: 'Inverted OR logic', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'XOR', name: 'XOR Gate', description: 'Exclusive OR logic', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'XNOR', name: 'XNOR Gate', description: 'Inverted XOR logic', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'BUFFER', name: 'Buffer', description: 'Passes signal unchanged', category: 'Logic Gates', badgeTag: 'Fixed IC' },
-  { type: 'TRI_STATE_BUFFER', name: 'Tri-State Buffer', description: 'Buffer with active-high Enable (OE)', category: 'Logic Gates', badgeTag: 'Fixed IC' },
+const CATEGORY_ICON: Record<PartCategory | 'custom' | 'recent', React.ReactNode> = {
+  recent: <History className="w-[18px] h-[18px]" />,
+  custom: <Boxes className="w-[18px] h-[18px]" />,
+  Signals: <ToggleLeft className="w-[18px] h-[18px]" />,
+  Gates: (
+    <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
+      <path d="M5 5h7a7 7 0 0 1 0 14H5z" />
+    </svg>
+  ),
+  Combinational: <GitMerge className="w-[18px] h-[18px]" />,
+  Arithmetic: <Calculator className="w-[18px] h-[18px]" />,
+  Memory: <MemoryStick className="w-[18px] h-[18px]" />,
+  Displays: <Lightbulb className="w-[18px] h-[18px]" />,
+  Wiring: <Spline className="w-[18px] h-[18px]" />,
+};
 
-  // Combinational Components (Fixed ICs)
-  { type: 'HALF_SUBTRACTOR', name: 'Half Subtractor', description: 'Subtracts 2 bits -> Difference & Borrow', category: 'Combinational', badgeTag: 'SUB-2' },
-  { type: 'FULL_SUBTRACTOR', name: 'Full Subtractor', description: '3-bit subtractor with Borrow In/Out', category: 'Combinational', badgeTag: 'SUB-3' },
-  { type: 'MUX_4TO1', name: '4:1 Multiplexer', description: 'Selects 1 of 4 inputs to output Y', category: 'Combinational', badgeTag: '74HC153' },
-  { type: 'DEMUX_1TO4', name: '1:4 Demultiplexer', description: 'Routes input to 1 of 4 outputs', category: 'Combinational', badgeTag: '74HC139' },
-  { type: 'MUX_8TO1', name: '8:1 Multiplexer', description: 'Selects 1 of 8 inputs with 3 select bits', category: 'Combinational', badgeTag: '74HC151' },
-  { type: 'DEMUX_1TO8', name: '1:8 Demultiplexer', description: 'Routes input to 1 of 8 output lines', category: 'Combinational', badgeTag: '74HC138' },
-  { type: 'DECODER_3TO8', name: '3->8 Decoder', description: '3-to-8 line decoder chip', category: 'Combinational', badgeTag: '74HC138' },
-  { type: 'DECODER_4TO16', name: '4->16 Decoder', description: '4-to-16 line active-high decoder', category: 'Combinational', badgeTag: '74HC154' },
-  { type: 'ENCODER_8TO3', name: '8->3 Encoder', description: '8-to-3 priority line encoder', category: 'Combinational', badgeTag: '74HC148' },
-  { type: 'PARITY_GENERATOR', name: 'Parity Generator', description: 'Generates even & odd parity bits', category: 'Combinational', badgeTag: '74HC280' },
-  { type: 'PARITY_CHECKER', name: 'Parity Checker', description: 'Checks input parity error bit', category: 'Combinational', badgeTag: '74HC280C' },
-  { type: 'CONVERTER_BIN_TO_GRAY', name: 'Binary to Gray', description: 'Converts 4-bit binary to Gray code', category: 'Combinational', badgeTag: 'CONV-BG' },
-  { type: 'CONVERTER_GRAY_TO_BIN', name: 'Gray to Binary', description: 'Converts 4-bit Gray code to binary', category: 'Combinational', badgeTag: 'CONV-GB' },
-  { type: 'PRIORITY_ENCODER', name: 'Priority Encoder', description: '4-to-2 priority line encoder', category: 'Combinational', badgeTag: '74HC148' },
-  { type: 'COMPARATOR_4BIT', name: '4-Bit Comparator', description: 'Compares A & B (A>B, A=B, A<B)', category: 'Combinational', badgeTag: '74HC85' },
-  { type: 'DECODER_BCD_TO_7SEG', name: 'BCD to 7-Segment', description: 'Decodes 4-bit BCD to 7 segments (a-g)', category: 'Combinational', badgeTag: '74HC4511' },
+const pinCount = (type: GateType) => {
+  try {
+    const pins = getDefaultICPins(type);
+    return pins.inputs.length + pins.outputs.length;
+  } catch {
+    return 4;
+  }
+};
 
-  // Combinational Configurable
-  { type: 'CFG_ENCODER', name: 'Encoder', description: 'Variable N-to-Log2(N) priority encoder block', category: 'Combinational', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'CFG_DECODER', name: 'Decoder', description: 'Variable N-bit input decoder (2^N outputs)', category: 'Combinational', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'CFG_MUX', name: 'MUX', description: 'Variable N-channel W-bit width multiplexer', category: 'Combinational', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'CFG_DEMUX', name: 'DEMUX', description: 'Variable N-channel W-bit width demultiplexer', category: 'Combinational', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'CFG_COMPARATOR', name: 'Comparator', description: 'Variable N-bit magnitude comparator (>, =, <)', category: 'Combinational', isConfigurable: true, badgeTag: 'Configurable' },
+interface PartButtonProps {
+  part: PartInfo;
+  onAdd: (type: GateType) => void;
+  onDragStart: (e: React.DragEvent, type: GateType) => void;
+}
 
-  // Sequential Components (Fixed ICs)
-  { type: 'D_LATCH', name: 'D Latch', description: 'Level-triggered data latch with Enable', category: 'Sequential', badgeTag: '74HC75' },
-  { type: 'JK_FLIPFLOP', name: 'JK Flip-Flop', description: 'Edge-triggered JK flip-flop', category: 'Sequential', badgeTag: '74HC109' },
-  { type: 'T_FLIPFLOP', name: 'T Flip-Flop', description: 'Toggle flip-flop with clear', category: 'Sequential', badgeTag: '74HC74T' },
-  { type: 'REGISTER_4BIT', name: '4-Bit Register', description: 'Parallel-in parallel-out 4-bit register', category: 'Sequential', badgeTag: '74HC173' },
-  { type: 'SHIFT_REGISTER_4BIT', name: '4-Bit Shift Register', description: 'Serial/parallel shift register', category: 'Sequential', badgeTag: '74HC195' },
-  { type: 'UP_COUNTER_4BIT', name: 'Up Counter', description: '4-bit binary up counter (0 to 15)', category: 'Sequential', badgeTag: '74HC191U' },
-  { type: 'DOWN_COUNTER_4BIT', name: 'Down Counter', description: '4-bit binary down counter (15 to 0)', category: 'Sequential', badgeTag: '74HC191D' },
-  { type: 'RING_COUNTER', name: 'Ring Counter', description: '4-bit circulating ring counter', category: 'Sequential', badgeTag: '74HC4017' },
-  { type: 'RIPPLE_COUNTER', name: 'Ripple Counter', description: '4-bit asynchronous ripple counter', category: 'Sequential', badgeTag: '74HC393' },
-  { type: 'SYNCHRONOUS_COUNTER', name: 'Synchronous Counter', description: '4-bit synchronous binary counter', category: 'Sequential', badgeTag: '74HC163' },
-  { type: 'UP_DOWN_COUNTER', name: 'Up/Down Counter', description: '4-bit bi-directional counter', category: 'Sequential', badgeTag: '74HC190' },
-  { type: 'FREQUENCY_DIVIDER', name: 'Frequency Divider', description: 'Divides clock frequency by 2, 4, 8, 16', category: 'Sequential', badgeTag: '74HC4024' },
+/** Symbol tile: the part's schematic symbol with its short name underneath. */
+const PartTile: React.FC<PartButtonProps> = ({ part, onAdd, onDragStart }) => (
+  <Tooltip content={part.description} side="right" delay={500}>
+    <button
+      type="button"
+      draggable
+      onDragStart={(e) => onDragStart(e, part.type)}
+      onClick={() => onAdd(part.type)}
+      aria-label={`${part.name}: ${part.description}`}
+      className="group flex flex-col items-center justify-end gap-1.5 h-[76px] px-1 pb-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-2 active:bg-surface-3 cursor-grab active:cursor-grabbing transition-colors"
+    >
+      <span className="h-8 flex items-center justify-center group-hover:text-accent transition-colors">
+        <PartGlyph type={part.type} />
+      </span>
+      <span className="text-xs font-medium leading-tight text-center text-fg">{part.name}</span>
+    </button>
+  </Tooltip>
+);
 
-  // Sequential Configurable
-  { type: 'CFG_REGISTER', name: 'Register', description: 'Variable N-bit parallel register with EN/CLR', category: 'Sequential', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'CFG_SHIFT_REGISTER', name: 'Shift Register', description: 'Variable N-bit shift register (SI, SO, Load)', category: 'Sequential', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'CFG_COUNTER', name: 'Counter', description: 'Variable N-bit modulo counter (Up/Down/BCD)', category: 'Sequential', isConfigurable: true, badgeTag: 'Configurable' },
+/** Chip row: DIP glyph, name and description, part number at the right. */
+const PartRow: React.FC<PartButtonProps & { showCategory?: boolean }> = ({ part, onAdd, onDragStart, showCategory }) => {
+  const isChip = ['Combinational', 'Arithmetic', 'Memory'].includes(part.category);
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={(e) => onDragStart(e, part.type)}
+      onClick={() => onAdd(part.type)}
+      title={part.description}
+      className="group w-full flex items-center gap-3 pl-2 pr-2.5 py-1.5 rounded-lg text-left hover:bg-surface-2 active:bg-surface-3 cursor-grab active:cursor-grabbing transition-colors"
+    >
+      <span className="h-7 w-11 shrink-0 flex items-center justify-center text-fg-subtle group-hover:text-accent transition-colors">
+        {isChip ? <ChipGlyph pins={pinCount(part.type)} /> : <PartGlyph type={part.type} />}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-[13px] font-medium text-fg truncate">{part.name}</span>
+        <span className="block text-xs text-fg-subtle truncate">
+          {showCategory ? `${part.category} · ${part.description}` : part.description}
+        </span>
+      </span>
+      {part.partNumber && <span className="text-[11px] font-mono text-fg-subtle shrink-0">{part.partNumber}</span>}
+    </button>
+  );
+};
 
-  // Arithmetic Components
-  { type: 'HALF_ADDER', name: 'Half Adder', description: 'Adds 2 bits -> Sum & Carry Out', category: 'Arithmetic', badgeTag: 'ADD-2' },
-  { type: 'FULL_ADDER', name: 'Full Adder', description: '3-bit adder with Carry In & Carry Out', category: 'Arithmetic', badgeTag: 'ADD-3' },
-  { type: 'ADDER_4BIT', name: '4-Bit Adder', description: '4-bit parallel ripple carry adder', category: 'Arithmetic', badgeTag: '74HC283' },
-  { type: 'INCREMENTER_4BIT', name: '4-Bit Incrementer', description: 'Increments 4-bit input by +1', category: 'Arithmetic', badgeTag: 'INC-4' },
-  { type: 'DECREMENTER_4BIT', name: '4-Bit Decrementer', description: 'Decrements 4-bit input by -1', category: 'Arithmetic', badgeTag: 'DEC-4' },
-  { type: 'ADDER_SUBTRACTOR_4BIT', name: 'Adder/Subtractor', description: '4-bit combined adder/subtractor', category: 'Arithmetic', badgeTag: '74HC283S' },
-  { type: 'ALU_4BIT', name: '4-Bit ALU', description: 'Arithmetic Logic Unit (8 operations)', category: 'Arithmetic', badgeTag: '74HC181' },
+interface SectionProps {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  count: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
 
-  // Utility Components
-  { type: 'BUS_SPLITTER', name: 'Bus Splitter', description: 'Splits multi-bit bus into individual lines', category: 'Utility', badgeTag: 'Fixed IC' },
-  { type: 'BUS_JOINER', name: 'Bus Joiner', description: 'Combines single bit lines into a bus', category: 'Utility', badgeTag: 'Fixed IC' },
-  { type: 'BUS_TAP', name: 'Bus Tap', description: 'Extracts single line from a bus', category: 'Utility', badgeTag: 'Fixed IC' },
-  { type: 'BIT_EXTRACTOR', name: 'Bit Extractor', description: 'Extracts specific bit N', category: 'Utility', badgeTag: 'Fixed IC' },
-  { type: 'DELAY_ELEMENT', name: 'Delay Element', description: 'Buffers signal with 1-tick latency', category: 'Utility', badgeTag: 'Fixed IC' },
-  { type: 'TUNNEL', name: 'Wireless Tunnel', description: 'Wireless wire connection node', category: 'Utility', badgeTag: 'Fixed IC' },
-  { type: 'TEXT_LABEL', name: 'Annotation Note', description: 'Text note for schematic documentation', category: 'Utility', badgeTag: 'Fixed IC' },
-  { type: 'CFG_BUS_SPLITTER', name: 'Bus Splitter', description: 'Splits variable N-bit bus into single bit lines', category: 'Utility', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'CFG_BUS_JOINER', name: 'Bus Joiner', description: 'Combines variable N single lines into bus', category: 'Utility', isConfigurable: true, badgeTag: 'Configurable' },
+const Section = React.forwardRef<HTMLElement, SectionProps>(({ id, title, icon, count, isOpen, onToggle, children }, ref) => (
+  <section ref={ref} data-section={id} className="scroll-mt-2">
+    <h3>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="w-full flex items-center gap-2 pl-2 pr-2.5 h-9 rounded-lg text-[13px] font-semibold text-fg hover:bg-surface-2 cursor-pointer"
+      >
+        <span className="text-fg-subtle" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="flex-1 text-left">{title}</span>
+        <span className="text-xs font-normal text-fg-subtle tabular-nums">{count}</span>
+        <ChevronRight
+          className={`w-4 h-4 text-fg-subtle transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+    </h3>
+    {isOpen && <div className="pt-0.5 pb-3">{children}</div>}
+  </section>
+));
+Section.displayName = 'Section';
 
-  // Outputs
-  { type: 'OUTPUT', name: 'Digital Output', description: 'Glow LED display', category: 'Outputs', badgeTag: 'Fixed IC' },
-  { type: 'OSCILLOSCOPE', name: 'Oscilloscope', description: 'Digital waveform oscilloscope display', category: 'Outputs', badgeTag: 'Fixed IC' },
-  { type: 'RGB_LED', name: 'RGB LED', description: 'Multi-color R, G, B led indicator', category: 'Outputs', badgeTag: 'Fixed IC' },
-  { type: 'LOGIC_PROBE', name: 'Logic Probe', description: 'Visual state probe (0, 1, Floating Z)', category: 'Outputs', badgeTag: 'Fixed IC' },
-  { type: 'SEVEN_SEGMENT', name: '7-Segment LED', description: '4-bit numeric segment display', category: 'Outputs', badgeTag: 'Fixed IC' },
-  { type: 'HEX_DISPLAY', name: 'Hex Display', description: 'Single hexadecimal digit display (0-F)', category: 'Outputs', badgeTag: 'Fixed IC' },
-  { type: 'BUS_MONITOR', name: 'Bus Monitor', description: 'Displays multi-bit bus in Hex/Dec/Bin', category: 'Outputs', badgeTag: 'Fixed IC' },
-  { type: 'LED_MATRIX', name: 'LED Matrix', description: 'Configurable LED dot-matrix display (8x8/16x16)', category: 'Outputs', isConfigurable: true, badgeTag: 'Configurable' },
-  { type: 'BOOLEAN_EQUATION_GENERATOR', name: 'Boolean Equation', description: 'Live mathematical expression solver from connected logic graph', category: 'Outputs', badgeTag: 'Fixed IC' },
-];
+interface LeftToolboxProps {
+  /** Rail: icon-only strip; clicking an icon expands the bin at that section. */
+  mode?: 'panel' | 'rail';
+}
 
-export const LeftToolbox: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'fixed' | 'configurable'>('all');
-  const addNode = useCircuitStore((state) => state.addNode);
+export const LeftToolbox: React.FC<LeftToolboxProps> = ({ mode = 'panel' }) => {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState<Record<string, boolean>>(() =>
+    readJSON(OPEN_KEY, Object.fromEntries(PART_CATEGORIES.map((c) => [c.id, c.defaultOpen])))
+  );
+  const [recent, setRecent] = useState<GateType[]>(() => readJSON<GateType[]>(RECENT_KEY, []).slice(0, RECENT_MAX));
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const pendingScroll = useRef<string | null>(null);
 
+  const { addNode, customComponents, instantiateCustomComponent, setShowToolbox } = useCircuitStore(
+    useShallow((s) => ({
+      addNode: s.addNode,
+      customComponents: s.customComponents,
+      instantiateCustomComponent: s.instantiateCustomComponent,
+      setShowToolbox: s.setShowToolbox,
+    }))
+  );
 
-  const handleAddAtCenter = (type: GateType) => {
-    const x = 320 + Math.random() * 80;
-    const y = 180 + Math.random() * 80;
-    addNode(type, { x, y });
+  const rememberRecent = (type: GateType) => {
+    setRecent((prev) => {
+      const next = [type, ...prev.filter((t) => t !== type)].slice(0, RECENT_MAX);
+      writeJSON(RECENT_KEY, next);
+      return next;
+    });
+  };
+
+  const handleAdd = (type: GateType) => {
+    addNode(type, nextPlacementPosition());
+    rememberRecent(type);
   };
 
   const handleDragStart = (e: React.DragEvent, type: GateType) => {
     e.dataTransfer.setData('application/reactflow', type);
     e.dataTransfer.effectAllowed = 'move';
+    rememberRecent(type);
   };
 
-  const filteredItems = TOOLBOX_ITEMS.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.badgeTag && item.badgeTag.toLowerCase().includes(searchQuery.toLowerCase()));
+  const setSectionOpen = (id: string, value: boolean) =>
+    setOpen((prev) => {
+      const next = { ...prev, [id]: value };
+      writeJSON(OPEN_KEY, next);
+      return next;
+    });
 
-    if (!matchesSearch) return false;
+  const q = query.trim().toLowerCase();
+  const results = useMemo(
+    () =>
+      q
+        ? PARTS.filter(
+            (p) =>
+              p.name.toLowerCase().includes(q) ||
+              p.description.toLowerCase().includes(q) ||
+              p.type.toLowerCase().replace(/_/g, ' ').includes(q) ||
+              p.partNumber?.toLowerCase().includes(q)
+          )
+        : [],
+    [q]
+  );
 
-    if (typeFilter === 'fixed') {
-      return !item.isConfigurable;
-    }
-    if (typeFilter === 'configurable') {
-      return item.isConfigurable;
-    }
+  const customList = Object.values(customComponents || {}).filter((c) => !q || c.name.toLowerCase().includes(q));
+  const recentParts = recent.map((t) => PARTS.find((p) => p.type === t)).filter((p): p is PartInfo => !!p);
 
-    return true;
-  });
+  // After expanding from the rail, open and scroll to the chosen section
+  useEffect(() => {
+    if (mode !== 'panel' || !pendingScroll.current) return;
+    const id = pendingScroll.current;
+    pendingScroll.current = null;
+    requestAnimationFrame(() => sectionRefs.current[id]?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }, [mode]);
 
-  const categories = ['Inputs', 'Logic Gates', 'Combinational', 'Sequential', 'Arithmetic', 'Utility', 'Outputs'] as const;
-  const customComponentList = Object.values(useCircuitStore.getState().customComponents || {});
-  const { instantiateCustomComponent } = useCircuitStore();
+  if (mode === 'rail') {
+    const railItems: { id: string; title: string }[] = [
+      ...PART_CATEGORIES.map((c) => ({ id: c.id, title: c.title })),
+      ...(Object.keys(customComponents || {}).length ? [{ id: 'custom', title: 'My components' }] : []),
+    ];
+    return (
+      <nav aria-label="Part categories" className="w-14 h-full border-r border-line bg-surface-1 flex flex-col items-center gap-1 py-2">
+        <Tooltip content="Find a part" shortcut="/" side="right">
+          <button
+            type="button"
+            aria-label="Find a part"
+            onClick={() => {
+              setShowToolbox(true);
+              requestAnimationFrame(() => document.getElementById('parts-search')?.focus());
+            }}
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-fg-muted hover:text-fg hover:bg-surface-2 cursor-pointer"
+          >
+            <Search className="w-[18px] h-[18px]" />
+          </button>
+        </Tooltip>
+        <div className="w-6 h-px bg-line my-1" aria-hidden="true" />
+        {railItems.map((item) => (
+          <Tooltip key={item.id} content={item.title} side="right">
+            <button
+              type="button"
+              aria-label={item.title}
+              onClick={() => {
+                setSectionOpen(item.id, true);
+                pendingScroll.current = item.id;
+                setShowToolbox(true);
+              }}
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-fg-muted hover:text-fg hover:bg-surface-2 cursor-pointer"
+            >
+              {CATEGORY_ICON[item.id as PartCategory]}
+            </button>
+          </Tooltip>
+        ))}
+      </nav>
+    );
+  }
 
   return (
-    <aside className="w-64 h-full border-r flex flex-col z-20 select-none overflow-hidden bg-slate-950/90 border-slate-900 text-slate-100">
-      {/* Header & Search */}
-      <div className="p-3.5 border-b space-y-3 shrink-0 border-slate-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-mono font-bold tracking-wider uppercase text-slate-200">
-              Palette
-            </span>
-          </div>
-          <Badge variant="slate" size="xs">
-            {filteredItems.length + customComponentList.length} Items
-          </Badge>
+    <aside aria-label="Parts" className="w-72 h-full border-r border-line flex flex-col select-none overflow-hidden bg-surface-1 text-fg">
+      <div className="px-3 pt-3 pb-2 shrink-0 flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-fg-subtle absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+          <input
+            id="parts-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setQuery('');
+                (e.target as HTMLInputElement).blur();
+              }
+              if (e.key === 'Enter' && results[0]) handleAdd(results[0].type);
+            }}
+            placeholder="Find a part"
+            aria-label="Find a part"
+            aria-describedby="parts-search-hint"
+            className="w-full h-9 pl-8 pr-8 rounded-lg bg-surface-0 border border-line text-[13px] text-fg placeholder:text-fg-subtle hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 [&::-webkit-search-cancel-button]:hidden"
+          />
+          {query ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setQuery('')}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <kbd
+              id="parts-search-hint"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-5 min-w-5 px-1 rounded border border-line text-[11px] font-mono text-fg-subtle flex items-center justify-center pointer-events-none"
+            >
+              /
+            </kbd>
+          )}
         </div>
-
-        <Input
-          placeholder="Search components..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          leftIcon={<Search className="w-3.5 h-3.5" />}
-          onClear={() => setSearchQuery('')}
-        />
-
-        {/* Component Type Filter Bar */}
-        <SegmentedControl
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'fixed', label: 'Fixed IC' },
-            { value: 'configurable', label: 'Cfg' },
-          ]}
-          value={typeFilter}
-          onChange={(val) => setTypeFilter(val as 'all' | 'fixed' | 'configurable')}
-          size="xs"
-          className="w-full"
-        />
+        <Tooltip content="Collapse to icons" side="bottom">
+          <button
+            type="button"
+            aria-label="Collapse parts panel"
+            onClick={() => setShowToolbox(false)}
+            className="hidden lg:flex w-9 h-9 shrink-0 rounded-lg items-center justify-center text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
 
-      {/* Component Palette Item List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
-        {/* Custom Components Category Section */}
-        {customComponentList.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-slate-400 px-1">
-              <div className="flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-300">
-                  Custom Subcircuits
+      <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+        {q ? (
+          <div role="region" aria-live="polite" aria-label="Search results">
+            <p className="px-2 pt-1 pb-2 text-xs text-fg-subtle">
+              {results.length + customList.length === 0
+                ? `Nothing matches "${query}". Try a gate name like XOR or a chip like 74HC283.`
+                : `${results.length + customList.length} found${results.length ? ' · Enter adds the first' : ''}`}
+            </p>
+            {results.map((part) => (
+              <PartRow key={part.type} part={part} onAdd={handleAdd} onDragStart={handleDragStart} showCategory />
+            ))}
+            {customList.map((comp) => (
+              <button
+                key={comp.id}
+                type="button"
+                onClick={() => instantiateCustomComponent(comp.id, nextPlacementPosition())}
+                className="w-full flex items-center gap-3 pl-2 pr-2.5 py-1.5 rounded-lg text-left hover:bg-surface-2 cursor-pointer"
+              >
+                <span className="h-7 w-11 shrink-0 flex items-center justify-center" style={{ color: comp.color || 'var(--signal-bus)' }}>
+                  <ChipGlyph pins={comp.inputs.length + comp.outputs.length} />
                 </span>
-              </div>
-              <span className="text-[10px] font-mono text-slate-500">{customComponentList.length}</span>
-            </div>
-
-            <div className="space-y-1.5">
-              {customComponentList
-                .filter((c) => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                .map((comp) => (
-                  <div
-                    key={comp.id}
-                    onClick={() => instantiateCustomComponent(comp.id, { x: 300, y: 200 })}
-                    className="group flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all duration-150 bg-emerald-950/20 border-emerald-900/60 hover:border-emerald-500/50 hover:bg-emerald-900/40"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div
-                        className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                        style={{ backgroundColor: comp.color || '#10b981' }}
-                      >
-                        ⚡
-                      </div>
-                      <div className="flex flex-col min-w-0 pr-1">
-                        <span className="text-xs font-mono font-bold truncate text-slate-100">
-                          {comp.name}
-                        </span>
-                        <span className="text-[10px] font-sans truncate text-slate-400">
-                          {comp.inputs.length} IN / {comp.outputs.length} OUT
-                        </span>
-                      </div>
-                    </div>
-
-                    <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  </div>
-                ))}
-            </div>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[13px] font-medium text-fg truncate">{comp.name}</span>
+                  <span className="block text-xs text-fg-subtle truncate">My components</span>
+                </span>
+              </button>
+            ))}
           </div>
-        )}
-
-        {categories.map((category) => {
-          const items = filteredItems
-            .filter((i) => i.category === category)
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-          if (items.length === 0) return null;
-
-          return (
-            <div key={category} className="space-y-2">
-              <div className="flex items-center justify-between text-slate-400 px-1">
-                <div className="flex items-center gap-1.5">
-                  {category === 'Inputs' && <ToggleLeft className="w-3.5 h-3.5 text-slate-400" />}
-                  {category === 'Logic Gates' && <Cpu className="w-3.5 h-3.5 text-slate-400" />}
-                  {category === 'Combinational' && <Cpu className="w-3.5 h-3.5 text-blue-400" />}
-                  {category === 'Sequential' && <Cpu className="w-3.5 h-3.5 text-slate-400" />}
-                  {category === 'Arithmetic' && <Cpu className="w-3.5 h-3.5 text-amber-400" />}
-                  {category === 'Utility' && <Cpu className="w-3.5 h-3.5 text-slate-500" />}
-                  {category === 'Outputs' && <Monitor className="w-3.5 h-3.5 text-emerald-400" />}
-                  <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-300">
-                    {category}
-                  </span>
+        ) : (
+          <>
+            {recentParts.length > 0 && (
+              <Section
+                id="recent"
+                title="Recently used"
+                icon={CATEGORY_ICON.recent}
+                count={recentParts.length}
+                isOpen={open.recent !== false}
+                onToggle={() => setSectionOpen('recent', open.recent === false)}
+              >
+                <div className="grid grid-cols-3 gap-0.5">
+                  {recentParts.map((part) => (
+                    <PartTile key={part.type} part={part} onAdd={handleAdd} onDragStart={handleDragStart} />
+                  ))}
                 </div>
-                <span className="text-[10px] font-mono text-slate-500">{items.length}</span>
-              </div>
+              </Section>
+            )}
 
-              <div className="space-y-1.5">
-                {items.map((item) => (
-                  <div
-                    key={`${item.type}-${item.isConfigurable ? 'cfg' : 'fixed'}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, item.type)}
-                    onClick={() => handleAddAtCenter(item.type)}
-                    className="group flex items-center justify-between p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-emerald-500/50 hover:bg-slate-800/80 cursor-pointer transition-all duration-150"
+            {PART_CATEGORIES.map((cat) => {
+              const parts = PARTS.filter((p) => p.category === cat.id);
+              const isOpen = open[cat.id] ?? cat.defaultOpen;
+              return (
+                <Section
+                  key={cat.id}
+                  ref={(el) => {
+                    sectionRefs.current[cat.id] = el;
+                  }}
+                  id={cat.id}
+                  title={cat.title}
+                  icon={CATEGORY_ICON[cat.id]}
+                  count={parts.length}
+                  isOpen={isOpen}
+                  onToggle={() => setSectionOpen(cat.id, !isOpen)}
+                >
+                  {cat.layout === 'tiles' ? (
+                    <div className="grid grid-cols-3 gap-0.5">
+                      {parts.map((part) => (
+                        <PartTile key={part.type} part={part} onAdd={handleAdd} onDragStart={handleDragStart} />
+                      ))}
+                    </div>
+                  ) : (
+                    parts.map((part) => <PartRow key={part.type} part={part} onAdd={handleAdd} onDragStart={handleDragStart} />)
+                  )}
+                </Section>
+              );
+            })}
+
+            {customList.length > 0 && (
+              <Section
+                ref={(el) => {
+                  sectionRefs.current.custom = el;
+                }}
+                id="custom"
+                title="My components"
+                icon={CATEGORY_ICON.custom}
+                count={customList.length}
+                isOpen={open.custom !== false}
+                onToggle={() => setSectionOpen('custom', open.custom === false)}
+              >
+                {customList.map((comp) => (
+                  <button
+                    key={comp.id}
+                    type="button"
+                    onClick={() => instantiateCustomComponent(comp.id, nextPlacementPosition())}
+                    title={comp.description || `Add ${comp.name}`}
+                    className="group w-full flex items-center gap-3 pl-2 pr-2.5 py-1.5 rounded-lg text-left hover:bg-surface-2 cursor-pointer"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
-                        <GateIcon type={item.type} className="w-6 h-6" />
-                      </div>
-                      <div className="flex flex-col min-w-0 pr-1">
-                        <span className="text-xs font-mono font-medium truncate text-slate-200 group-hover:text-white">
-                          {item.name}
-                        </span>
-                        <span className="text-[10px] font-sans truncate text-slate-400">
-                          {item.description}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      {item.isConfigurable ? (
-                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                          Cfg
-                        </span>
-                      ) : (item.badgeTag && item.badgeTag.startsWith('74HC')) ? (
-                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          {item.badgeTag}
-                        </span>
-                      ) : null}
-                      <Plus className="w-3.5 h-3.5 text-slate-500 transition-colors group-hover:text-emerald-400" />
-                    </div>
-                  </div>
+                    <span className="h-7 w-11 shrink-0 flex items-center justify-center" style={{ color: comp.color || 'var(--signal-bus)' }}>
+                      <ChipGlyph pins={comp.inputs.length + comp.outputs.length} />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[13px] font-medium text-fg truncate">{comp.name}</span>
+                      <span className="block text-xs text-fg-subtle truncate">
+                        {comp.inputs.length} in, {comp.outputs.length} out
+                      </span>
+                    </span>
+                  </button>
                 ))}
-              </div>
-            </div>
-          );
-        })}
+              </Section>
+            )}
+          </>
+        )}
       </div>
+
+      <p className="px-4 py-2.5 border-t border-line text-xs text-fg-subtle shrink-0">
+        Click to place at the center, or drag onto the canvas.
+      </p>
     </aside>
   );
 };

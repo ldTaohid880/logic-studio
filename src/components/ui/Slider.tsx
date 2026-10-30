@@ -44,7 +44,7 @@ export const Slider: React.FC<SliderProps> = ({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-slate-700 [&::-webkit-slider-thumb]:shadow-md hover:[&::-webkit-slider-thumb]:bg-slate-100 transition-all"
+          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer disabled:opacity-40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-slate-700 [&::-webkit-slider-thumb]:shadow-md hover:[&::-webkit-slider-thumb]:bg-slate-100 transition-all"
         />
         <div
           className="absolute left-0 h-1.5 bg-emerald-600 rounded-lg pointer-events-none"

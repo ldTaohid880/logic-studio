@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { ModalFrame } from './Dialog';
 import {
   SevenSegmentConfig,
   COLOR_CONFIGS,
@@ -187,23 +188,27 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div className="w-full max-w-4xl max-h-[85vh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 font-mono">
+    <ModalFrame
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={`7-segment truth table for ${nodeLabel}`}
+      className="w-full max-w-4xl max-h-[85vh] font-mono"
+    >
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/60">
+        <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-surface-0/60">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-cyan-950/80 border border-cyan-800 text-cyan-400">
               <TableIcon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-100 uppercase tracking-wide">
+              <h2 className="text-sm font-bold text-slate-100">
                 7-Segment Truth Table - {nodeLabel}
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-cyan-400 font-semibold uppercase bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-800">
+                <span className="text-[11px] text-cyan-400 font-semibold bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-800">
                   Mode: {config.mode.toUpperCase()}
                 </span>
-                <span className="text-[10px] text-slate-400 uppercase">
+                <span className="text-[11px] text-slate-400">
                   {config.displayType === 'common_anode' ? 'Common Anode (Active LOW)' : 'Common Cathode (Active HIGH)'}
                 </span>
               </div>
@@ -228,7 +233,7 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
               placeholder="Search by binary, digit, or row #..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-cyan-500"
             />
           </div>
 
@@ -238,7 +243,7 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
               onClick={() => setFollowActiveRow(!followActiveRow)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all ${
                 followActiveRow
-                  ? 'bg-cyan-950 border-cyan-500 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                  ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -260,7 +265,7 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
         <div className="flex-1 overflow-y-auto p-4">
           <table className="w-full border-collapse text-left text-xs font-mono">
             <thead>
-              <tr className="border-b border-slate-800 text-[11px] text-slate-400 uppercase bg-slate-950/60 sticky top-0 z-10">
+              <tr className="border-b border-slate-800 text-xs text-slate-400 bg-surface-0/60 sticky top-0 z-10">
                 <th className="p-2.5 w-12 text-center">Row</th>
                 {config.mode === 'direct' ? (
                   <>
@@ -307,7 +312,7 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
                       return (
                         <td key={seg} className="p-2 text-center">
                           <span
-                            className={`inline-block w-5 py-0.5 rounded text-[10px] font-bold ${
+                            className={`inline-block w-5 py-0.5 rounded text-[11px] font-bold ${
                               val === 1
                                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                                 : 'bg-slate-900 text-slate-500'
@@ -324,7 +329,7 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
                       return (
                         <td key={bitIdx} className="p-2 text-center">
                           <span
-                            className={`inline-block w-5 py-0.5 rounded text-[10px] font-bold ${
+                            className={`inline-block w-5 py-0.5 rounded text-[11px] font-bold ${
                               val === 1
                                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                                 : 'bg-slate-900 text-slate-500'
@@ -341,7 +346,7 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
                   {config.showDecimalPoint && (
                     <td className="p-2 text-center">
                       <span
-                        className={`inline-block w-5 py-0.5 rounded text-[10px] font-bold ${
+                        className={`inline-block w-5 py-0.5 rounded text-[11px] font-bold ${
                           row.inputValues['in-dp'] === 1
                             ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                             : 'bg-slate-900 text-slate-500'
@@ -377,9 +382,9 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
                           <span
                             key={seg}
                             title={`Seg ${seg.toUpperCase()}: ${isOn ? 'ON' : 'OFF'}`}
-                            className={`w-4 h-5 rounded text-[9px] font-bold flex items-center justify-center uppercase transition-all ${
+                            className={`w-4 h-5 rounded text-[11px] font-bold flex items-center justify-center transition-all ${
                               isOn
-                                ? 'bg-cyan-950 border border-cyan-500 text-cyan-300 shadow-[0_0_4px_rgba(6,182,212,0.4)]'
+                                ? 'bg-cyan-950 border border-cyan-500 text-cyan-300'
                                 : 'bg-slate-950 border border-slate-800 text-slate-600'
                             }`}
                           >
@@ -396,14 +401,13 @@ export const SevenSegmentTruthTableModal: React.FC<SevenSegmentTruthTableModalPr
         </div>
 
         {/* Modal Footer */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-xs text-slate-400">
+        <div className="p-3 border-t border-slate-800 bg-surface-1 flex items-center justify-between text-xs text-slate-400">
           <span>Showing {filteredRows.length} rows</span>
-          <div className="flex items-center gap-1 text-[11px]">
+          <div className="flex items-center gap-1 text-xs">
             <Eye className="w-3.5 h-3.5 text-cyan-400" />
             <span>Active Row automatically tracks current circuit inputs</span>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalFrame>
   );
 };

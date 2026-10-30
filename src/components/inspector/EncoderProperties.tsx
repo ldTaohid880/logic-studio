@@ -65,17 +65,9 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
         View Truth Table & Logic Guide
       </Button>
 
-      <InspectorSection title="General Settings" icon={<Settings className="w-4 h-4" />}>
-        <PropertyRow label="Label">
-          <Input
-            value={label}
-            onChange={(e) => onUpdateLabel(e.target.value)}
-            placeholder="Encoder label..."
-            className="w-36"
-          />
-        </PropertyRow>
+      <InspectorSection title="Settings" icon={<Settings className="w-4 h-4" />}>
 
-        <PropertyRow label="Inputs Count">
+        <PropertyRow label="Inputs">
           <SegmentedControl
             options={[
               { value: 4, label: '4' },
@@ -91,8 +83,8 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
         </PropertyRow>
       </InspectorSection>
 
-      <InspectorSection title="Independent Logic Polarity" icon={<Cpu className="w-4 h-4" />}>
-        <PropertyRow label="Input Logic" hint={`Active when ${isInputActiveHigh ? 'HIGH (1)' : 'LOW (0)'}`}>
+      <InspectorSection title="Active levels" icon={<Cpu className="w-4 h-4" />}>
+        <PropertyRow label="Inputs are" hint={`Active when ${isInputActiveHigh ? 'HIGH (1)' : 'LOW (0)'}`}>
           <SegmentedControl
             options={[
               { value: 'high', label: 'Active HIGH' },
@@ -105,7 +97,7 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
           />
         </PropertyRow>
 
-        <PropertyRow label="Output Logic" hint={isOutputActiveHigh ? 'Direct Binary' : 'Inverted Binary'}>
+        <PropertyRow label="Outputs are" hint={isOutputActiveHigh ? 'Direct Binary' : 'Inverted Binary'}>
           <SegmentedControl
             options={[
               { value: 'high', label: 'Active HIGH' },
@@ -121,8 +113,8 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
 
 
 
-      <InspectorSection title="Live Encoder Analysis" icon={<Cpu className="w-4 h-4" />}>
-        <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2 font-mono text-[11px]">
+      <InspectorSection title="Live encoder analysis" icon={<Cpu className="w-4 h-4" />}>
+        <div className="bg-surface-0 p-3 rounded-xl border border-slate-800 space-y-2 font-mono text-xs">
           <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <span className="text-cyan-400 font-bold">Analysis Status</span>
             <Badge
@@ -144,7 +136,7 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
               <span className="text-slate-200 font-bold">{explanation.activeInputText}</span>
             </div>
 
-            <div className="text-[10px] text-slate-400 bg-slate-950/60 p-1.5 rounded border border-slate-800/80">
+            <div className="text-[11px] text-slate-400 bg-surface-0 p-1.5 rounded border border-slate-800/80">
               {explanation.inputMeaningText}
             </div>
 
@@ -159,14 +151,14 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
             </div>
           </div>
 
-          <p className="text-[10px] text-slate-300 pt-1 border-t border-slate-800/80 leading-relaxed font-sans">
+          <p className="text-[11px] text-slate-300 pt-1 border-t border-slate-800/80 leading-relaxed font-sans">
             {explanation.explanation}
           </p>
         </div>
       </InspectorSection>
 
-      <InspectorSection title="Priority & Signal Configuration" icon={<Settings className="w-4 h-4" />}>
-        <PropertyRow label="Priority Encoding">
+      <InspectorSection title="Priority and status outputs" icon={<Settings className="w-4 h-4" />}>
+        <PropertyRow label="Priority">
           <Switch
             checked={!!config.priority}
             onChange={(checked) => onUpdateConfig({ priority: checked })}
@@ -174,7 +166,7 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
         </PropertyRow>
 
         {config.priority && (
-          <PropertyRow label="Priority Direction">
+          <PropertyRow label="Priority order">
             <SegmentedControl
               options={[
                 { value: 'highest', label: 'Highest First' },
@@ -188,7 +180,7 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
           </PropertyRow>
         )}
 
-        <PropertyRow label="EI Active Mode">
+        <PropertyRow label="Enable input (EI)">
           <SegmentedControl
             options={[
               { value: 'high', label: 'Active HIGH' },
@@ -201,28 +193,28 @@ export const EncoderProperties: React.FC<EncoderPropertiesProps> = ({
           />
         </PropertyRow>
 
-        <PropertyRow label="Valid Output (V)">
+        <PropertyRow label="Valid output (V)">
           <Switch
             checked={!!config.showValid}
             onChange={(checked) => onUpdateConfig({ showValid: checked })}
           />
         </PropertyRow>
 
-        <PropertyRow label="Enable Output (EO)">
+        <PropertyRow label="Enable output (EO)">
           <Switch
             checked={!!config.showEnableOutput}
             onChange={(checked) => onUpdateConfig({ showEnableOutput: checked })}
           />
         </PropertyRow>
 
-        <PropertyRow label="Group Signal (GS)">
+        <PropertyRow label="Group signal (GS)">
           <Switch
             checked={!!config.showGroupSignal}
             onChange={(checked) => onUpdateConfig({ showGroupSignal: checked })}
           />
         </PropertyRow>
 
-        <PropertyRow label="Display Format">
+        <PropertyRow label="Number format">
           <SegmentedControl
             options={[
               { value: 'binary', label: 'Binary' },

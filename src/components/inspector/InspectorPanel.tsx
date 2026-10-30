@@ -1,736 +1,301 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import { useCircuitStore } from '../../store/useCircuitStore';
-import { NodeData, SignalValue } from '../../types/circuit';
-import { GateIcon } from '../nodes/GateIcons';
-import { Sliders, Trash2, Table, Info, Activity, Hash, Palette, Check, Ban, Pipette } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
+import { GateType, NodeData } from '../../types/circuit';
+import { PartGlyph } from '../toolbar/PartGlyph';
+import { Sliders, Trash2, Hash, Lock, Unlock, Wrench, Layers, Activity } from 'lucide-react';
 import { EncoderProperties } from './EncoderProperties';
 import { SevenSegmentProperties } from './SevenSegmentProperties';
-import { ClockProperties } from './ClockProperties';
-import { MultiInputProperties } from './MultiInputProperties';
-import { OscilloscopeProperties } from './OscilloscopeProperties';
-import { ConfigurableProperties } from './ConfigurableProperties';
-import { LedMatrixProperties } from './LedMatrixProperties';
-import { EquationGeneratorProperties } from './EquationGeneratorProperties';
 import { GroupProperties } from './GroupProperties';
-import { DEFAULT_OSCILLOSCOPE_CONFIG } from '../../types/oscilloscope';
-import { GateTruthTableModal } from '../ui/GateTruthTableModal';
+import { CustomComponentProperties } from './CustomComponentProperties';
+import { WireInspector } from './WireInspector';
+import { InspectorHeader } from './InspectorHeader';
+import { PinStatusList } from './PinStatusList';
+import { OutputColorPicker } from './OutputColorPicker';
+import { OutputColor } from '../../theme/outputColors';
+import { PartLiveView, hasLiveView } from './PartLiveView';
+import { CircuitOverview } from './CircuitOverview';
+import { SelectionSummary } from './SelectionSummary';
 import { DEFAULT_ENCODER_CONFIG } from '../../types/encoder';
 import { DEFAULT_SEVEN_SEGMENT_CONFIG } from '../../types/sevenSegment';
-import { DEFAULT_CLOCK_CONFIG, DEFAULT_CLOCK_STATE } from '../../types/clock';
-import { DEFAULT_MULTI_INPUT_CONFIG } from '../../types/multiInput';
-import { DEFAULT_LED_MATRIX_CONFIG } from '../../types/ledMatrix';
+import { getComponentInfo } from '../../data/components';
 
 import { InspectorSection } from '../ui/InspectorSection';
 import { PropertyRow } from '../ui/PropertyRow';
 import { Input } from '../ui/Input';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
-import { Badge } from '../ui/Badge';
 
-import { CustomComponentProperties } from './CustomComponentProperties';
+interface PanelProps {
+  nodeId: string;
+  nodeData: NodeData;
+}
 
-const PREDEFINED_COLORS = [
-  { name: 'Red', hex: '#ef4444' },
-  { name: 'Blue', hex: '#3b82f6' },
-  { name: 'Yellow', hex: '#eab308' },
-  { name: 'Purple', hex: '#a855f7' },
-  { name: 'Orange', hex: '#f97316' },
-  { name: 'Cyan', hex: '#06b6d4' },
-  { name: 'Pink', hex: '#ec4899' },
-  { name: 'White', hex: '#ffffff' },
-  { name: 'Gray', hex: '#64748b' },
-  { name: 'Green', hex: '#22c55e' },
-];
+/**
+ * Parts with their own settings panel, shown below "How it works". Everything else gets
+ * the generic Settings / Pins sections.
+ */
+const TYPE_PANELS: Partial<Record<GateType, React.FC<PanelProps>>> = {
+  CUSTOM: ({ nodeId, nodeData }) => <CustomComponentProperties nodeId={nodeId} data={nodeData} />,
+  ENCODER: ({ nodeId, nodeData }) => (
+    <EncoderProperties
+      nodeId={nodeId}
+      label={nodeData.label}
+      config={nodeData.encoderConfig || DEFAULT_ENCODER_CONFIG}
+      state={nodeData.encoderState}
+      currentInputs={(nodeData.inputs || []).map((p) => p.value)}
+      onUpdateLabel={(l) => useCircuitStore.getState().updateNodeLabel(nodeId, l)}
+      onUpdateConfig={(cfg) => useCircuitStore.getState().updateEncoderConfig(nodeId, cfg)}
+    />
+  ),
+  SEVEN_SEGMENT: ({ nodeId, nodeData }) => (
+    <SevenSegmentProperties
+      nodeId={nodeId}
+      label={nodeData.label}
+      config={nodeData.sevenSegmentConfig || DEFAULT_SEVEN_SEGMENT_CONFIG}
+      currentInputs={nodeData.inputs || []}
+      onUpdateLabel={(l) => useCircuitStore.getState().updateNodeLabel(nodeId, l)}
+      onUpdateConfig={(cfg) => useCircuitStore.getState().updateSevenSegmentConfig(nodeId, cfg)}
+    />
+  ),
+};
 
-export const InspectorPanel: React.FC = () => {
-  const [isGateTruthTableOpen, setIsGateTruthTableOpen] = useState(false);
-  const customColorInputRef = useRef<HTMLInputElement>(null);
+const MULTI_INPUT_GATES = new Set<GateType>(['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR']);
 
-  const {
-    nodes,
-    edges,
-    selectedNodeId,
-    selectedEdgeId,
-    updateNodeLabel,
-    updateNodeInputCount,
-    updateEncoderConfig,
-    updateSevenSegmentConfig,
-    deleteSelected,
-    showToast,
-  } = useCircuitStore();
+const SETTINGS_TYPES = new Set<GateType>([...MULTI_INPUT_GATES, 'TUNNEL', 'TEXT_LABEL', 'DIP_SWITCH', 'BUS_MONITOR', 'OUTPUT', 'HEX_DISPLAY']);
 
+// Per-part panels built from InspectorSections (no extra padding around them)
+const SECTIONED_PANELS = new Set<GateType>(['SEVEN_SEGMENT']);
 
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
-  const selectedEdge = edges.find((e) => e.id === selectedEdgeId);
+// Default display color per part, matching the node renderers
+const DEFAULT_COLOR: Partial<Record<GateType, OutputColor>> = { OUTPUT: 'red', HEX_DISPLAY: 'red', BUS_MONITOR: 'green' };
 
-  if (!selectedNode && !selectedEdge) {
-    return (
-      <aside className="w-80 h-full border-l p-5 flex flex-col items-center justify-center text-center z-20 select-none bg-slate-950/90 border-slate-800 text-slate-500">
-        <div className="w-12 h-12 rounded-2xl border flex items-center justify-center mb-3 text-cyan-400 bg-slate-900 border-slate-800">
-          <Info className="w-6 h-6 opacity-60" />
-        </div>
-        <p className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          No Component Selected
-        </p>
-        <p className="text-[11px] mt-1 max-w-[220px] leading-relaxed text-slate-400">
-          Click any logic gate, wire connection, clock, or display to inspect signal parameters.
-        </p>
-      </aside>
-    );
-  }
-
-  if (selectedEdge) {
-    const signalVal = (selectedEdge.data?.signalValue ?? -1) as SignalValue;
-    return (
-      <aside className="w-80 h-full border-l p-4 flex flex-col z-20 select-none space-y-4 bg-slate-950/90 border-slate-800 text-slate-100">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <span className="text-xs font-bold font-mono uppercase tracking-wider text-slate-200">
-            Wire Connection
-          </span>
-          <IconButton
-            icon={<Trash2 className="w-4 h-4 text-rose-400" />}
-            tooltip="Delete Wire"
-            variant="danger"
-            size="sm"
-            onClick={() => {
-              deleteSelected();
-              showToast('Wire deleted');
-            }}
-          />
-        </div>
-
-        <InspectorSection title="Connection Details" icon={<Activity className="w-4 h-4" />}>
-          <PropertyRow label="Wire ID">
-            <span className={`text-xs font-mono truncate max-w-[140px] text-slate-300`}>
-              {selectedEdge.id}
-            </span>
-          </PropertyRow>
-
-          <PropertyRow label="Wire Label">
-            <Input
-              value={selectedEdge.data?.label || ''}
-              onChange={(e) => useCircuitStore.getState().updateEdgeLabel(selectedEdge.id, e.target.value)}
-              placeholder="e.g. CLK, RESET..."
-              className="w-36 font-sans text-slate-300"
-            />
-          </PropertyRow>
-
-          <PropertyRow label="Signal State">
-            <Badge
-              variant={signalVal === 1 ? 'emerald' : signalVal === 0 ? 'slate' : 'amber'}
-              pulse={signalVal === 1}
-            >
-              {signalVal === 1 ? 'HIGH (1)' : signalVal === 0 ? 'LOW (0)' : 'UNKNOWN (?)'}
-            </Badge>
-          </PropertyRow>
-        </InspectorSection>
-
-        <InspectorSection title="Wire Appearance" icon={<Palette className="w-4 h-4" />}>
-          <PropertyRow label="Wire Color">
-            <div className="flex flex-col gap-2 w-full">
-              {/* Color Grid */}
-              <div className="grid grid-cols-5 gap-2.5">
-                {/* None/Default button */}
-                <button
-                  onClick={() => useCircuitStore.getState().updateEdgeColor(selectedEdge.id, undefined)}
-                  className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${
-                    !selectedEdge.data?.color
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-400 shadow-md ring-1 ring-purple-500'
-                      : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-                  }`}
-                  title="Default Color"
-                >
-                  <Ban className="w-4 h-4" />
-                </button>
-
-                {PREDEFINED_COLORS.map((c) => {
-                  const isSelected = selectedEdge.data?.color === c.hex;
-                  return (
-                    <button
-                      key={c.name}
-                      onClick={() => useCircuitStore.getState().updateEdgeColor(selectedEdge.id, c.hex)}
-                      className={`w-7 h-7 rounded-lg border transition-all relative flex items-center justify-center hover:scale-105 shadow-sm ${
-                        isSelected
-                          ? 'border-purple-500 ring-2 ring-purple-500/50'
-                          : 'border-slate-800 hover:border-slate-600'
-                      }`}
-                      style={{ backgroundColor: c.hex }}
-                      title={c.name}
-                    >
-                      {isSelected && (
-                        <Check className="w-3.5 h-3.5 mix-blend-difference text-white" />
-                      )}
-                    </button>
-                  );
-                })}
-
-                {/* Custom Color Picker Button */}
-                <div className="relative w-7 h-7">
-                  <button
-                    className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all relative hover:scale-105 ${
-                      selectedEdge.data?.color && !PREDEFINED_COLORS.some((c) => c.hex === selectedEdge.data?.color)
-                        ? 'border-purple-500 ring-2 ring-purple-500/50'
-                        : 'border-slate-800 bg-slate-900 hover:bg-slate-850'
-                    }`}
-                    style={
-                      selectedEdge.data?.color && !PREDEFINED_COLORS.some((c) => c.hex === selectedEdge.data?.color)
-                        ? { backgroundColor: selectedEdge.data.color }
-                        : {}
-                    }
-                    title="Custom Color"
-                    onClick={() => customColorInputRef.current?.click()}
-                  >
-                    {(!selectedEdge.data?.color || PREDEFINED_COLORS.some((c) => c.hex === selectedEdge.data?.color)) ? (
-                      <Pipette className="w-4 h-4 text-slate-400" />
-                    ) : (
-                      <Check className="w-3.5 h-3.5 mix-blend-difference text-white" />
-                    )}
-                  </button>
-                  <input
-                    type="color"
-                    ref={customColorInputRef}
-                    value={
-                      (selectedEdge.data?.color && !PREDEFINED_COLORS.some((c) => c.hex === selectedEdge.data?.color))
-                        ? selectedEdge.data.color
-                        : '#3b82f6'
-                    }
-                    onChange={(e) => useCircuitStore.getState().updateEdgeColor(selectedEdge.id, e.target.value)}
-                    className="absolute inset-0 opacity-0 w-0 h-0 cursor-pointer pointer-events-none"
-                  />
-                </div>
-              </div>
-            </div>
-          </PropertyRow>
-        </InspectorSection>
-      </aside>
-    );
-  }
-
-  const nodeData = selectedNode!.data as unknown as NodeData;
-  const { label, gateType, inputs = [], outputs = [], inputCount = 2 } = nodeData;
-
-  const isConfigurableGate = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR'].includes(gateType);
-
-  const pinCountOptions = [
-    { value: 2, label: '2 Pins' },
-    { value: 3, label: '3 Pins' },
-    { value: 4, label: '4 Pins' },
-  ];
+/** Settings for parts without a dedicated panel (the name is edited in the header). */
+const GeneralSettings: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
+  const { gateType, inputCount = 2 } = nodeData;
+  const updateNodeData = useCircuitStore((s) => s.updateNodeData);
 
   return (
-    <aside className="w-80 h-full border-l flex flex-col z-20 select-none overflow-hidden bg-slate-950/90 border-slate-800 text-slate-100">
-      {/* Inspector Header */}
-      <div className="p-4 pb-3 border-b shrink-0 flex items-center justify-between border-slate-800">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-1.5 rounded-xl border text-emerald-400 shrink-0 bg-slate-900 border-slate-800">
-            <GateIcon type={gateType} className="w-6 h-6" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-xs font-bold font-mono tracking-wider uppercase truncate text-slate-100">
-              {gateType} Inspector
-            </h2>
-            <p className="text-[10px] font-mono text-slate-500 truncate">ID: {selectedNode!.id}</p>
-          </div>
-        </div>
-
-        <IconButton
-          icon={<Trash2 className="w-4 h-4 text-rose-400" />}
-          tooltip="Delete Component"
-          variant="danger"
-          size="sm"
-          onClick={() => {
-            deleteSelected();
-            showToast('Component deleted');
-          }}
-        />
-      </div>
-
-      {/* Scrollable Inspector Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-        {/* Specialty IC Properties */}
-      {gateType.startsWith('CFG_') ? (
-        <>
-          <InspectorSection title="General Configuration" icon={<Sliders className="w-4 h-4" />}>
-            <PropertyRow label="Label">
-              <Input
-                value={label}
-                onChange={(e) => updateNodeLabel(selectedNode!.id, e.target.value)}
-                placeholder="Component label..."
-                className="w-36"
-              />
-            </PropertyRow>
-          </InspectorSection>
-          <ConfigurableProperties nodeId={selectedNode!.id} nodeData={nodeData} />
-          {/* Pin Status Monitor */}
-          <InspectorSection title="Pin Status Monitor" icon={<Hash className="w-4 h-4" />}>
-            {inputs.length > 0 && (
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-mono text-slate-400 block">Inputs ({inputs.length})</span>
-                {inputs.map((pin) => (
-                  <div key={pin.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono">
-                    <span className="text-slate-300 font-medium">{pin.name}</span>
-                    <Badge variant={pin.value === 1 ? 'emerald' : pin.value === 0 ? 'slate' : 'amber'} pulse={pin.value === 1}>
-                      {pin.value === 1 ? 'HIGH (1)' : pin.value === 0 ? 'LOW (0)' : 'UNKNOWN (?)'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-            {outputs.length > 0 && (
-              <div className="space-y-1.5 pt-2">
-                <span className="text-[10px] font-mono text-slate-400 block">Outputs ({outputs.length})</span>
-                {outputs.map((pin) => (
-                  <div key={pin.id} className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono">
-                    <span className="text-slate-300 font-medium">{pin.name}</span>
-                    <Badge variant={pin.value === 1 ? 'emerald' : pin.value === 0 ? 'slate' : 'amber'} pulse={pin.value === 1}>
-                      {pin.value === 1 ? 'HIGH (1)' : pin.value === 0 ? 'LOW (0)' : 'UNKNOWN (?)'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </InspectorSection>
-        </>
-      ) : gateType === 'CUSTOM' ? (
-        <CustomComponentProperties
-          nodeId={selectedNode!.id}
-          data={nodeData}
-        />
-      ) : gateType === 'OSCILLOSCOPE' ? (
-        <OscilloscopeProperties
-          nodeId={selectedNode!.id}
-          config={nodeData.scopeConfig || DEFAULT_OSCILLOSCOPE_CONFIG}
-          inputPins={inputs}
-        />
-      ) : gateType === 'CLOCK' ? (
-        <ClockProperties
-          nodeId={selectedNode!.id}
-          label={label}
-          config={nodeData.clockConfig || DEFAULT_CLOCK_CONFIG}
-          state={nodeData.clockState || DEFAULT_CLOCK_STATE}
-          outputValue={nodeData.value ?? 0}
-        />
-      ) : gateType === 'MULTI_INPUT' ? (
-        <MultiInputProperties
-          nodeId={selectedNode!.id}
-          label={label}
-          config={nodeData.multiInputConfig || DEFAULT_MULTI_INPUT_CONFIG}
-        />
-      ) : gateType === 'ENCODER' ? (
-        <EncoderProperties
-          nodeId={selectedNode!.id}
-          label={label}
-          config={nodeData.encoderConfig || DEFAULT_ENCODER_CONFIG}
-          state={nodeData.encoderState}
-          currentInputs={inputs.map((p) => p.value)}
-          onUpdateLabel={(l) => updateNodeLabel(selectedNode!.id, l)}
-          onUpdateConfig={(cfg) => updateEncoderConfig(selectedNode!.id, cfg)}
-        />
-      ) : gateType === 'SEVEN_SEGMENT' ? (
-        <SevenSegmentProperties
-          nodeId={selectedNode!.id}
-          label={label}
-          config={nodeData.sevenSegmentConfig || DEFAULT_SEVEN_SEGMENT_CONFIG}
-          currentInputs={inputs}
-          onUpdateLabel={(l) => updateNodeLabel(selectedNode!.id, l)}
-          onUpdateConfig={(cfg) => updateSevenSegmentConfig(selectedNode!.id, cfg)}
-        />
-      ) : gateType === 'LED_MATRIX' ? (
-        <LedMatrixProperties
-          nodeId={selectedNode!.id}
-          label={label}
-          config={nodeData.ledMatrixConfig || DEFAULT_LED_MATRIX_CONFIG}
-        />
-      ) : gateType === 'BOOLEAN_EQUATION_GENERATOR' ? (
-        <EquationGeneratorProperties
-          nodeId={selectedNode!.id}
-          outputVarName={(nodeData.outputVarName as string) || 'F'}
-          label={label}
-        />
-      ) : gateType === 'HALF_ADDER' || gateType === 'FULL_ADDER' ? (
-        <>
-          {/* General Properties */}
-          <InspectorSection title="General Configuration" icon={<Sliders className="w-4 h-4" />}>
-            <PropertyRow label="Label">
-              <Input
-                value={label}
-                onChange={(e) => updateNodeLabel(selectedNode!.id, e.target.value)}
-                placeholder="Component label..."
-                className="w-36"
-              />
-            </PropertyRow>
-
-            <PropertyRow label="Propagation Delay">
-              <div className="flex items-center gap-1.5 w-36">
-                <Input
-                  type="number"
-                  min="0"
-                  max="1000"
-                  value={nodeData.propagationDelayNs !== undefined ? (nodeData.propagationDelayNs as number) : 5}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    const nodes = useCircuitStore.getState().nodes;
-                    useCircuitStore.setState({
-                      nodes: nodes.map((n) =>
-                        n.id === selectedNode!.id
-                          ? { ...n, data: { ...n.data, propagationDelayNs: val } }
-                          : n
-                      ),
-                    });
-                  }}
-                  className="w-24 text-right font-mono"
-                />
-                <span className="text-xs font-mono text-slate-400">ns</span>
-              </div>
-            </PropertyRow>
-
-            <PropertyRow label="Lock Position">
-              <Button
-                variant={nodeData.isLocked ? 'danger' : 'secondary'}
-                size="xs"
-                onClick={() => useCircuitStore.getState().toggleLockNode(selectedNode!.id)}
-              >
-                {nodeData.isLocked ? 'Locked (Fixed)' : 'Unlocked'}
-              </Button>
-            </PropertyRow>
-          </InspectorSection>
-
-          {/* Pin Status Monitor */}
-          <InspectorSection title="Pin Status Monitor" icon={<Hash className="w-4 h-4" />}>
-            {inputs.length > 0 && (
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono text-slate-400 block font-bold">
-                  Inputs ({inputs.length})
-                </span>
-                {inputs.map((pin) => {
-                  const alias = nodeData.pinAliases?.[pin.id] || '';
-                  return (
-                    <div
-                      key={pin.id}
-                      className="flex flex-col p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono gap-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-300 font-semibold">{pin.name}</span>
-                        <Badge
-                          variant={pin.value === 1 ? 'emerald' : pin.value === 0 ? 'slate' : 'amber'}
-                          pulse={pin.value === 1}
-                        >
-                          {pin.value === 1 ? 'HIGH (1)' : pin.value === 0 ? 'LOW (0)' : 'UNKNOWN (?)'}
-                        </Badge>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Set pin alias..."
-                        value={alias}
-                        onChange={(e) => useCircuitStore.getState().updatePinAlias(selectedNode!.id, pin.id, e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-cyan-500 font-sans"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {outputs.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-slate-800 mt-2">
-                <span className="text-[10px] font-mono text-slate-400 block font-bold">
-                  Outputs ({outputs.length})
-                </span>
-                {outputs.map((pin) => {
-                  const alias = nodeData.pinAliases?.[pin.id] || '';
-                  return (
-                    <div
-                      key={pin.id}
-                      className="flex flex-col p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono gap-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-300 font-semibold">{pin.name}</span>
-                        <Badge
-                          variant={pin.value === 1 ? 'emerald' : pin.value === 0 ? 'slate' : 'amber'}
-                          pulse={pin.value === 1}
-                        >
-                          {pin.value === 1 ? 'HIGH (1)' : pin.value === 0 ? 'LOW (0)' : 'UNKNOWN (?)'}
-                        </Badge>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Set pin alias..."
-                        value={alias}
-                        onChange={(e) => useCircuitStore.getState().updatePinAlias(selectedNode!.id, pin.id, e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-cyan-500 font-sans"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </InspectorSection>
-
-          {/* View Truth Table Action */}
-          <div className="pt-2">
-            <Button
-              variant="primary"
-              size="md"
-              leftIcon={<Table className="w-4 h-4" />}
-              onClick={() => setIsGateTruthTableOpen(true)}
-              className="w-full"
-            >
-              View Component Truth Table
-            </Button>
-
-            <GateTruthTableModal
-              isOpen={isGateTruthTableOpen}
-              onClose={() => setIsGateTruthTableOpen(false)}
-              gateType={gateType}
-              inputCount={inputs.length}
-              currentInputs={inputs}
-              nodeLabel={label}
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* General Properties */}
-          <InspectorSection title="General Configuration" icon={<Sliders className="w-4 h-4" />}>
-            <PropertyRow label="Label">
-              <Input
-                value={label}
-                onChange={(e) => updateNodeLabel(selectedNode!.id, e.target.value)}
-                placeholder="Component label..."
-                className="w-36"
-              />
-            </PropertyRow>
-
-            {gateType === 'TUNNEL' && (
-              <PropertyRow label="Wireless Tag">
-                <Input
-                  value={nodeData.tunnelLabel || ''}
-                  onChange={(e) => {
-                    const tag = e.target.value.toUpperCase();
-                    useCircuitStore.setState({
-                      nodes: useCircuitStore.getState().nodes.map((n) =>
-                        n.id === selectedNode!.id
-                          ? { ...n, data: { ...n.data, tunnelLabel: tag } }
-                          : n
-                      ),
-                    });
-                  }}
-                  placeholder="e.g. CLK_BUS"
-                  className="w-36 font-mono"
-                />
-              </PropertyRow>
-            )}
-
-            {gateType === 'TEXT_LABEL' && (
-              <PropertyRow label="Note Text">
-                <Input
-                  value={nodeData.annotationText || ''}
-                  onChange={(e) => {
-                    const text = e.target.value;
-                    useCircuitStore.setState({
-                      nodes: useCircuitStore.getState().nodes.map((n) =>
-                        n.id === selectedNode!.id
-                          ? { ...n, data: { ...n.data, annotationText: text } }
-                          : n
-                      ),
-                    });
-                  }}
-                  placeholder="Enter note text..."
-                  className="w-36"
-                />
-              </PropertyRow>
-            )}
-
-            <PropertyRow label="Lock Position">
-              <Button
-                variant={nodeData.isLocked ? 'danger' : 'secondary'}
-                size="xs"
-                onClick={() => useCircuitStore.getState().toggleLockNode(selectedNode!.id)}
-              >
-                {nodeData.isLocked ? 'Locked (Fixed)' : 'Unlocked'}
-              </Button>
-            </PropertyRow>
-
-            {isConfigurableGate && (
-              <PropertyRow label="Input Pins">
-                <SegmentedControl
-                  options={pinCountOptions}
-                  value={inputCount}
-                  onChange={(val) => updateNodeInputCount(selectedNode!.id, val as number)}
-                  size="xs"
-                  className="w-36"
-                />
-              </PropertyRow>
-            )}
-
-            {(gateType === 'DIP_SWITCH' || gateType === 'BUS_MONITOR') && (
-              <PropertyRow label="Bit Width">
-                <SegmentedControl
-                  options={[
-                    { value: 2, label: '2 Bit' },
-                    { value: 4, label: '4 Bit' },
-                    { value: 8, label: '8 Bit' },
-                  ]}
-                  value={nodeData.bitWidth || 4}
-                  onChange={(val) => {
-                    const width = val as number;
-                    const nodes = useCircuitStore.getState().nodes;
-                    useCircuitStore.setState({
-                      nodes: nodes.map((n) => {
-                        if (n.id === selectedNode!.id) {
-                          const newPins = Array.from({ length: width }, (_, i) => ({
-                            id: gateType === 'DIP_SWITCH' ? `out-${i}` : `in-${i}`,
-                            name: gateType === 'DIP_SWITCH' ? `SW${i + 1}` : `B${i}`,
-                            value: 0 as SignalValue,
-                          }));
-                          return {
-                            ...n,
-                            data: {
-                              ...n.data,
-                              bitWidth: width,
-                              ...(gateType === 'DIP_SWITCH' ? { outputs: newPins, dipValues: Array(width).fill(0) } : { inputs: newPins }),
-                            },
-                          };
-                        }
-                        return n;
-                      }),
-                    });
-                    useCircuitStore.getState().tickSimulation(true);
-                  }}
-                  size="xs"
-                  className="w-36"
-                />
-              </PropertyRow>
-            )}
-
-            {gateType === 'BUS_MONITOR' && (
-              <PropertyRow label="Format">
-                <SegmentedControl
-                  options={[
-                    { value: 'hex', label: 'HEX' },
-                    { value: 'dec', label: 'DEC' },
-                    { value: 'bin', label: 'BIN' },
-                  ]}
-                  value={nodeData.displayFormat || 'hex'}
-                  onChange={(val) => {
-                    const fmt = val as 'hex' | 'dec' | 'bin';
-                    const nodes = useCircuitStore.getState().nodes;
-                    useCircuitStore.setState({
-                      nodes: nodes.map((n) =>
-                        n.id === selectedNode!.id
-                          ? { ...n, data: { ...n.data, displayFormat: fmt } }
-                          : n
-                      ),
-                    });
-                  }}
-                  size="xs"
-                  className="w-36"
-                />
-              </PropertyRow>
-            )}
-          </InspectorSection>
-
-          {/* Pin Status Monitor Section */}
-          <InspectorSection title="Pin Status Monitor" icon={<Hash className="w-4 h-4" />}>
-            {/* Input Pins */}
-            {inputs.length > 0 && (
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono text-slate-400 block font-bold">
-                  Inputs ({inputs.length})
-                </span>
-                {inputs.map((pin) => {
-                  const alias = nodeData.pinAliases?.[pin.id] || '';
-                  return (
-                    <div
-                      key={pin.id}
-                      className="flex flex-col p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono gap-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-300 font-semibold">{pin.name}</span>
-                        <Badge
-                          variant={pin.value === 1 ? 'emerald' : pin.value === 0 ? 'slate' : 'amber'}
-                          pulse={pin.value === 1}
-                        >
-                          {pin.value === 1 ? 'HIGH (1)' : pin.value === 0 ? 'LOW (0)' : 'UNKNOWN (?)'}
-                        </Badge>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Set pin alias..."
-                        value={alias}
-                        onChange={(e) => useCircuitStore.getState().updatePinAlias(selectedNode!.id, pin.id, e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-cyan-500 font-sans"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Output Pins */}
-            {outputs.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-slate-800 mt-2">
-                <span className="text-[10px] font-mono text-slate-400 block font-bold">
-                  Outputs ({outputs.length})
-                </span>
-                {outputs.map((pin) => {
-                  const alias = nodeData.pinAliases?.[pin.id] || '';
-                  return (
-                    <div
-                      key={pin.id}
-                      className="flex flex-col p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono gap-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-300 font-semibold">{pin.name}</span>
-                        <Badge
-                          variant={pin.value === 1 ? 'emerald' : pin.value === 0 ? 'slate' : 'amber'}
-                          pulse={pin.value === 1}
-                        >
-                          {pin.value === 1 ? 'HIGH (1)' : pin.value === 0 ? 'LOW (0)' : 'UNKNOWN (?)'}
-                        </Badge>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Set pin alias..."
-                        value={alias}
-                        onChange={(e) => useCircuitStore.getState().updatePinAlias(selectedNode!.id, pin.id, e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-300 focus:outline-none focus:border-cyan-500 font-sans"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </InspectorSection>
-
-          {/* View Truth Table Action */}
-          {isConfigurableGate && (
-            <div className="pt-2">
-              <Button
-                variant="primary"
-                size="md"
-                leftIcon={<Table className="w-4 h-4" />}
-                onClick={() => setIsGateTruthTableOpen(true)}
-                className="w-full"
-              >
-                View Gate Truth Table
-              </Button>
-
-              <GateTruthTableModal
-                isOpen={isGateTruthTableOpen}
-                onClose={() => setIsGateTruthTableOpen(false)}
-                gateType={gateType}
-                inputCount={inputCount}
-                currentInputs={inputs}
-                nodeLabel={label}
-              />
-            </div>
-          )}
-        </>
+    <InspectorSection title="Settings" icon={<Sliders className="w-4 h-4" />}>
+      {gateType === 'TUNNEL' && (
+        <PropertyRow label="Tunnel tag" hint="Tunnels with the same tag are connected without a wire.">
+          <Input
+            value={nodeData.tunnelLabel || ''}
+            aria-label="Tunnel tag"
+            onChange={(e) => updateNodeData(nodeId, { tunnelLabel: e.target.value.toUpperCase() }, { propagate: true })}
+            placeholder="e.g. CLK_BUS"
+            className="font-mono"
+          />
+        </PropertyRow>
       )}
+
+      {gateType === 'TEXT_LABEL' && (
+        <PropertyRow label="Note text">
+          <Input
+            value={nodeData.annotationText || ''}
+            aria-label="Note text"
+            onChange={(e) => updateNodeData(nodeId, { annotationText: e.target.value })}
+            placeholder="Write a note"
+          />
+        </PropertyRow>
+      )}
+
+      {MULTI_INPUT_GATES.has(gateType) && (
+        <PropertyRow label="Inputs">
+          <SegmentedControl
+            ariaLabel="Number of inputs"
+            options={[
+              { value: 2, label: '2' },
+              { value: 3, label: '3' },
+              { value: 4, label: '4' },
+            ]}
+            value={inputCount}
+            onChange={(val) => useCircuitStore.getState().updateNodeInputCount(nodeId, val as number)}
+            size="sm"
+          />
+        </PropertyRow>
+      )}
+
+      {(gateType === 'DIP_SWITCH' || gateType === 'BUS_MONITOR') && (
+        <PropertyRow label="Bit width" hint="Changing the width removes wires on pins that no longer exist.">
+          <SegmentedControl
+            ariaLabel="Bit width"
+            options={[
+              { value: 2, label: '2-bit' },
+              { value: 4, label: '4-bit' },
+              { value: 8, label: '8-bit' },
+            ]}
+            value={nodeData.bitWidth || 4}
+            onChange={(val) => useCircuitStore.getState().setNodeBitWidth(nodeId, val as number)}
+            size="sm"
+          />
+        </PropertyRow>
+      )}
+
+      {DEFAULT_COLOR[gateType] && (
+        <PropertyRow label="Color">
+          <OutputColorPicker
+            value={nodeData.displayColor ?? DEFAULT_COLOR[gateType]!}
+            onChange={(c) => updateNodeData(nodeId, { displayColor: c })}
+          />
+        </PropertyRow>
+      )}
+
+      {gateType === 'BUS_MONITOR' && (
+        <PropertyRow label="Number format">
+          <SegmentedControl
+            ariaLabel="Number format"
+            options={[
+              { value: 'hex', label: 'Hex' },
+              { value: 'dec', label: 'Dec' },
+              { value: 'bin', label: 'Bin' },
+            ]}
+            value={nodeData.displayFormat || 'hex'}
+            onChange={(val) => updateNodeData(nodeId, { displayFormat: val })}
+            size="sm"
+          />
+        </PropertyRow>
+      )}
+    </InspectorSection>
+  );
+};
+
+const NodeInspector: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
+  const { deleteSelected, showToast, toggleLockNode, updateNodeLabel } = useCircuitStore(
+    useShallow((s) => ({
+      deleteSelected: s.deleteSelected,
+      showToast: s.showToast,
+      toggleLockNode: s.toggleLockNode,
+      updateNodeLabel: s.updateNodeLabel,
+    }))
+  );
+
+  const { gateType, label, inputs = [], outputs = [] } = nodeData;
+  const info = getComponentInfo(gateType);
+  const TypePanel = TYPE_PANELS[gateType];
+
+  return (
+    <aside aria-label={`${info.name} properties`} className="w-full h-full flex flex-col overflow-hidden bg-surface-1 text-fg">
+      <InspectorHeader
+        icon={<PartGlyph type={gateType} />}
+        title={info.name}
+        rename={{ value: label ?? '', placeholder: info.name, onChange: (v) => updateNodeLabel(nodeId, v) }}
+        subtitle={
+          <>
+            {info.name}
+            {info.partNumber && <span className="font-mono"> · {info.partNumber}</span>}
+          </>
+        }
+        actions={
+          <>
+            <IconButton
+              icon={nodeData.isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+              tooltip={nodeData.isLocked ? 'Unlock position' : 'Lock position'}
+              isActive={!!nodeData.isLocked}
+              onClick={() => toggleLockNode(nodeId)}
+            />
+            <IconButton
+              icon={<Trash2 className="w-4 h-4" />}
+              tooltip="Delete part"
+              shortcut="Del"
+              variant="danger"
+              onClick={() => {
+                deleteSelected();
+                showToast('Part deleted');
+              }}
+            />
+          </>
+        }
+      />
+
+      <div className="@container flex-1 overflow-y-auto min-h-0">
+        {hasLiveView(gateType) && (
+          <InspectorSection title="How it works" icon={<Activity className="w-4 h-4" />}>
+            {info.description && !['INPUT', 'PUSH_BUTTON', 'OUTPUT', 'LOGIC_PROBE', 'CONST_HIGH', 'CONST_LOW'].includes(gateType) && (
+              <p className="text-[13px] text-fg-muted">{info.description}.</p>
+            )}
+            <PartLiveView nodeId={nodeId} nodeData={nodeData} />
+          </InspectorSection>
+        )}
+
+        {!hasLiveView(gateType) && info.description && (
+          <p className="px-4 pt-3 pb-1 text-[13px] text-fg-muted">{info.description}.</p>
+        )}
+
+        {TypePanel && (
+          // Section-based panels pad themselves; older card-style panels get the padding here
+          <div className={SECTIONED_PANELS.has(gateType) ? '' : 'p-4 space-y-4 border-b border-line'}>
+            <TypePanel nodeId={nodeId} nodeData={nodeData} />
+          </div>
+        )}
+
+        {!TypePanel && SETTINGS_TYPES.has(gateType) && <GeneralSettings nodeId={nodeId} nodeData={nodeData} />}
+
+        {!TypePanel && (inputs.length > 0 || outputs.length > 0) && (
+          <InspectorSection
+            title="Pins"
+            icon={<Hash className="w-4 h-4" />}
+            badge={<span className="text-xs text-fg-subtle tabular-nums">{inputs.length + outputs.length}</span>}
+            defaultExpanded={!hasLiveView(gateType)}
+          >
+            <PinStatusList nodeId={nodeId} inputs={inputs} outputs={outputs} aliases={nodeData.pinAliases} />
+          </InspectorSection>
+        )}
+
+        <InspectorSection title="Advanced" icon={<Wrench className="w-4 h-4" />} defaultExpanded={false}>
+          <PropertyRow label="Part ID">
+            <code className="text-xs font-mono text-fg-subtle truncate select-text">{nodeId}</code>
+          </PropertyRow>
+          <PropertyRow label="Type">
+            <code className="text-xs font-mono text-fg-subtle select-text">{gateType}</code>
+          </PropertyRow>
+        </InspectorSection>
       </div>
     </aside>
   );
+};
+
+interface InspectorPanelProps {
+  onOpenWizard?: () => void;
+  onOpenCircuitTruthTable?: () => void;
+}
+
+export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onOpenWizard, onOpenCircuitTruthTable }) => {
+  const { nodes, edges, selectedNodeId, selectedEdgeId } = useCircuitStore(
+    useShallow((s) => ({ nodes: s.nodes, edges: s.edges, selectedNodeId: s.selectedNodeId, selectedEdgeId: s.selectedEdgeId }))
+  );
+
+  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
+  const selectedEdge = edges.find((e) => e.id === selectedEdgeId);
+  const multiSelection = nodes.filter((n) => n.selected);
+
+  if (multiSelection.length > 1) {
+    return <SelectionSummary selected={multiSelection} onOpenWizard={onOpenWizard} />;
+  }
+
+  if (selectedEdge && !selectedNode) {
+    return <WireInspector edge={selectedEdge} />;
+  }
+
+  if (!selectedNode) return <CircuitOverview onOpenCircuitTruthTable={onOpenCircuitTruthTable} />;
+
+  // Groups carry no gate type; they get their own panel
+  if (selectedNode.type === 'groupNode') {
+    const data = selectedNode.data as { label?: string; color?: string };
+    return (
+      <aside aria-label="Group properties" className="w-full h-full flex flex-col overflow-hidden bg-surface-1 text-fg">
+        <InspectorHeader
+          icon={<Layers className="w-6 h-6" />}
+          title="Group"
+          rename={{ value: data.label ?? '', placeholder: 'Group', onChange: (v) => useCircuitStore.getState().updateNodeLabel(selectedNode.id, v) }}
+          subtitle="A frame around related parts"
+        />
+        <div className="@container flex-1 overflow-y-auto min-h-0 p-4">
+          <GroupProperties nodeId={selectedNode.id} label={data.label} color={data.color} />
+        </div>
+      </aside>
+    );
+  }
+
+  return <NodeInspector key={selectedNode.id} nodeId={selectedNode.id} nodeData={selectedNode.data as unknown as NodeData} />;
 };

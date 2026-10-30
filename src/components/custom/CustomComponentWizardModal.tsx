@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
+import { ModalFrame } from '../ui/Dialog';
 import { useCircuitStore } from '../../store/useCircuitStore';
+import { useShallow } from 'zustand/react/shallow';
 import { CustomPinDefinition } from '../../types/customComponent';
 import { NodeData } from '../../types/circuit';
 import {
@@ -15,6 +17,7 @@ import {
   Info,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { ModalHeader } from '../ui/ModalHeader';
 import { Input } from '../ui/Input';
 
 interface CustomComponentWizardModalProps {
@@ -22,17 +25,25 @@ interface CustomComponentWizardModalProps {
   onClose: () => void;
 }
 
+const STEP_NAMES = ['Name it', 'Choose pins', 'Check the symbol'];
+
 const PRESET_COLORS = ['#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#ef4444'];
 
 export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { nodes, edges, convertSelectionToCustomComponent, showToast } = useCircuitStore();
+  const {
+    nodes,
+    edges,
+    convertSelectionToCustomComponent,
+    showToast,
+  } = useCircuitStore(useShallow((s) => ({ nodes: s.nodes, edges: s.edges, convertSelectionToCustomComponent: s.convertSelectionToCustomComponent, showToast: s.showToast })));
 
+  const titleId = useId();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [name, setName] = useState('My Custom Subcircuit');
-  const [category, setCategory] = useState('Custom Components');
+  const [name, setName] = useState('My component');
+  const [category, setCategory] = useState('My components');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#10b981');
 
@@ -73,7 +84,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
     currSelectedNodes.forEach((node) => {
       const data = node.data as unknown as NodeData;
 
-      if (['INPUT', 'PUSH_BUTTON', 'CLOCK', 'CONST_HIGH', 'CONST_LOW', 'MULTI_INPUT'].includes(data.gateType)) {
+      if (['INPUT', 'PUSH_BUTTON', 'CONST_HIGH', 'CONST_LOW'].includes(data.gateType)) {
         inCount++;
         detectedInputs.push({
           id: `in-${inCount - 1}`,
@@ -83,7 +94,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
           internalNodeId: node.id,
           internalPinId: 'in-0',
         });
-      } else if (['OUTPUT', 'LOGIC_PROBE', 'RGB_LED', 'SEVEN_SEGMENT', 'HEX_DISPLAY'].includes(data.gateType)) {
+      } else if (['OUTPUT', 'LOGIC_PROBE', 'SEVEN_SEGMENT', 'HEX_DISPLAY'].includes(data.gateType)) {
         outCount++;
         detectedOutputs.push({
           id: `out-${outCount - 1}`,
@@ -137,11 +148,11 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
 
       const leafNodes = currSelectedNodes.filter((n) => {
         const data = n.data as unknown as NodeData;
-        if (['INPUT', 'PUSH_BUTTON', 'CLOCK', 'CONST_HIGH', 'CONST_LOW'].includes(data.gateType)) return false;
+        if (['INPUT', 'PUSH_BUTTON', 'CONST_HIGH', 'CONST_LOW'].includes(data.gateType)) return false;
         return !nodesFeedingOtherSelectedNodes.has(n.id);
       });
 
-      const finalOutputNodes = leafNodes.length > 0 ? leafNodes : currSelectedNodes.filter((n) => !['INPUT', 'PUSH_BUTTON', 'CLOCK'].includes((n.data as unknown as NodeData).gateType));
+      const finalOutputNodes = leafNodes.length > 0 ? leafNodes : currSelectedNodes.filter((n) => !['INPUT', 'PUSH_BUTTON'].includes((n.data as unknown as NodeData).gateType));
 
       finalOutputNodes.forEach((node) => {
         const data = node.data as unknown as NodeData;
@@ -176,7 +187,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
 
       const rootInputNodes = currSelectedNodes.filter((n) => {
         const data = n.data as unknown as NodeData;
-        if (['OUTPUT', 'LOGIC_PROBE', 'RGB_LED'].includes(data.gateType)) return false;
+        if (['OUTPUT', 'LOGIC_PROBE'].includes(data.gateType)) return false;
         return !nodesReceivingInternalEdges.has(n.id);
       });
 
@@ -276,62 +287,39 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn select-none">
-      <div className="relative w-full max-w-3xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl text-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg"
-              style={{ backgroundColor: color }}
-            >
-              <Component className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold font-mono tracking-wide">
-                Create Custom Component / Subcircuit
-              </h2>
-              <p className="text-xs text-slate-400">
-                Step {step} of 3 — {step === 1 ? 'Component Information' : step === 2 ? 'Pin & Node Mapping' : 'Symbol Preview'}
-              </p>
-            </div>
-          </div>
+    <ModalFrame
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy={titleId}
+      className="w-full max-w-3xl max-h-[90vh]"
+    >
+        <ModalHeader
+          titleId={titleId}
+          icon={<Component className="w-5 h-5" style={{ color }} />}
+          title="Make a component from the selection"
+          description={`Step ${step} of 3: ${STEP_NAMES[step - 1].toLowerCase()}`}
+          onClose={onClose}
+        />
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Step Indicator */}
-        <div className="px-6 py-3 bg-slate-950/50 border-b border-slate-800/60 flex items-center justify-between text-xs font-mono">
-          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 1 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
-              1
-            </span>
-            Info
-          </div>
-
-          <div className="w-12 h-[1px] bg-slate-800" />
-
-          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 2 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
-              2
-            </span>
-            Pins & Nodes
-          </div>
-
-          <div className="w-12 h-[1px] bg-slate-800" />
-
-          <div className={`flex items-center gap-2 ${step >= 3 ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step >= 3 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
-              3
-            </span>
-            Preview
-          </div>
-        </div>
+        <ol className="px-5 py-2.5 border-b border-line flex items-center gap-2 text-[13px]" aria-label="Progress">
+          {STEP_NAMES.map((stepName, i) => {
+            const n = i + 1;
+            const state = n < step ? 'done' : n === step ? 'current' : 'todo';
+            return (
+              <li key={stepName} className="flex items-center gap-2" aria-current={state === 'current' ? 'step' : undefined}>
+                {i > 0 && <span className="w-8 h-px bg-line" aria-hidden="true" />}
+                <span
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                    state === 'todo' ? 'bg-surface-2 text-fg-subtle' : 'bg-accent text-on-accent'
+                  }`}
+                >
+                  {state === 'done' ? <CheckCircle2 className="w-4 h-4" /> : n}
+                </span>
+                <span className={state === 'todo' ? 'text-fg-subtle' : 'text-fg font-medium'}>{stepName}</span>
+              </li>
+            );
+          })}
+        </ol>
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
@@ -344,7 +332,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Half Adder, ALU, 4-bit Register"
+                  placeholder="e.g. Half adder, 2-bit comparator"
                   className="w-full bg-slate-950 border-slate-800 text-slate-100"
                 />
               </div>
@@ -370,7 +358,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
                   placeholder="Briefly describe what this subcircuit does..."
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-950 border border-slate-800 text-slate-100 focus:outline-none focus:border-emerald-500 resize-none"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-950 border border-slate-800 text-slate-100 focus:border-emerald-500 resize-none"
                 />
               </div>
 
@@ -400,7 +388,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
               {/* Input Pins Table */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold font-mono text-cyan-400 flex items-center gap-1.5">
                     Input Pins ({inputs.length})
                   </h3>
                   <button
@@ -417,7 +405,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                         },
                       ]);
                     }}
-                    className="text-[11px] font-mono text-emerald-400 hover:underline"
+                    className="text-xs font-mono text-emerald-400 hover:underline"
                   >
                     + Add Input Pin
                   </button>
@@ -454,7 +442,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                             updated[idx].internalPinId = availableHandles[0]?.id || 'in-0';
                             setInputs(updated);
                           }}
-                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:outline-none focus:border-cyan-500"
+                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:border-cyan-500"
                         >
                           <option value="">Select Internal Node...</option>
                           {selectedNodes.map((n) => {
@@ -477,7 +465,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                             updated[idx].internalPinId = e.target.value;
                             setInputs(updated);
                           }}
-                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:outline-none focus:border-cyan-500"
+                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:border-cyan-500"
                         >
                           {getNodeInputHandles(pin.internalNodeId).map((h) => (
                             <option key={h.id} value={h.id}>
@@ -517,7 +505,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
               {/* Output Pins Table */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold font-mono text-emerald-400 flex items-center gap-1.5">
                     Output Pins ({outputs.length})
                   </h3>
                   <button
@@ -534,7 +522,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                         },
                       ]);
                     }}
-                    className="text-[11px] font-mono text-emerald-400 hover:underline"
+                    className="text-xs font-mono text-emerald-400 hover:underline"
                   >
                     + Add Output Pin
                   </button>
@@ -571,7 +559,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                             updated[idx].internalPinId = availableHandles[0]?.id || 'out-0';
                             setOutputs(updated);
                           }}
-                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:outline-none focus:border-emerald-500"
+                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:border-emerald-500"
                         >
                           <option value="">Select Internal Node...</option>
                           {selectedNodes.map((n) => {
@@ -594,7 +582,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                             updated[idx].internalPinId = e.target.value;
                             setOutputs(updated);
                           }}
-                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:outline-none focus:border-emerald-500"
+                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2 py-1.5 focus:border-emerald-500"
                         >
                           {getNodeOutputHandles(pin.internalNodeId).map((h) => (
                             <option key={h.id} value={h.id}>
@@ -643,12 +631,12 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
               <div className="w-64 rounded-xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden text-left">
                 <div className="px-3 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded flex items-center justify-center text-[10px] text-white font-bold" style={{ backgroundColor: color }}>
+                    <div className="w-4 h-4 rounded flex items-center justify-center text-[11px] text-white font-bold" style={{ backgroundColor: color }}>
                       <Layers className="w-2.5 h-2.5" />
                     </div>
                     <span className="text-xs font-bold font-mono text-slate-100">{name || 'Component'}</span>
                   </div>
-                  <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <span className="px-1.5 py-0.5 text-[11px] font-mono font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                     CUSTOM
                   </span>
                 </div>
@@ -658,7 +646,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                     {inputs.map((inPin) => (
                       <div key={inPin.id} className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-slate-600 border border-slate-500" />
-                        <span className="text-[11px] font-mono text-slate-300">{inPin.name}</span>
+                        <span className="text-xs font-mono text-slate-300">{inPin.name}</span>
                       </div>
                     ))}
                   </div>
@@ -666,7 +654,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                   <div className="space-y-2 text-right">
                     {outputs.map((outPin) => (
                       <div key={outPin.id} className="flex items-center justify-end gap-1.5">
-                        <span className="text-[11px] font-mono text-slate-300">{outPin.name}</span>
+                        <span className="text-xs font-mono text-slate-300">{outPin.name}</span>
                         <span className="w-2 h-2 rounded-full bg-slate-600 border border-slate-500" />
                       </div>
                     ))}
@@ -674,7 +662,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-400 max-w-md flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-surface-1 border border-slate-800 text-xs text-slate-400 max-w-md flex items-center gap-2">
                 <Info className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                 <span>
                   Once saved, this subcircuit will appear under <strong>{category}</strong> in the left toolbox and can be reused freely across your projects.
@@ -685,7 +673,7 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
         </div>
 
         {/* Footer Controls */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-800 bg-surface-1 flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cancel
           </Button>
@@ -723,7 +711,6 @@ export const CustomComponentWizardModal: React.FC<CustomComponentWizardModalProp
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </ModalFrame>
   );
 };
