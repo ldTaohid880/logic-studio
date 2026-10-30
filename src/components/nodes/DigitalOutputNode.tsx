@@ -26,10 +26,9 @@ export const DigitalOutputNode = React.memo(({ data }: NodeProps) => {
       <PartSvg width={W} height={H}>
         <Lead x1={0} x2={25} y={15} value={value} />
         {/* Lens rim */}
-        <circle
-          cx={40}
-          cy={15}
-          r={14}
+        {/* Rim, with the flat that marks the cathode side */}
+        <path
+          d="M51.8 7.5 A14 14 0 1 0 51.8 22.5 Z"
           style={{
             fill: '#15181d',
             stroke: state === 'unknown' ? 'var(--signal-unknown)' : 'var(--line-strong)',

@@ -5,7 +5,7 @@ import { DEFAULT_SEVEN_SEGMENT_CONFIG } from '../../types/sevenSegment';
 import { evaluateSevenSegment } from '../../utils/sevenSegmentLogic';
 import { outputColor } from '../../theme/outputColors';
 import { Pin, pinDisplayName } from './Pin';
-import { DisplayFace, PartLabel, PITCH } from './partKit';
+import { DisplayFace, HW, MODULE_BODY, PartLabel, PITCH } from './partKit';
 import { SegmentDigit } from './SegmentDigit';
 
 const PINS = ['D0', 'D1', 'D2', 'D3'];
@@ -28,13 +28,13 @@ export const HexDisplayNode: React.FC<NodeProps> = memo(({ data: nodeData }) => 
     : null;
 
   return (
-    <div className="relative rounded-md border-[1.5px] border-line-strong bg-surface-1" style={{ width: W, height: H }}>
+    <div className="lsp-hw relative rounded-[4px] border-[1.5px]" style={{ width: W, height: H, background: MODULE_BODY, borderColor: HW.plasticEdge }}>
       <PartLabel text={data.label} />
       {PINS.map((name, i) => {
         const pin = inputs[i] ?? { id: `in-${i}`, name, value: -1 as const };
         return (
           <div key={pin.id} className="absolute left-0 flex items-center pl-2.5" style={{ top: i * PITCH, height: PITCH }}>
-            <span className="text-[11px] font-mono text-fg-muted">{pinDisplayName(pin, data.pinAliases, 4)}</span>
+            <span className="text-[11px] font-mono text-[#b4b9c0]">{pinDisplayName(pin, data.pinAliases, 4)}</span>
             <Pin type="target" position={Position.Left} id={pin.id} value={pin.value} label={pin.name} style={{ top: 15 }} />
           </div>
         );

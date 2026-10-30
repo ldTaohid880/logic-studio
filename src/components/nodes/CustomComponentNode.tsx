@@ -4,7 +4,7 @@ import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ExternalLink } from 'lucide-react';
-import { ChipFrame, ChipPinRow } from './ChipFrame';
+import { ChipFrame, ChipPinRow, chipActionClass } from './ChipFrame';
 
 export const CustomComponentNode: React.FC<NodeProps> = memo(({ id, data }) => {
   const nodeData = data as unknown as NodeData;
@@ -39,7 +39,7 @@ export const CustomComponentNode: React.FC<NodeProps> = memo(({ id, data }) => {
             onClick={openSubcircuit}
             title="Open subcircuit (double-click)"
             aria-label="Open subcircuit"
-            className="nodrag p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer"
+            className={chipActionClass}
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </button>

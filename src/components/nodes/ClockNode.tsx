@@ -4,14 +4,14 @@ import { NodeData } from '../../types/circuit';
 import { signalColor } from '../../theme/signals';
 import { DEFAULT_CLOCK_HZ } from '../../simulation/timeline';
 import { Pin } from './Pin';
-import { Lead, PartLabel, PartSvg } from './partKit';
+import { HW, Lead, PartLabel, PartSvg } from './partKit';
 
 const W = 60;
 const H = 30;
 
 export const formatHz = (hz: number) => `${hz} Hz`;
 
-/** Clock: a square-wave source driven by simulated time; its wave lights up while the output is 1. */
+/** Clock: a crystal oscillator can driven by simulated time; the engraved wave lights up while the output is 1. */
 export const ClockNode: React.FC<NodeProps> = memo(({ data: nodeData }) => {
   const data = nodeData as unknown as NodeData;
   const value = data.value ?? 0;
@@ -21,10 +21,12 @@ export const ClockNode: React.FC<NodeProps> = memo(({ data: nodeData }) => {
     <div className="lsp-schematic relative" style={{ width: W, height: H }}>
       <PartLabel text={data.label} />
       <PartSvg width={W} height={H}>
-        <rect x={1} y={1} width={36} height={28} rx={3} style={{ fill: 'var(--surface-1)', stroke: 'var(--line-strong)', strokeWidth: 1.5 }} />
+        <rect x={1} y={1} width={36} height={28} rx={5} fill={HW.metal} stroke={HW.metalEdge} strokeWidth={1.5} />
+        <rect x={4} y={4} width={30} height={22} rx={3.5} fill="none" stroke={HW.metalDark} strokeWidth={1} />
+        <path d="M4.5 4.5 L9 4.5 L4.5 9 Z" fill={HW.metalEdge} />
         <path
-          d="M6 22 H12 V8 H19 V22 H26 V8 H32"
-          style={{ fill: 'none', stroke: signalColor(value), strokeWidth: 2, strokeLinejoin: 'round' }}
+          d="M8 21 H13 V9 H19 V21 H25 V9 H30"
+          style={{ fill: 'none', stroke: value === 1 ? signalColor(1) : '#6f757d', strokeWidth: 2, strokeLinejoin: 'round' }}
         />
         <Lead x1={37} x2={W} y={15} value={value} />
       </PartSvg>

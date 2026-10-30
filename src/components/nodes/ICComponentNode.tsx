@@ -4,7 +4,7 @@ import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ExternalLink } from 'lucide-react';
-import { ChipFrame, ChipPinRow } from './ChipFrame';
+import { ChipFrame, ChipPinRow, chipActionClass } from './ChipFrame';
 import { getComponentInfo } from '../../data/components';
 
 const CATEGORY_COLOR: Record<string, string> = {
@@ -36,7 +36,8 @@ export const ICComponentNode: React.FC<NodeProps> = memo(({ id, data: nodeData }
 
   return (
     <ChipFrame
-      title={data.label || header.title}
+      // New chips are labelled with their type id; print the readable name instead
+      title={data.label && data.label !== data.gateType ? data.label : header.title}
       tag={header.code}
       accentColor={CATEGORY_COLOR[header.category] ?? 'var(--fg-subtle)'}
       onDoubleClick={handleDoubleClick}
@@ -47,7 +48,7 @@ export const ICComponentNode: React.FC<NodeProps> = memo(({ id, data: nodeData }
             onClick={handleDoubleClick}
             title="Show internal logic (double-click)"
             aria-label="Show internal logic"
-            className="nodrag p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-2 cursor-pointer"
+            className={chipActionClass}
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </button>

@@ -45,6 +45,26 @@ export const PartSvg: React.FC<{ width: number; height: number; children: React.
   </svg>
 );
 
+/**
+ * Colors of real components (metal, plastic, epoxy). Like display faces they look the same in both
+ * themes; the signal level is still shown by the lead, the pin and a printed digit.
+ */
+export const HW = {
+  metal: '#c7ccd2',
+  metalEdge: '#8d939b',
+  metalDark: '#a9afb7',
+  plastic: '#1f2125',
+  plasticEdge: '#3d4046',
+  slot: '#0b0c0e',
+  print: '#f2f4f6',
+  dipBody: '#c62f2f',
+  dipEdge: '#8f1d1d',
+  dipSlot: '#6e1414',
+};
+
+/** Black plastic housing of display modules. */
+export const MODULE_BODY = 'linear-gradient(180deg, #2a2c31 0%, #1b1c20 100%)';
+
 /** Text for a level, so state is readable without color. */
 export const levelGlyph = (value: number | undefined) => ({ high: '1', low: '0', unknown: '?' })[signalState(value)];
 

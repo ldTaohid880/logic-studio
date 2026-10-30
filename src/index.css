@@ -533,3 +533,12 @@
 .react-flow__handle.lsp-pin.lsp-pin-ghost {
   opacity: 0;
 }
+
+/* Parts drawn as real hardware (chips, board): no card chrome; the drawing is the part */
+.react-flow__node > div.lsp-hw,
+.react-flow__node > div.lsp-hw:hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: 4px;
+}
