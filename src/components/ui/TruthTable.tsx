@@ -9,6 +9,8 @@ export interface TruthTableRow {
   internal?: (number | string)[];
   outputs: (number | string)[];
   isActive?: boolean;
+  /** Replaces the minterm number in the first column (e.g. "D3 active"). */
+  label?: string;
   /** Short warning shown on the row (e.g. the circuit doesn't settle for it). */
   warning?: string;
 }
@@ -23,6 +25,8 @@ interface TruthTableProps {
   caption?: string;
   /** Hide the minterm column (e.g. for sequential tables where rows are not minterms). */
   showMinterms?: boolean;
+  /** Header of the first column when rows carry labels instead of minterm numbers. */
+  rowHeader?: string;
   /** Makes rows clickable (and focusable with Enter/Space). */
   onRowClick?: (row: TruthTableRow) => void;
   rowActionLabel?: string;
@@ -32,6 +36,7 @@ const cellValue = (v: number | string) => {
   if (v === 1 || v === '1') return <span className="font-semibold text-fg">1</span>;
   if (v === 0 || v === '0') return <span className="text-fg-subtle">0</span>;
   if (v === -1 || v === '?') return <span className="text-signal-unknown">?</span>;
+  if (v === 'X') return <span className="text-fg-muted" title="Don't care: either value">X</span>;
   return <span className="font-semibold text-fg">{v}</span>;
 };
 
@@ -51,6 +56,7 @@ export const TruthTable: React.FC<TruthTableProps> = ({
   showMinterms = true,
   onRowClick,
   rowActionLabel = 'Set the inputs on the canvas to this row',
+  rowHeader,
 }) => {
   const hasInternal = internalHeaders.length > 0;
   const onRowKeyDown = (e: React.KeyboardEvent, row: TruthTableRow) => {
@@ -85,8 +91,8 @@ export const TruthTable: React.FC<TruthTableProps> = ({
         )}
         <tr className="text-fg">
           {showMinterms && (
-            <th scope="col" className="w-14 py-2 px-2 border-b-2 border-line-strong text-left text-xs font-medium text-fg-subtle font-sans">
-              <abbr title="Minterm number" className="no-underline">m</abbr>
+            <th scope="col" className="w-14 py-2 px-2 border-b-2 border-line-strong text-left text-xs font-medium text-fg-subtle font-sans whitespace-nowrap">
+              {rowHeader ?? <abbr title="Minterm number" className="no-underline">m</abbr>}
             </th>
           )}
           {inputHeaders.map((h, i) => (
@@ -133,9 +139,9 @@ export const TruthTable: React.FC<TruthTableProps> = ({
             {showMinterms && (
               <td className={`py-1.5 px-2 text-left text-xs border-b border-line whitespace-nowrap ${row.isActive ? 'text-accent-fg font-semibold' : 'text-fg-subtle'}`}>
                 {row.isActive ? (
-                  <span title="Matches the inputs on the canvas right now">▸ m{row.index}</span>
+                  <span title="Matches the inputs on the canvas right now">▸ {row.label ?? `m${row.index}`}</span>
                 ) : (
-                  `m${row.index}`
+                  row.label ?? `m${row.index}`
                 )}
                 {row.warning && (
                   <span className="ml-1 text-signal-unknown" title={row.warning} aria-label={row.warning}>

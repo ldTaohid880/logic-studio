@@ -1,5 +1,4 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { toPng } from 'html-to-image';
 import { Check, Copy, Download, Image as ImageIcon, Info, Table } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { ModalFrame } from './Dialog';
@@ -8,7 +7,7 @@ import { Button } from './Button';
 import { SegmentedControl } from './SegmentedControl';
 import { TruthTable, TruthTableRow } from './TruthTable';
 import { useCircuitStore } from '../../store/useCircuitStore';
-import { resolveCssColor } from '../../theme/signals';
+import { useTableExport, tableLines } from './useTableExport';
 import {
   CircuitTableModel,
   CircuitTableRow,
@@ -79,7 +78,6 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose })
   const [memoryStart, setMemoryStart] = useState<MemoryStart>('reset');
   const [rows, setRows] = useState<CircuitTableRow[] | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const structureKey = tableInputsKey(nodes, edges, false);
   // Recompute only when the circuit's structure changes, not on every switch flip
@@ -154,39 +152,19 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose })
   }));
   const activeRow = tableRows.find((r) => r.isActive);
 
-  const fileBase = 'circuit-truth-table';
-  const lines = (sep: string) => {
-    const quote = (s: string) => (sep === ',' && /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-    const show = (v: number | string) => (v === -1 ? '?' : String(v));
-    return [
-      ['m', ...inputNames, ...visibleInternal.map((c) => c.label), ...model.outputs.map((c) => c.label)].map(quote).join(sep),
-      ...tableRows.map((r) => [r.index, ...r.inputs, ...(r.internal ?? []), ...r.outputs].map(show).join(sep)),
-    ];
-  };
+  const { copied, copyLines, downloadCSV, saveImage } = useTableExport('circuit-truth-table');
+  const lines = (sep: string) =>
+    tableLines(
+      ['m', ...inputNames, ...visibleInternal.map((c) => c.label), ...model.outputs.map((c) => c.label)],
+      tableRows.map((r) => [r.index, ...r.inputs, ...(r.internal ?? []), ...r.outputs]),
+      sep
+    );
 
-  const handleCopy = async () => {
+  const handleCopy = () => {
     const expressions = summaries
       .filter((s) => s.terms)
       .map((s) => `${s.name} = ${formatSOP(s.terms!, varNames)}`);
-    await navigator.clipboard.writeText([...lines('\t'), ...(expressions.length ? ['', ...expressions] : [])].join('\n'));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
-
-  const handleCSV = () => {
-    const link = document.createElement('a');
-    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines(',').join('\n'));
-    link.download = `${fileBase}.csv`;
-    link.click();
-  };
-
-  const handlePNG = async () => {
-    if (!tableRef.current) return;
-    const dataUrl = await toPng(tableRef.current, { backgroundColor: resolveCssColor('--surface-1', '#ffffff') });
-    const link = document.createElement('a');
-    link.download = `${fileBase}.png`;
-    link.href = dataUrl;
-    link.click();
+    copyLines([...lines('\t'), ...(expressions.length ? ['', ...expressions] : [])]);
   };
 
   const rowCount = 2 ** model.inputs.length;
@@ -362,10 +340,10 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose })
             <Button size="sm" variant="ghost" disabled={!rows} leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} onClick={handleCopy}>
               {copied ? 'Copied' : 'Copy'}
             </Button>
-            <Button size="sm" variant="ghost" disabled={!rows} leftIcon={<Download className="w-4 h-4" />} onClick={handleCSV}>
+            <Button size="sm" variant="ghost" disabled={!rows} leftIcon={<Download className="w-4 h-4" />} onClick={() => downloadCSV(lines(','))}>
               CSV
             </Button>
-            <Button size="sm" variant="secondary" disabled={!rows} leftIcon={<ImageIcon className="w-4 h-4" />} onClick={handlePNG}>
+            <Button size="sm" variant="secondary" disabled={!rows} leftIcon={<ImageIcon className="w-4 h-4" />} onClick={() => saveImage(tableRef.current)}>
               Save image
             </Button>
           </footer>

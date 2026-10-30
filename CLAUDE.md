@@ -25,9 +25,11 @@ src/
     useCircuitStore.ts   composes slices + throttled autosave
     types.ts             CircuitStore interface, StoreSlice<T>, ThemeMode/UiDensity/WireStyle
     helpers.ts           storage keys/loaders, makeId, removeUnsupportedParts, markRemovedWireTargets
-    slices/              editor, devices, simulation, customComponents, project, history, ui
+    partFactory.ts       createPart: default pins, label and settings for a new part (used by addNode)
+    slices/              editor, clipboard, groups, devices, simulation, customComponents, project, history, ui
   data/components.ts     parts catalog (PARTS, PART_CATEGORIES, getComponentInfo): names, descriptions,
                          categories and part numbers used by the parts bin and the properties panel
+  data/examples/         built-in example circuits, one module per category; index.ts sets the order
   theme/signals.ts       signal colors/widths as CSS variables (signalColor, signalState, wireStrokeWidth)
   components/
     canvas/     CircuitCanvas (nodeTypes, context menu, drop), CanvasControls, EmptyCanvas, breadcrumbs
@@ -37,12 +39,13 @@ src/
     inspector/  InspectorPanel (picks the view), PartLiveView ("How it works"), CircuitOverview (nothing
                 selected), SelectionSummary (several selected), WireInspector, per-part panels
     ui/         primitives: Dialog/ModalFrame, ModalHeader, ConfirmDialog, DropdownMenu/MenuPanel, Tooltip,
-                IconButton, Button, Input, SegmentedControl, Select, TruthTable, Toast; plus dialogs
+                IconButton, Button, Input, SegmentedControl, Select, TruthTable, Toast; plus dialogs.
+                Part truth tables (gate, encoder, 7-segment) use TruthTableDialog + useTableExport
     custom/     custom component wizard and library dialogs
   hooks/        useGlobalShortcuts (all keyboard shortcuts), useMediaQuery
   config/       shortcuts.ts (list shown in the Shortcuts dialog — keep in sync with useGlobalShortcuts)
   types/        circuit.ts (GateType, NodeData, PinData, SignalValue) + encoder/sevenSegment/customComponent
-  utils/        pin factories, presets (examples), truth tables (gateTruthTable, circuitTruthTableEngine),
+  utils/        pin factories, truth tables (gateTruthTable, circuitTruthTableEngine, booleanMinimizer),
                 canvasBridge (visible canvas center for click-to-add), fileActions, import/export
 ```
 
@@ -82,7 +85,7 @@ src/
 1. Add the literal to `GateType` in `src/types/circuit.ts` (plus a config type in `src/types/` if it has settings).
 2. Define default pins (`getDefaultICPins` in `icLogic.ts` for fixed ICs, or a pin factory in `src/utils/`).
 3. Implement evaluation (`evaluateIC` in `icLogic.ts` or `evaluateGate` in `gateLogic.ts`) and register the type in the matching set/branch in `engine.ts`.
-4. Handle creation in `addNode` (`store/slices/editor.ts`): node `type`, label, pins, config.
+4. Handle creation in `createPart` (`store/partFactory.ts`): node `type`, label, pins, config.
 5. Render it: reuse an existing node family (`ICComponentNode` via `ChipFrame` for chips) or add one in `components/nodes/` and register it in `nodeTypes` in `CircuitCanvas.tsx`.
 6. Add it to `PARTS` in `src/data/components.ts` (name, description, category, part number); give it a glyph in `toolbar/PartGlyph.tsx` if it isn't a chip. Add an inspector panel (`TYPE_PANELS` in `InspectorPanel.tsx`) if it has settings, and a case in `PartLiveView.tsx` if it has something to show live.
 7. Add a test in `src/simulation/*.test.ts`.

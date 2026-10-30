@@ -70,7 +70,7 @@ export function generateEncoderTruthTable(
   const noInputVals = Array(numInputs).fill(inactiveVal);
   rows.push({
     id: 'row-none',
-    label: 'No Active Input',
+    label: 'No active input',
     inputs: [...noInputVals].reverse(),
     outputs: Array(numBinaryOutputs).fill(idleOutputBit),
     decimal: '-',
@@ -114,7 +114,7 @@ export function generateEncoderTruthTable(
 
       rows.push({
         id: `row-d${activeIdx}`,
-        label: `D${activeIdx} Active`,
+        label: `D${activeIdx} active`,
         inputs: [...inputVals].reverse(),
         outputs,
         decimal: activeIdx,
@@ -142,7 +142,7 @@ export function generateEncoderTruthTable(
 
       rows.push({
         id: `row-d${activeIdx}`,
-        label: `D${activeIdx} Active`,
+        label: `D${activeIdx} active`,
         inputs: [...inputVals].reverse(),
         outputs,
         decimal: activeIdx,
@@ -161,7 +161,7 @@ export function generateEncoderTruthTable(
 
     rows.push({
       id: 'row-error',
-      label: 'Multiple Inputs Active',
+      label: 'Several inputs active',
       inputs: [...errInputs].reverse(),
       outputs: Array(numBinaryOutputs).fill(0),
       decimal: 'ERROR',
@@ -180,7 +180,7 @@ export function generateEncoderTruthTable(
     const liveInputsRev = [...liveInputs.slice(0, numInputs)].reverse();
     rows.push({
       id: 'row-live-sim-error',
-      label: '⚡ Current Live Canvas State (Error)',
+      label: 'Canvas now (error)',
       inputs: liveInputsRev,
       outputs: Array(numBinaryOutputs).fill(0),
       decimal: 'ERROR',
@@ -204,29 +204,4 @@ export function generateEncoderTruthTable(
     },
     rows,
   };
-}
-
-export function exportTruthTableToCSV(table: TruthTableData, filename = 'encoder_truth_table.csv') {
-  const headerLine = ['Row Label', ...table.headers.inputs, ...table.headers.outputs, 'Decimal', 'Valid (V)', 'EO', 'GS', 'Notes'].join(',');
-  const rowLines = table.rows.map((row) => {
-    return [
-      `"${row.label}"`,
-      ...row.inputs,
-      ...row.outputs,
-      row.decimal,
-      row.valid,
-      row.eo,
-      row.gs,
-      `"${row.explanationNote || ''}"`,
-    ].join(',');
-  });
-
-  const csvContent = 'data:text/csv;charset=utf-8,' + [headerLine, ...rowLines].join('\n');
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 }
