@@ -53,6 +53,26 @@ const GLYPHS: Partial<Record<GateType, () => React.ReactNode>> = {
         <line x1={40} y1={20} x2={62} y2={20} {...stroke} />
       </>
     ),
+  BUS_JOIN: () =>
+    frame(
+      <>
+        {[8, 16, 24, 32].map((y) => (
+          <line key={y} x1={6} y1={y} x2={34} y2={y} {...stroke} strokeWidth={1.5} />
+        ))}
+        <rect x={34} y={5} width={5} height={30} rx={1.5} fill="currentColor" />
+        <line x1={39} y1={20} x2={60} y2={20} {...stroke} strokeWidth={4} />
+      </>
+    ),
+  BUS_SPLIT: () =>
+    frame(
+      <>
+        <line x1={4} y1={20} x2={25} y2={20} {...stroke} strokeWidth={4} />
+        <rect x={25} y={5} width={5} height={30} rx={1.5} fill="currentColor" />
+        {[8, 16, 24, 32].map((y) => (
+          <line key={y} x1={30} y1={y} x2={58} y2={y} {...stroke} strokeWidth={1.5} />
+        ))}
+      </>
+    ),
   PULL_UP: () =>
     frame(
       <>

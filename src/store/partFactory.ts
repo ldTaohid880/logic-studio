@@ -7,6 +7,7 @@ import { createSevenSegmentPins } from '../utils/sevenSegmentPins';
 import { getDefaultICPins, DEFAULT_ROM_CONTENTS } from '../simulation/icLogic';
 import { BOARD_PINS, DEFAULT_CLOCK_HZ, boardPinName } from '../simulation/timeline';
 import { isSensor, SENSORS } from '../simulation/sensors';
+import { createBusPins, DEFAULT_BUS_WIDTH } from '../utils/busPins';
 import { IC_GATE_TYPES } from '../simulation/engine';
 import { makeId } from '../utils/ids';
 
@@ -43,6 +44,8 @@ const SHAPES: Partial<Record<GateType, PartShape>> = {
   PUSH_BUTTON: { nodeType: 'pushButton', inputCount: 0 },
   CLOCK: { nodeType: 'clockSource', label: 'CLK', inputCount: 0 },
   ARDUINO_UNO: { nodeType: 'boardNode', label: 'Uno', inputCount: 0 },
+  BUS_JOIN: { nodeType: 'busNode', label: '', inputCount: DEFAULT_BUS_WIDTH },
+  BUS_SPLIT: { nodeType: 'busNode', label: '', inputCount: 1 },
   PULL_UP: { nodeType: 'resistorNode', label: '', inputCount: 0 },
   PULL_DOWN: { nodeType: 'resistorNode', label: '', inputCount: 0 },
   SENSOR_LIGHT: { nodeType: 'sensorModule', label: 'Light', inputCount: 0 },
@@ -91,6 +94,9 @@ function defaultPins(gateType: GateType, shape: PartShape): { inputs: PinData[];
       return { inputs: pins('in', 4, (i) => `B${i}`), outputs: [] };
     case 'HEX_DISPLAY':
       return { inputs: pins('in', 4, (i) => `D${i}`), outputs: [] };
+    case 'BUS_JOIN':
+    case 'BUS_SPLIT':
+      return createBusPins(gateType, DEFAULT_BUS_WIDTH);
     case 'ARDUINO_UNO':
       // Each pin has a read side (input) and a drive side (output); outputs float until a program drives them
       return {
@@ -150,6 +156,7 @@ export function createPart(gateType: GateType, position: { x: number; y: number 
       ...(gateType === 'ENCODER' ? { encoderConfig: DEFAULT_ENCODER_CONFIG } : {}),
       ...(gateType === 'SEVEN_SEGMENT' ? { sevenSegmentConfig: DEFAULT_SEVEN_SEGMENT_CONFIG } : {}),
       ...(gateType === 'CLOCK' ? { clockHz: DEFAULT_CLOCK_HZ } : {}),
+      ...(gateType === 'BUS_JOIN' || gateType === 'BUS_SPLIT' ? { bitWidth: DEFAULT_BUS_WIDTH } : {}),
       ...(isSensor(gateType) ? { sensorLevel: SENSORS[gateType].level, sensorThreshold: SENSORS[gateType].threshold } : {}),
       ...(gateType === 'ROM_16X4' ? { romContents: DEFAULT_ROM_CONTENTS } : {}),
     } as unknown as Record<string, unknown>,

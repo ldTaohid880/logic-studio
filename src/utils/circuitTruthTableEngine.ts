@@ -136,8 +136,9 @@ export function describeCircuitForTable(nodes: Node[], edges: Edge[]): CircuitTa
         const label = d.label ? `${d.label}.${pin.name}` : pin.name;
         outputs.push({ id: `${n.id}|${pin.id}`, label, kind: 'output', nodeId: n.id, pinId: pin.id, format: 'bit' });
       });
-    } else if (!SOURCE_TYPES.has(d.gateType) && d.gateType !== 'TUNNEL') {
+    } else if (!SOURCE_TYPES.has(d.gateType) && d.gateType !== 'TUNNEL' && d.gateType !== 'PULL_UP' && d.gateType !== 'PULL_DOWN') {
       d.outputs.forEach((pin) => {
+        if (pin.width) return; // bus pins carry several bits; their single wires show as columns instead
         const column: TableColumn = {
           id: `${n.id}|${pin.id}`,
           label: d.outputs.length > 1 ? `${name}.${pin.name}` : name,

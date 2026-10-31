@@ -268,3 +268,33 @@ describe('pull resistors and open-drain outputs', () => {
     expect(res.conflictNodeIds).toEqual([]);
   });
 });
+
+describe('multi-bit buses', () => {
+  it('carries every bit from a joiner through a bus wire to a splitter', async () => {
+    const { createBusPins, busHex } = await import('../utils/busPins');
+    const join = createBusPins('BUS_JOIN', 4);
+    const split = createBusPins('BUS_SPLIT', 4);
+    const bits: SignalValue[] = [1, 0, 1, 1]; // 0b1101 = D
+    const nodes = [
+      ...bits.map((v, i) => makeNode(`s${i}`, 'INPUT', { value: v })),
+      makeNode('j', 'BUS_JOIN', {}, join.inputs, join.outputs),
+      makeNode('sp', 'BUS_SPLIT', {}, split.inputs, split.outputs),
+      ...bits.map((_, i) => makeNode(`l${i}`, 'OUTPUT')),
+    ];
+    const edges = [
+      ...bits.map((_, i) => wire(`s${i}`, 'j', 'out-0', `in-${i}`)),
+      wire('j', 'sp'),
+      ...bits.map((_, i) => wire('sp', `l${i}`, `out-${i}`)),
+    ];
+    const res = propagateSignals(nodes, edges);
+    expect(bits.map((_, i) => d(res.nodes, `l${i}`).inputs[0].value)).toEqual(bits);
+    const busWire = res.edges.find((e) => e.source === 'j')!;
+    expect(busWire.data?.bus).toEqual(bits);
+    expect(busHex(busWire.data?.bus as SignalValue[])).toBe('D');
+
+    // Unwiring one bit floats it on the bus, and the badge shows an unknown value
+    const res2 = propagateSignals(res.nodes, edges.filter((e) => e.source !== 's2'));
+    expect(res2.edges.find((e) => e.source === 'j')!.data?.bus).toEqual([1, 0, -1, 1]);
+    expect(busHex([1, 0, -1, 1])).toBeNull();
+  });
+});

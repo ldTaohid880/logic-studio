@@ -69,6 +69,8 @@ export type GateType =
   // Utility
   | 'DELAY_ELEMENT'
   | 'TUNNEL'
+  | 'BUS_JOIN'
+  | 'BUS_SPLIT'
   | 'PULL_UP'
   | 'PULL_DOWN'
   | 'OPEN_DRAIN_BUFFER'
@@ -81,6 +83,8 @@ export interface PinData {
   name: string;
   value: SignalValue;
   driven?: boolean; // Set while a wire drives this input pin; used to float the pin once the wire is removed
+  width?: number; // Bus pins: number of bits (2–8); the pin carries `bus` and `value` stays -1
+  bus?: SignalValue[]; // Bus pins: one level per bit, least significant first
 }
 
 export interface NodeData {

@@ -471,6 +471,12 @@
   background-color: var(--accent) !important;
 }
 
+/* Bus pins: a square in the bus color */
+.react-flow__handle.lsp-pin[data-signal="bus"] {
+  background-color: var(--signal-bus) !important;
+  border-radius: 2px;
+}
+
 /* Bigger hit targets on touch screens */
 @media (pointer: coarse) {
   .react-flow__handle.lsp-pin {

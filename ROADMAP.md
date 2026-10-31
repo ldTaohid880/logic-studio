@@ -15,14 +15,16 @@ Logic Studio is one app for beginners and advanced students alike. There is no b
 - **Shared bus wires:** several tri-state outputs (or board pins) can drive one input; disagreeing drivers are shown as a conflict.
 - **Karnaugh maps:** a K-map for each output (2–4 inputs) in the circuit truth table, with every group of the simplified expression outlined.
 - **Build a circuit from an expression or truth table:** AND/OR/NOT, NAND-only or NOR-only, with the gate count and logic levels of each.
+- **Watch any wire** in the timing diagram, like a logic analyser probe.
+- **Gate delays:** optional delay per gate, so static hazards glitch and ring oscillators run (Static hazard example).
+- **Pull-up and pull-down resistors** and an open-drain buffer (wired AND).
+- **Check my circuit:** expected outputs as expressions, saved with the circuit; the truth table marks rows that differ.
+- **Multi-bit buses:** bus joiner and splitter (2, 4 or 8 bits), bus wires with their value in hex.
 
 ## Next
 
 ### Datasheets
 A datasheet for every part: pinout with real pin numbers, function table, equations, timing diagram, the real equivalent chip and how ours differs, links to manufacturer pages, and a searchable parts reference. Electrical and package figures checked against manufacturer datasheets.
-
-### Check my circuit
-Give a target truth table, or a list of test inputs and expected outputs, and the app runs them and shows which rows fail. Starts from the truth table dialog ("Save as test"). Works for assignments and self-study.
 
 ### State machine designer
 Draw states and transitions; the app builds the state table, the simplified next-state and output equations (with the existing minimiser) and the flip-flop circuit.
@@ -31,16 +33,10 @@ Draw states and transitions; the app builds the state table, the simplified next
 Feed sensor readings into the board's ADC so sketches can use `analogRead` on A0–A5 and the sensors' real values, not just their thresholded digital output. Possibly a potentiometer part.
 
 ### Timing lessons
-Optional gate delays (default 0, so nothing changes for beginners) to show propagation delay, the critical path and glitches (hazards) in the timing diagram. Needs an event-driven engine mode.
+Different delays per gate type and highlighting the critical path (unit gate delays are done).
 
-### Multi-bit buses
-Wires that carry 4 or 8 bits with a visible width, splitters and joiners. Lets RAM, ROM, registers and the ALU take buses instead of separate bit pins. (One-bit shared wires with conflict detection are done.)
-
-### Watch any wire
-Add any wire to the timing diagram, like a logic analyser probe, not just switches, clocks, sensors, LEDs and probes.
-
-### Pull-up and pull-down resistors
-Resistor parts that give a floating wire a default level, and open-drain outputs, so interfacing ideas (and board inputs) can be shown properly.
+### More from buses
+Bus pins on RAM, ROM, registers, the ALU and displays, bus tunnels, and tri-state bus drivers, so wide data paths need fewer splitters. Sequential test vectors for "check my circuit" (clocked steps, not just a truth table).
 
 ### Industry-standard parts
 Dual D flip-flop (74HC74 pinout), counters with parallel load (74HC161), universal shift register (74HC194), 4-to-16 decoder, decade counter, 8-bit register and latch.

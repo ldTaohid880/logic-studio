@@ -33,6 +33,7 @@ import { ClockNode } from '../nodes/ClockNode';
 import { BoardNode } from '../nodes/BoardNode';
 import { SensorNode } from '../nodes/SensorNode';
 import { ResistorNode } from '../nodes/ResistorNode';
+import { BusNode } from '../nodes/BusNode';
 import { SignalEdge } from '../edges/SignalEdge';
 import { GateType, NodeData } from '../../types/circuit';
 import { MenuPanel, MenuEntry } from '../ui/DropdownMenu';
@@ -58,6 +59,7 @@ const nodeTypes = {
   boardNode: BoardNode,
   sensorModule: SensorNode,
   resistorNode: ResistorNode,
+  busNode: BusNode,
 };
 
 const edgeTypes = {

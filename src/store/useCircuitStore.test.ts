@@ -319,3 +319,28 @@ describe('expected outputs', () => {
     expect(store().expected).toBe("Y = A'");
   });
 });
+
+describe('bus wiring', () => {
+  it('only joins bus pins of the same width, and resizing drops the bus wire', () => {
+    store().loadCircuit([], []);
+    store().addNode('BUS_JOIN', { x: 0, y: 0 });
+    store().addNode('BUS_SPLIT', { x: 150, y: 0 });
+    store().addNode('OUTPUT', { x: 300, y: 0 });
+    const [join, split, ledId] = store().nodes.map((n) => n.id);
+    const undoSteps = store().historyPast.length;
+
+    store().onConnect({ source: join, sourceHandle: 'out-0', target: ledId, targetHandle: 'in-0' });
+    expect(store().edges).toHaveLength(0);
+    expect(store().toastMessage).toMatch(/only connects to a bus pin/);
+    expect(store().historyPast.length).toBe(undoSteps); // a refused wire is not an undo step
+
+    store().onConnect({ source: join, sourceHandle: 'out-0', target: split, targetHandle: 'in-0' });
+    store().onConnect({ source: split, sourceHandle: 'out-3', target: ledId, targetHandle: 'in-0' });
+    expect(store().edges).toHaveLength(2);
+
+    store().setNodeBitWidth(split, 8);
+    expect(store().edges).toHaveLength(1); // the bus wire went; bit 3 still exists on 8 bits
+    store().onConnect({ source: join, sourceHandle: 'out-0', target: split, targetHandle: 'in-0' });
+    expect(store().toastMessage).toMatch(/a 4-bit bus to an 8-bit bus pin/);
+  });
+});
