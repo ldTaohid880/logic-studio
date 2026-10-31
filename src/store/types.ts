@@ -134,6 +134,9 @@ export interface CircuitStore {
 
   // Project management
   presets: CircuitPreset[];
+  /** Expected outputs of the circuit as expressions, one per line ("check my circuit"); saved with the circuit. */
+  expected: string;
+  setExpected: (text: string) => void;
   loadCircuit: (nodes: Node[], edges: Edge[]) => void;
   /** Open a saved circuit file (JSON text): checks it, adds its custom components, loads it. Returns success. */
   openCircuitFile: (text: string) => boolean;

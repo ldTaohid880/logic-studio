@@ -304,3 +304,18 @@ describe('gate delays in the store', () => {
     expect(store().timeline.passDue).toBeNull();
   });
 });
+
+describe('expected outputs', () => {
+  it('are kept with the circuit, written to saved files, and cleared for a new circuit', async () => {
+    const { parseCircuitFile } = await import('../utils/circuitFile');
+    loadInverter();
+    store().setExpected("Y = A'");
+    const file = { nodes: store().nodes, edges: store().edges, expected: store().expected };
+    expect(parseCircuitFile(file, {})).toMatchObject({ ok: true, expected: "Y = A'" });
+
+    store().clearCanvas();
+    expect(store().expected).toBe('');
+    expect(store().openCircuitFile(JSON.stringify(file))).toBe(true);
+    expect(store().expected).toBe("Y = A'");
+  });
+});

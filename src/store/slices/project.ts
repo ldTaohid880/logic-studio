@@ -1,6 +1,6 @@
 import { CircuitPreset } from '../../types/circuit';
 import { CIRCUIT_PRESETS } from '../../data/examples';
-import { getInitialPresets, savePresetsToStorage, removeUnsupportedParts, saveCustomComponentsToStorage } from '../helpers';
+import { getInitialPresets, savePresetsToStorage, removeUnsupportedParts, saveCustomComponentsToStorage, initialCircuit } from '../helpers';
 import { parseCircuitFile } from '../../utils/circuitFile';
 import { CircuitStore, StoreSlice } from '../types';
 import { restartBoards } from '../../simulation/avr/boards';
@@ -8,6 +8,8 @@ import { restartBoards } from '../../simulation/avr/boards';
 // Presets and whole-circuit load/clear
 export type ProjectSlice = Pick<CircuitStore,
   | 'presets'
+  | 'expected'
+  | 'setExpected'
   | 'loadCircuit'
   | 'openCircuitFile'
   | 'loadPreset'
@@ -20,6 +22,11 @@ export type ProjectSlice = Pick<CircuitStore,
 
 export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
   presets: getInitialPresets(),
+  expected: initialCircuit.expected,
+
+  // A setting of the circuit rather than an edit of it, so it isn't an undo step
+  setExpected: (expected) => set({ expected }),
+
   loadCircuit: (rawNodes, rawEdges) => {
     get().saveHistory();
     const { nodes, edges, removed } = removeUnsupportedParts(rawNodes, rawEdges);
@@ -32,6 +39,7 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
       selectedEdgeId: null,
       timeline: { ...get().timeline, time: 0, traces: {}, behind: false, passDue: null },
       boardSerial: {},
+      expected: '',
     });
     get().tickSimulation();
     if (removed > 0) {
@@ -64,6 +72,7 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
     }
     const toastBefore = get().toastMessage;
     get().loadCircuit(parsed.nodes, parsed.edges);
+    set({ expected: parsed.expected });
     if (parsed.renamed > 0) {
       get().showToast(
         `Circuit opened. ${parsed.renamed} component${parsed.renamed === 1 ? '' : 's'} differed from your library and ${
@@ -139,6 +148,7 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
       selectedEdgeId: null,
       timeline: { ...get().timeline, time: 0, traces: {}, behind: false, passDue: null },
       boardSerial: {},
+      expected: '',
     });
   },
 

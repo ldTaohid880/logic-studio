@@ -13,6 +13,8 @@ export type ParsedCircuitFile =
       components: Record<string, CustomComponentDefinition>;
       /** Definitions that shared an id with a different library entry and were added under a new id. */
       renamed: number;
+      /** Expected outputs saved with the circuit ("check my circuit"), or an empty string. */
+      expected: string;
     }
   | { ok: false; error: string };
 
@@ -93,5 +95,5 @@ export function parseCircuitFile(json: unknown, library: Record<string, CustomCo
     return { ok: false, error: `Cannot open this file: the component "${recursive.name}" contains itself` };
   }
 
-  return { ok: true, nodes, edges, components, renamed: idMap.size };
+  return { ok: true, nodes, edges, components, renamed: idMap.size, expected: typeof json.expected === 'string' ? json.expected : '' };
 }
