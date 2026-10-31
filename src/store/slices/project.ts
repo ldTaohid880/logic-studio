@@ -1,6 +1,6 @@
 import { CircuitPreset } from '../../types/circuit';
 import { CIRCUIT_PRESETS } from '../../data/examples';
-import { getInitialPresets, savePresetsToStorage, removeUnsupportedParts, saveCustomComponentsToStorage, initialCircuit } from '../helpers';
+import { makeId, getInitialPresets, savePresetsToStorage, removeUnsupportedParts, saveCustomComponentsToStorage, initialCircuit } from '../helpers';
 import { parseCircuitFile } from '../../utils/circuitFile';
 import { CircuitStore, StoreSlice } from '../types';
 import { restartBoards } from '../../simulation/avr/boards';
@@ -96,7 +96,7 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
 
   addPreset: (data) => {
     const newPreset: CircuitPreset = {
-      id: `preset-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: makeId('preset'),
       name: data.name.trim() || 'Custom Preset',
       category: data.category.trim() || 'Custom',
       description: data.description.trim() || 'Custom user created circuit preset.',

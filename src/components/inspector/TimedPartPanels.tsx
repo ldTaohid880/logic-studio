@@ -65,7 +65,7 @@ const MemoryGrid: React.FC<{ words: number[]; address: number | null; onChange?:
               const v = parseInt(e.target.value, 16);
               if (!Number.isNaN(v)) onChange(a, v);
             }}
-            className="w-full min-w-0 bg-transparent text-fg font-semibold outline-none uppercase"
+            className="w-full min-w-0 bg-transparent text-fg font-semibold outline-none uppercase" // conventions-ignore sentence-case: hex digits, not a label
           />
         ) : (
           <span className="text-fg font-semibold">{hex(w)}</span>

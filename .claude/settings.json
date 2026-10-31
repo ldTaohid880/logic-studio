@@ -3,20 +3,40 @@
   "permissions": {
     "allow": [
       "Bash(npm run lint)",
+      "Bash(npm run lint:conventions)",
       "Bash(npm run test)",
       "Bash(npm test)",
       "Bash(npm run build)",
       "Bash(npm run check)",
+      "Bash(npm run dev)",
+      "Bash(npm run screenshots)",
       "Bash(npx vitest run:*)",
       "Bash(npx tsc --noEmit:*)",
+      "Bash(node scripts/check-conventions.mjs:*)",
+      "Bash(node scripts/agent/:*)",
+      "Bash(fuser -k 3000/tcp)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge --ff-only:*)"
     ],
     "deny": [
       "Read(./.env)",
-      "Read(./.env.*)"
+      "Read(./.env.*)",
+      "Bash(npx playwright install:*)",
+      "Bash(pkill:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit.mjs\"", "timeout": 10 }
+        ]
+      }
     ]
   }
 }

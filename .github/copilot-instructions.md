@@ -1,0 +1,1 @@
+Read [AGENTS.md](../AGENTS.md) first: it points to the project guide (CLAUDE.md), the topic rules in `.claude/rules/` and the step-by-step runbooks in `.claude/skills/`. Run `npm run check` before finishing.

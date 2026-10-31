@@ -82,7 +82,8 @@ npm run dev        # http://localhost:3000
 | `npm run dev` | Development server with hot reload |
 | `npm test` | Unit tests (Vitest) |
 | `npm run lint` | Type check (TypeScript, strict) |
-| `npm run check` | Type check, tests and production build; run before opening a pull request |
+| `npm run lint:conventions` | Project conventions (colour tokens, sentence case, store selectors, dialogs, ids, line endings) |
+| `npm run check` | Type check, conventions, tests and production build; run before opening a pull request |
 | `npm run build` | Production bundle in `dist/`, ready for any static host |
 
 The app is fully client-side, so there's no server or database to set up. Link previews use absolute URLs: `SITE_URL` if set (for example `SITE_URL=https://logic.example.com npm run build`), otherwise the Vercel production domain, otherwise the live demo address.
@@ -91,7 +92,7 @@ The app is fully client-side, so there's no server or database to set up. Link p
 
 React 19 and TypeScript, the canvas from [React Flow](https://reactflow.dev/), state in [Zustand](https://zustand.docs.pmnd.rs/), styling with Tailwind CSS 4, built with Vite. The simulation engine (`src/simulation/`) is plain TypeScript with no React, and is covered by unit tests that check every chip against an independent reference model.
 
-[`CLAUDE.md`](CLAUDE.md) is the developer guide: project layout, how the simulation works, store conventions and a checklist for adding a new part.
+[`CLAUDE.md`](CLAUDE.md) is the developer guide: commands, layout and the hard rules, with topic rules in [`.claude/rules/`](.claude/rules) (simulation, store, UI, tests, data). Coding agents start at [`AGENTS.md`](AGENTS.md), which also lists step-by-step runbooks in [`.claude/skills/`](.claude/skills) for adding a part or example, checking a change in the browser, writing emulator tests and opening a pull request.
 
 ## Contributing
 
