@@ -25,11 +25,9 @@ Logic Studio is one app for beginners and advanced students alike. There is no b
 - **Export and projects:** SVG and PDF export, a parts list packed into real chips (CSV), several autosaved projects.
 - **Arduino extras:** analogRead from sensor AO pins and a potentiometer, analogWrite (PWM dims LEDs), tone and a buzzer, a 16 × 2 LCD that works with LiquidCrystal.
 - **Share links and Verilog export.**
+- **Datasheets for every part:** a wide reader with real pinouts, function tables made from the simulation, 74HC electrical and timing figures, print/PDF and `#datasheet=` links.
 
 ## Next
-
-### Datasheets
-A datasheet for every part: pinout with real pin numbers, function table, equations, timing diagram, the real equivalent chip and how ours differs, links to manufacturer pages, and a searchable parts reference. Electrical and package figures checked against manufacturer datasheets.
 
 ### State machine designer
 Draw states and transitions; the app builds the state table, the simplified next-state and output equations (with the existing minimiser) and the flip-flop circuit.

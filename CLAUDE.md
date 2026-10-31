@@ -35,6 +35,8 @@ src/
     slices/              editor, clipboard, groups, devices, simulation, timeline, customComponents, project, projects, history, ui
   data/components.ts     parts catalog (PARTS, PART_CATEGORIES, getComponentInfo): names, descriptions,
                          categories and part numbers used by the parts bin and the properties panel
+  data/datasheets/       datasheet for every part (types, family.ts = 74HC figures, one module per category, generated.ts fallback,
+                         functionTable.ts built from the simulation; getDatasheet(type) in index.ts)
   data/examples/         built-in example circuits, one module per category; index.ts sets the order
   theme/signals.ts       signal colors/widths as CSS variables (signalColor, signalState, wireStrokeWidth)
   components/
@@ -43,6 +45,7 @@ src/
                 ChipFrame.tsx (ICs, encoder and custom components drawn as DIP packages), symbols/gateGeometry.ts
                 (IEEE gate shapes; gates stay schematic symbols)
     toolbar/    TopBar (File/View menus), LeftToolbox (parts bin + icon rail), PartGlyph, StatusBar
+    datasheet/  DatasheetReader (lazy-loaded wide reader, opened with `openDatasheet(type)` from the ui slice), DipPinout, PinTable, SpecTable, FunctionTable
     timeline/   TimingPanel: run controls + timing diagram under the canvas, shown only with a clock or board
     inspector/  InspectorPanel (picks the view), TimedPartPanels (clock, ROM/RAM, ALU, board), PartLiveView ("How it works"), CircuitOverview (nothing
                 selected), SelectionSummary (several selected), WireInspector, per-part panels
@@ -114,6 +117,7 @@ src/
 5. Render it: reuse an existing node family (`ICComponentNode` via `ChipFrame` for chips) or add one in `components/nodes/` and register it in `nodeTypes` in `CircuitCanvas.tsx`.
 6. Add it to `PARTS` in `src/data/components.ts` (name, description, category, part number); give it a glyph in `toolbar/PartGlyph.tsx` if it isn't a chip. Add an inspector panel (`TYPE_PANELS` in `InspectorPanel.tsx`) if it has settings, and a case in `PartLiveView.tsx` if it has something to show live.
 7. Add a test in `src/simulation/*.test.ts`.
+8. Datasheet: every `PARTS` entry already gets a generated sheet. For a part with a real chip, add a hand-written entry in the matching `data/datasheets/` module (its `partNumber` must equal the catalog's; `datasheets.test.ts` checks pin numbering, `mapping` ids and that memory parts have a `modeTable`).
 
 ## Testing
 

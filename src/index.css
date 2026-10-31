@@ -555,3 +555,19 @@
   box-shadow: none;
   border-radius: 4px;
 }
+
+/* Printing a datasheet: hide the app behind the reader and let the sheet flow over several pages */
+@media print {
+  body.ls-printing-datasheet {
+    overflow: visible !important;
+    background: #ffffff;
+    color: #000000;
+  }
+  body.ls-printing-datasheet #root {
+    display: none !important;
+  }
+  body.ls-printing-datasheet [role="dialog"] {
+    background: #ffffff;
+    color: #000000;
+  }
+}

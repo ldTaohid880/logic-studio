@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { Suspense, lazy, useRef, useState, useEffect, useCallback } from 'react';
 import { TopBar } from './components/toolbar/TopBar';
 import { LeftToolbox } from './components/toolbar/LeftToolbox';
 import { StatusBar } from './components/toolbar/StatusBar';
@@ -21,6 +21,9 @@ import { useCircuitStore } from './store/useCircuitStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useMediaQuery } from './hooks/useMediaQuery';
+
+// Loaded on first use: the datasheet text is large and most sessions never open it
+const DatasheetReader = lazy(() => import('./components/datasheet/DatasheetReader'));
 
 const INSPECTOR_WIDTH_KEY = 'logic_studio_inspector_width';
 const INSPECTOR_MIN = 300;
@@ -52,7 +55,7 @@ export default function App() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  const { showInspector, showToolbox, setShowInspector, setShowToolbox, theme, density } = useCircuitStore(
+  const { showInspector, showToolbox, setShowInspector, setShowToolbox, theme, density, datasheetType } = useCircuitStore(
     useShallow((s) => ({
       showInspector: s.showInspector,
       showToolbox: s.showToolbox,
@@ -60,6 +63,7 @@ export default function App() {
       setShowToolbox: s.setShowToolbox,
       theme: s.theme,
       density: s.density,
+      datasheetType: s.datasheetType,
     }))
   );
 
@@ -87,6 +91,24 @@ export default function App() {
       decodeShare(window.location.hash).then((text) => {
         if (text) setSharedCircuit(text);
         else if (window.location.hash.startsWith('#circuit=')) useCircuitStore.getState().showToast('Invalid share link: it may have been cut short');
+      });
+    };
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+  }, []);
+
+  // #datasheet=AND or #datasheet=74HC08 opens the reader straight away (nothing on the canvas changes)
+  useEffect(() => {
+    const check = () => {
+      const match = /^#datasheet=(.+)$/.exec(window.location.hash);
+      if (!match) return;
+      const key = decodeURIComponent(match[1]);
+      import('./data/datasheets').then(({ resolveDatasheetKey }) => {
+        const type = resolveDatasheetKey(key);
+        if (type) useCircuitStore.getState().openDatasheet(type);
+        else useCircuitStore.getState().showToast(`Invalid datasheet link: no part called ${key}`);
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
       });
     };
     check();
@@ -228,6 +250,11 @@ export default function App() {
       <PartsListDialog isOpen={isPartsListOpen} onClose={() => setIsPartsListOpen(false)} />
       <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
       <ProjectsDialog isOpen={isProjectsOpen} onClose={() => setIsProjectsOpen(false)} />
+      {datasheetType && (
+        <Suspense fallback={null}>
+          <DatasheetReader />
+        </Suspense>
+      )}
       <ConfirmDialog
         isOpen={sharedCircuit !== null}
         title="Open the shared circuit?"

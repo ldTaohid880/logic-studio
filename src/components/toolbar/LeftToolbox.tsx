@@ -14,7 +14,7 @@ import {
   Spline,
   Boxes,
   History,
-  PanelLeftClose, Cpu, Radar } from 'lucide-react';
+  PanelLeftClose, Cpu, Radar, Info } from 'lucide-react';
 import { PARTS, PART_CATEGORIES, PartCategory, PartInfo } from '../../data/components';
 import { PartGlyph, ChipGlyph } from './PartGlyph';
 import { nextPlacementPosition } from '../../utils/canvasBridge';
@@ -75,9 +75,23 @@ interface PartButtonProps {
   onDragStart: (e: React.DragEvent, type: GateType) => void;
 }
 
+/** Small info button on a part: opens its datasheet. Shown on hover or keyboard focus. */
+const DatasheetButton: React.FC<{ part: PartInfo; className?: string }> = ({ part, className = '' }) => (
+  <button
+    type="button"
+    aria-label={`${part.name} datasheet`}
+    title="Datasheet"
+    onClick={() => useCircuitStore.getState().openDatasheet(part.type)}
+    className={`absolute w-5 h-5 rounded-md flex items-center justify-center text-fg-subtle hover:text-accent hover:bg-surface-3 opacity-0 group-hover/part:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40 transition-opacity cursor-pointer ${className}`}
+  >
+    <Info className="w-3.5 h-3.5" />
+  </button>
+);
+
 /** Symbol tile: the part's schematic symbol with its short name underneath. */
 const PartTile: React.FC<PartButtonProps> = ({ part, onAdd, onDragStart }) => (
-  <Tooltip content={part.description} side="right" delay={500}>
+  <div className="relative group/part">
+    <Tooltip content={part.description} side="right" delay={500}>
     <button
       type="button"
       draggable
@@ -91,13 +105,16 @@ const PartTile: React.FC<PartButtonProps> = ({ part, onAdd, onDragStart }) => (
       </span>
       <span className="text-xs font-medium leading-tight text-center text-fg">{part.name}</span>
     </button>
-  </Tooltip>
+    </Tooltip>
+    <DatasheetButton part={part} className="top-0.5 right-0.5" />
+  </div>
 );
 
 /** Chip row: DIP glyph, name and description, part number at the right. */
 const PartRow: React.FC<PartButtonProps & { showCategory?: boolean }> = ({ part, onAdd, onDragStart, showCategory }) => {
   const isChip = ['Combinational', 'Arithmetic', 'Memory'].includes(part.category);
   return (
+    <div className="relative group/part">
     <button
       type="button"
       draggable
@@ -115,8 +132,10 @@ const PartRow: React.FC<PartButtonProps & { showCategory?: boolean }> = ({ part,
           {showCategory ? `${part.category} · ${part.description}` : part.description}
         </span>
       </span>
-      {part.partNumber && <span className="text-[11px] font-mono text-fg-subtle shrink-0">{part.partNumber}</span>}
+      {part.partNumber && <span className="text-[11px] font-mono text-fg-subtle shrink-0 group-hover/part:invisible">{part.partNumber}</span>}
     </button>
+    <DatasheetButton part={part} className="top-1/2 -translate-y-1/2 right-1.5" />
+    </div>
   );
 };
 

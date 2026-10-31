@@ -3,7 +3,7 @@ import { useCircuitStore } from '../../store/useCircuitStore';
 import { useShallow } from 'zustand/react/shallow';
 import { GateType, NodeData } from '../../types/circuit';
 import { PartGlyph } from '../toolbar/PartGlyph';
-import { Sliders, Trash2, Hash, Lock, Unlock, Wrench, Layers, Activity } from 'lucide-react';
+import { Sliders, Trash2, Hash, Lock, Unlock, Wrench, Layers, Activity, BookOpen } from 'lucide-react';
 import { EncoderProperties } from './EncoderProperties';
 import { SevenSegmentProperties } from './SevenSegmentProperties';
 import { GroupProperties } from './GroupProperties';
@@ -183,12 +183,13 @@ const GeneralSettings: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
 };
 
 const NodeInspector: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
-  const { deleteSelected, showToast, toggleLockNode, updateNodeLabel } = useCircuitStore(
+  const { deleteSelected, showToast, toggleLockNode, updateNodeLabel, openDatasheet } = useCircuitStore(
     useShallow((s) => ({
       deleteSelected: s.deleteSelected,
       showToast: s.showToast,
       toggleLockNode: s.toggleLockNode,
       updateNodeLabel: s.updateNodeLabel,
+      openDatasheet: s.openDatasheet,
     }))
   );
 
@@ -211,6 +212,11 @@ const NodeInspector: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
         }
         actions={
           <>
+            <IconButton
+              icon={<BookOpen className="w-4 h-4" />}
+              tooltip="Datasheet"
+              onClick={() => openDatasheet(gateType)}
+            />
             <IconButton
               icon={nodeData.isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
               tooltip={nodeData.isLocked ? 'Unlock position' : 'Lock position'}

@@ -1,3 +1,4 @@
+import { GateType } from '../../types/circuit';
 import { CircuitStore, StoreSlice, ThemeMode, UiDensity, ToastVariant, WireStyle } from '../types';
 
 // Toasts, theme/density preferences and panel/label visibility toggles
@@ -26,6 +27,9 @@ export type UiSlice = Pick<CircuitStore,
   | 'setEditingEdgeId'
   | 'isCanvasLocked'
   | 'toggleCanvasLock'
+  | 'datasheetType'
+  | 'openDatasheet'
+  | 'closeDatasheet'
 >;
 
 const PREFS_KEY = 'logic_studio_ui_prefs';
@@ -74,6 +78,7 @@ const ERROR_PATTERN = /^(fail|invalid|cannot|import rejected|recursion|error)/i;
 const isNarrowViewport = () => typeof window !== 'undefined' && window.innerWidth < 1024;
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let lastDatasheetType: GateType = 'AND';
 
 export const createUiSlice: StoreSlice<UiSlice> = (set, get) => ({
   showWireLabels: true,
@@ -85,6 +90,7 @@ export const createUiSlice: StoreSlice<UiSlice> = (set, get) => ({
   showMinimap: readPrefs().showMinimap !== false,
   editingEdgeId: null,
   isCanvasLocked: false,
+  datasheetType: null,
 
   toastMessage: null,
   toastVariant: 'success',
@@ -153,5 +159,15 @@ export const createUiSlice: StoreSlice<UiSlice> = (set, get) => ({
     const isCanvasLocked = !get().isCanvasLocked;
     set({ isCanvasLocked });
     get().showToast(isCanvasLocked ? 'Part positions locked' : 'Part positions unlocked', 'info');
+  },
+
+  // Without a type, reopens the part viewed last (AND the first time)
+  openDatasheet: (type) => {
+    if (type) lastDatasheetType = type;
+    set({ datasheetType: type ?? lastDatasheetType });
+  },
+
+  closeDatasheet: () => {
+    set({ datasheetType: null });
   },
 });

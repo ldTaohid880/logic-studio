@@ -169,6 +169,10 @@ export interface CircuitStore {
   toggleMinimap: () => void;
   isCanvasLocked: boolean;
   toggleCanvasLock: () => void;
+  /** Part shown in the datasheet reader, or null while it is closed. Not an undo step. */
+  datasheetType: GateType | null;
+  openDatasheet: (type?: GateType) => void;
+  closeDatasheet: () => void;
 
   // Wire Labels
   showWireLabels: boolean;
