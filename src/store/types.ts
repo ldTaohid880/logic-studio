@@ -66,6 +66,8 @@ export interface CircuitStore {
 
   // Node operations
   addNode: (gateType: GateType, position: { x: number; y: number }) => void;
+  /** Add a ready-made set of parts and wires (e.g. built from an expression) in view, as one undo step. */
+  insertCircuit: (nodes: Node[], edges: Edge[]) => void;
   deleteSelected: () => void;
   duplicateSelected: () => void;
   copySelected: () => void;

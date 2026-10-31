@@ -170,3 +170,55 @@ describe('circuits that never settle', () => {
     expect(d(res.nodes, `b${count - 1}`).outputs[0].value).toBe(count % 2 === 0 ? 1 : 0);
   });
 });
+
+describe('shared bus wires', () => {
+  // Two tri-state buffers (data, enable) drive one LED
+  const bus = (a: SignalValue, enA: SignalValue, b: SignalValue, enB: SignalValue) => {
+    const nodes = [
+      makeNode('da', 'INPUT', { value: a }), makeNode('ea', 'INPUT', { value: enA }),
+      makeNode('db', 'INPUT', { value: b }), makeNode('eb', 'INPUT', { value: enB }),
+      makeNode('ta', 'TRI_STATE_BUFFER'), makeNode('tb', 'TRI_STATE_BUFFER'),
+      makeNode('led', 'OUTPUT'),
+    ];
+    const edges = [
+      wire('da', 'ta'), wire('ea', 'ta', 'out-0', 'in-1'),
+      wire('db', 'tb'), wire('eb', 'tb', 'out-0', 'in-1'),
+      wire('ta', 'led'), wire('tb', 'led'),
+    ];
+    const res = propagateSignals(nodes, edges);
+    return { level: d(res.nodes, 'led').inputs[0].value, conflicts: res.conflictNodeIds, edges: res.edges };
+  };
+
+  it('takes the level of the one enabled driver', () => {
+    expect(bus(1, 1, 0, 0)).toMatchObject({ level: 1, conflicts: [] });
+    expect(bus(1, 0, 0, 1)).toMatchObject({ level: 0, conflicts: [] });
+  });
+
+  it('floats when no driver is enabled', () => {
+    expect(bus(1, 0, 1, 0)).toMatchObject({ level: -1, conflicts: [] });
+  });
+
+  it('accepts drivers that agree and flags drivers that disagree', () => {
+    expect(bus(1, 1, 1, 1)).toMatchObject({ level: 1, conflicts: [] });
+    const fight = bus(1, 1, 0, 1);
+    expect(fight).toMatchObject({ level: -1, conflicts: ['led'] });
+    expect(fight.edges.filter((e) => e.data?.conflict).map((e) => e.source).sort()).toEqual(['ta', 'tb']);
+  });
+
+  it('lets tunnels share a tag with floating drivers', () => {
+    const tunnel = (id: string) => makeNode(id, 'TUNNEL', { tunnelLabel: 'bus' }, [{ id: 'in-0', name: 'In', value: -1 }], [{ id: 'out-0', name: 'Out', value: -1 }]);
+    const nodes = [
+      makeNode('on', 'INPUT', { value: 1 }), makeNode('off', 'INPUT', { value: 0 }), makeNode('d', 'INPUT', { value: 0 }),
+      makeNode('ta', 'TRI_STATE_BUFFER'), makeNode('tb', 'TRI_STATE_BUFFER'),
+      tunnel('t1'), tunnel('t2'), tunnel('t3'), makeNode('led', 'OUTPUT'),
+    ];
+    const edges = [
+      wire('on', 'ta'), wire('on', 'ta', 'out-0', 'in-1'), // drives 1
+      wire('d', 'tb'), wire('off', 'tb', 'out-0', 'in-1'), // disabled: floats
+      wire('ta', 't1'), wire('tb', 't2'), wire('t3', 'led'),
+    ];
+    const res = propagateSignals(nodes, edges);
+    expect(d(res.nodes, 'led').inputs[0].value).toBe(1);
+    expect(res.conflictNodeIds).toEqual([]);
+  });
+});

@@ -28,3 +28,6 @@ export function nextPlacementPosition(): { x: number; y: number } {
   const snap = (v: number) => Math.round(v / 15) * 15;
   return { x: snap(base.x - 50 + col * COL_GAP), y: snap(base.y - 30 + row * ROW_GAP) };
 }
+
+/** Visible canvas center in flow coordinates (a fixed point before the canvas has mounted). */
+export const visibleCanvasCenter = (): { x: number; y: number } => getCenter?.() ?? { x: 320, y: 180 };

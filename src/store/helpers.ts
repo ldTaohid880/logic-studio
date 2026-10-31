@@ -7,6 +7,7 @@ import { BUILTIN_HALF_ADDER, BUILTIN_FULL_ADDER } from '../utils/builtinAdders';
 export const DEFAULT_SIMULATION: SimulationState = {
   stepCount: 0,
   unstableNodeIds: [],
+  conflictNodeIds: [],
 };
 
 // Parts that were removed from Logic Studio. Saved circuits may still contain them.

@@ -5,7 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 
 /** Bottom status strip: selection, circuit size, simulation state. */
 export const StatusBar: React.FC = () => {
-  const { nodeCount, edgeCount, selectedCount, selectedEdgeId, depth, unstableCount } = useCircuitStore(
+  const { nodeCount, edgeCount, selectedCount, selectedEdgeId, depth, unstableCount, conflictCount } = useCircuitStore(
     useShallow((s) => ({
       nodeCount: s.nodes.filter((n) => n.type !== 'groupNode').length,
       edgeCount: s.edges.length,
@@ -13,6 +13,7 @@ export const StatusBar: React.FC = () => {
       selectedEdgeId: s.selectedEdgeId,
       depth: s.hierarchyPath.length,
       unstableCount: s.simulation.unstableNodeIds.length,
+      conflictCount: s.simulation.conflictNodeIds.length,
     }))
   );
 
@@ -38,7 +39,16 @@ export const StatusBar: React.FC = () => {
       </span>
       {depth > 1 && <span className="hidden sm:inline text-accent-fg">Editing subcircuit</span>}
       <span className="flex-1 truncate hidden md:block text-center">{hint}</span>
-      {unstableCount > 0 ? (
+      {conflictCount > 0 ? (
+        <span
+          role="status"
+          title="Two or more outputs drive the same wire to different levels, which on real hardware is a short circuit. Enable only one tri-state output on a shared wire at a time."
+          className="ml-auto md:ml-0 inline-flex items-center gap-1.5 text-danger font-medium"
+        >
+          <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+          Outputs conflict on a wire
+        </span>
+      ) : unstableCount > 0 ? (
         <span
           role="status"
           title="A feedback loop keeps flipping (for example an odd ring of inverters). The parts outlined in amber never reach a steady value."

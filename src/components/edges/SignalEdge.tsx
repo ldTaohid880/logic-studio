@@ -74,10 +74,12 @@ export const SignalEdge: React.FC<EdgeProps> = ({
   const state = signalState(signalValue);
   const customColor = data?.color as string | undefined;
 
-  let strokeColor: string = signalColor(signalValue);
+  // Two drivers disagree on this wire's input (bus conflict): drawn in the danger color with a short dash
+  const conflict = data?.conflict === true;
+  let strokeColor: string = conflict ? 'var(--danger)' : signalColor(signalValue);
   let pulseColor = 'color-mix(in srgb, var(--signal-high) 35%, white)';
 
-  if (customColor) {
+  if (customColor && !conflict) {
     const colors = getWireColors(customColor);
     strokeColor = isHigh ? colors.high : colors.low;
     pulseColor = colors.anim;
@@ -105,8 +107,9 @@ export const SignalEdge: React.FC<EdgeProps> = ({
         interactionWidth={16}
         style={{
           stroke: strokeColor,
-          strokeWidth: wireStrokeWidth(state),
-          strokeDasharray: wireDashArray(state),
+          strokeWidth: conflict ? wireStrokeWidth('high') : wireStrokeWidth(state),
+          strokeDasharray: conflict ? '2 4' : wireDashArray(state),
+          strokeLinecap: conflict ? 'round' : undefined,
           strokeLinejoin: 'round',
           transition: 'stroke 0.15s ease',
         }}

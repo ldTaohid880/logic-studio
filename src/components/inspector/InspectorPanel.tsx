@@ -191,7 +191,8 @@ const NodeInspector: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
       <InspectorHeader
         icon={<PartGlyph type={gateType} />}
         title={info.name}
-        rename={{ value: label ?? '', placeholder: info.name, onChange: (v) => updateNodeLabel(nodeId, v) }}
+        // New chips are labelled with their type id; show the field empty so the readable name shows as placeholder
+        rename={{ value: label && label !== gateType ? label : '', placeholder: info.name, onChange: (v) => updateNodeLabel(nodeId, v) }}
         subtitle={
           <>
             {info.name}

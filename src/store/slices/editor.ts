@@ -1,3 +1,4 @@
+import { visibleCanvasCenter } from '../../utils/canvasBridge';
 import {
   Edge,
   applyNodeChanges,
@@ -9,12 +10,16 @@ import { markRemovedWireTargets, initialCircuit } from '../helpers';
 import { createPart } from '../partFactory';
 import { CircuitStore, StoreSlice } from '../types';
 
+// Parts whose outputs can float, so several of them may share one wire (a bus)
+const BUS_DRIVERS = new Set<string>(['TRI_STATE_BUFFER', 'ARDUINO_UNO']);
+
 // Canvas editing: nodes, wires, selection, part properties and labels
 export type EditorSlice = Pick<CircuitStore,
   | 'nodes'
   | 'edges'
   | 'selectedNodeId'
   | 'selectedEdgeId'
+  | 'insertCircuit'
   | 'isDragging'
   | 'setIsDragging'
   | 'onNodesChange'
@@ -110,15 +115,40 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
       data: { signalValue: -1 },
     };
 
-    // Filter out existing edge connected to the same target handle (inputs can only receive 1 wire)
-    const filteredEdges = get().edges.filter(
-      (e) => !(e.target === connection.target && e.targetHandle === connection.targetHandle)
-    );
+    // A new wire on a used input replaces the old one, except on a shared bus: outputs that can float
+    // (tri-state buffers, board pins) may all drive the same input, and the engine resolves them together
+    const gateTypeOf = (id: string) => (get().nodes.find((n) => n.id === id)?.data as unknown as NodeData | undefined)?.gateType;
+    const intoSameInput = (e: Edge) => e.target === connection.target && e.targetHandle === connection.targetHandle;
+    const shareable = (id: string) => BUS_DRIVERS.has(gateTypeOf(id) ?? '');
+    const keepExisting = shareable(connection.source) && get().edges.filter(intoSameInput).every((e) => shareable(e.source));
+    const filteredEdges = get().edges.filter((e) => !intoSameInput(e) || (keepExisting && e.id !== newEdge.id));
 
     const nextEdges = [...filteredEdges, newEdge];
     set({ edges: nextEdges });
 
     // Propagate signals immediately
+    get().tickSimulation();
+  },
+
+  insertCircuit: (newNodes, newEdges) => {
+    if (newNodes.length === 0) return;
+    get().saveHistory();
+    // Centre the new parts in view; they arrive selected so they can be moved together
+    const maxX = Math.max(...newNodes.map((n) => n.position.x)) + 90;
+    const maxY = Math.max(...newNodes.map((n) => n.position.y)) + 60;
+    const center = visibleCanvasCenter();
+    const snap = (v: number) => Math.round(v / 15) * 15;
+    const dx = snap(center.x - maxX / 2);
+    const dy = snap(center.y - maxY / 2);
+    set({
+      nodes: [
+        ...get().nodes.map((n) => (n.selected ? { ...n, selected: false } : n)),
+        ...newNodes.map((n) => ({ ...n, position: { x: n.position.x + dx, y: n.position.y + dy }, selected: true })),
+      ],
+      edges: [...get().edges, ...newEdges],
+      selectedNodeId: null,
+      selectedEdgeId: null,
+    });
     get().tickSimulation();
   },
 

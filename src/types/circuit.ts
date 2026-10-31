@@ -33,6 +33,9 @@ export type GateType =
   | 'DECODER_BCD_TO_7SEG'
   | 'D_LATCH'
   | 'JK_FLIPFLOP'
+  | 'D_FLIPFLOP'
+  | 'SR_LATCH'
+  | 'MUX_2TO1'
   | 'REGISTER_4BIT'
   // Combinational
   | 'MUX_8TO1'
@@ -122,6 +125,7 @@ export interface BoardFirmware {
 export interface SimulationState {
   stepCount: number; // Number of propagation passes since the last reset
   unstableNodeIds: string[]; // Parts that never settled in the last propagation (oscillation)
+  conflictNodeIds: string[]; // Parts with an input driven to different levels at once (bus conflict)
 }
 
 export interface CircuitPreset {
