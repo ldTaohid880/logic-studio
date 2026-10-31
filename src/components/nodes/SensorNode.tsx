@@ -7,8 +7,6 @@ import { Pin } from './Pin';
 import { Lead, PartLabel, PartSvg } from './partKit';
 
 const W = 120;
-const BODY = 60;
-const H = 90;
 const MODULE_W = 104;
 
 // Module boards look the same in both themes, like real hardware (see DisplayFace in partKit)
@@ -64,6 +62,17 @@ const Element: React.FC<{ type: SensorType; level: number }> = ({ type, level })
           <path d="M3 18 h-6 M3 36 h-6" stroke="#9aa3ab" strokeWidth={1} />
         </g>
       );
+    case 'POTENTIOMETER': {
+      // Knob pointer turns from -135° to 135° across the range
+      const angle = -135 + (level / 100) * 270;
+      return (
+        <g>
+          <rect x={6} y={8} width={44} height={44} rx={3} fill="#1f3f7a" stroke="#132a55" />
+          <circle cx={28} cy={30} r={15} fill="#e9eef2" stroke="#9aa3ab" />
+          <line x1={28} y1={30} x2={28} y2={18} stroke="#1a1a1a" strokeWidth={2.5} strokeLinecap="round" transform={`rotate(${angle} 28 30)`} />
+        </g>
+      );
+    }
     case 'SENSOR_MOTION':
       return (
         <g>
@@ -85,7 +94,15 @@ export const SensorNode: React.FC<NodeProps> = memo(({ id, data: nodeData }) => 
   const level = sensorLevel(data);
   const out = data.outputs?.[0]?.value ?? -1;
   const pir = type === 'SENSOR_MOTION';
+  const pot = type === 'POTENTIOMETER';
+  const ao = data.outputs?.find((p) => p.name === 'AO');
+  // Comparator modules have a fourth pad for the analog output, so their board is taller
+  const BODY = ao ? 75 : 60;
+  const H = BODY + 30;
   const setLevel = (v: number) => useCircuitStore.getState().setSensorLevel(id, v);
+  const pads: [string, number][] = pot
+    ? [['VCC', 15], ['W', 30], ['GND', 45]]
+    : [['VCC', 15], [pir ? 'OUT' : 'DO', 30], ['GND', 45], ...(ao ? ([['AO', 60]] as [string, number][]) : [])];
 
   return (
     <div className="lsp-schematic relative" style={{ width: W, height: H }}>
@@ -93,7 +110,7 @@ export const SensorNode: React.FC<NodeProps> = memo(({ id, data: nodeData }) => 
       <PartSvg width={W} height={BODY}>
         <rect x={0} y={0} width={MODULE_W} height={BODY} rx={4} fill={pir ? HW.green : HW.blue} stroke={pir ? HW.greenEdge : HW.blueEdge} strokeWidth={1.5} />
         <Element type={type} level={level} />
-        {pir ? (
+        {pot ? null : pir ? (
           <>
             <Trimmer x={69} y={14} />
             <Trimmer x={69} y={46} />
@@ -108,18 +125,15 @@ export const SensorNode: React.FC<NodeProps> = memo(({ id, data: nodeData }) => 
             <text x={72} y={42} fontSize={5} textAnchor="middle" fill={HW.silk}>DO</text>
           </>
         )}
-        {/* VCC, GND and DO header */}
-        {[
-          ['VCC', 15],
-          ['DO', 30],
-          ['GND', 45],
-        ].map(([name, y]) => (
+        {/* Header pads */}
+        {pads.map(([name, y]) => (
           <g key={name}>
             <rect x={95} y={(y as number) - 3} width={6} height={6} fill={HW.gold} />
             <text x={92} y={(y as number) + 2} fontSize={5.5} textAnchor="end" fill={HW.silk}>{name}</text>
           </g>
         ))}
         <Lead x1={101} x2={W} y={30} value={out} />
+        {ao && <Lead x1={101} x2={W} y={60} value={ao.value} />}
       </PartSvg>
 
       <div className="absolute left-0 flex items-center gap-1.5" style={{ top: BODY + 6, width: MODULE_W + 14 }}>
@@ -151,7 +165,24 @@ export const SensorNode: React.FC<NodeProps> = memo(({ id, data: nodeData }) => 
         )}
       </div>
 
-      <Pin type="source" position={Position.Right} id="out-0" value={out} label={`${data.label || spec.name} DO`} style={{ top: 30 }} />
+      <Pin
+        type="source"
+        position={Position.Right}
+        id="out-0"
+        value={out}
+        label={pot ? `Wiper: ${level}% of 5 V` : `${data.label || spec.name} ${pir ? 'OUT' : 'DO'}`}
+        style={{ top: 30 }}
+      />
+      {ao && (
+        <Pin
+          type="source"
+          position={Position.Right}
+          id={ao.id}
+          value={ao.value}
+          label={`AO: ${((ao.analog ?? 0) * 5).toFixed(2)} V`}
+          style={{ top: 60 }}
+        />
+      )}
     </div>
   );
 });

@@ -47,6 +47,12 @@ export type GateType =
   // Sequential
   | 'T_FLIPFLOP'
   | 'COUNTER_4BIT'
+  | 'COUNTER_LOAD_4BIT'
+  | 'DECADE_COUNTER'
+  | 'SHIFT_REG_UNIVERSAL'
+  | 'DECODER_4TO16_HC'
+  | 'REGISTER_8BIT'
+  | 'LATCH_8BIT'
   | 'SHIFT_REG_4BIT'
   | 'RAM_16X4'
   | 'ROM_16X4'
@@ -58,6 +64,9 @@ export type GateType =
   | 'SENSOR_TEMPERATURE'
   | 'SENSOR_OBSTACLE'
   | 'SENSOR_MOTION'
+  | 'POTENTIOMETER'
+  | 'BUZZER'
+  | 'LCD_16X2'
   // Arithmetic
   | 'HALF_ADDER'
   | 'FULL_ADDER'
@@ -85,6 +94,8 @@ export interface PinData {
   driven?: boolean; // Set while a wire drives this input pin; used to float the pin once the wire is removed
   width?: number; // Bus pins: number of bits (2–8); the pin carries `bus` and `value` stays -1
   bus?: SignalValue[]; // Bus pins: one level per bit, least significant first
+  analog?: number; // Analog level as a fraction of 5 V (sensor AO, potentiometer, PWM duty); value stays the logic level
+  freq?: number; // Frequency in Hz of a pin that keeps toggling (a clock, tone() on a board pin)
 }
 
 export interface NodeData {

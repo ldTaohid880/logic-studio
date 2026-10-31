@@ -206,3 +206,84 @@ describe('gate delays', () => {
     expect(seen.has(0) && seen.has(1)).toBe(true);
   });
 });
+
+describe('analog levels and Arduino extras', () => {
+  it('carries a potentiometer or sensor AO level along a wire', () => {
+    const pot = part('POTENTIOMETER', { sensorLevel: 30 });
+    const light = part('SENSOR_LIGHT', { sensorLevel: 80 });
+    const [l1, l2] = [part('OUTPUT'), part('OUTPUT')];
+    const { nodes } = propagateSignals([pot, light, l1, l2], [wire(pot, l1), wire(light, l2, 'out-1')], {});
+    expect(dataOf(nodes, l1.id).inputs[0]).toMatchObject({ value: 0, analog: 0.3 });
+    expect(dataOf(nodes, l2.id).inputs[0]).toMatchObject({ value: 1, analog: 0.8 });
+  });
+
+  it('gives a clock’s frequency to the wire it drives', () => {
+    const clock = part('CLOCK', { clockHz: 50 });
+    const buzzer = part('BUZZER');
+    const { nodes } = propagateSignals([clock, buzzer], [wire(clock, buzzer)], {});
+    expect(dataOf(nodes, buzzer.id).inputs[0].freq).toBe(50);
+  });
+
+  it('reads A0 with analogRead: ADC result on D8–D13', () => {
+    // ldi r16,0x3F / out DDRB / ldi r16,0x60 / sts ADMUX / loop: ldi r16,0xC7 / sts ADCSRA /
+    // wait: lds r17,ADCSRA / sbrc r17,6 / rjmp wait / lds r18,ADCH / out PORTB,r18 / rjmp loop
+    const program = wordsToIntelHex([
+      0xe30f, 0xb904, 0xe600, 0x9300, 0x007c, 0xec07, 0x9300, 0x007a, 0x9110, 0x007a, 0xfd16, 0xcffc, 0x9120, 0x0079, 0xb925, 0xcff5,
+    ]);
+    const uno = new UnoBoard(program);
+    uno.analog(0, 0.3 * 5); // 1.5 V: 10-bit result ≈ 307, top 8 bits = 76 = 0b1001100
+    uno.run(2);
+    expect([8, 9, 10, 11, 12, 13].map((p) => uno.output(p))).toEqual([0, 0, 1, 1, 0, 0]);
+  });
+
+  it('measures PWM duty and frequency on a pin that keeps switching', () => {
+    // ldi r16,0x20 / out DDRB / top: sbi PORTB,5 / ldi r20,50 / dec r20 / brne / cbi PORTB,5 / ldi r20,150 / dec / brne / rjmp top
+    const program = wordsToIntelHex([0xe200, 0xb904, 0x9a2d, 0xe342, 0x954a, 0xf7f1, 0x982d, 0xe946, 0x954a, 0xf7f1, 0xcff7]);
+    const uno = new UnoBoard(program);
+    for (let i = 0; i < 4; i++) uno.run(1);
+    const pwm = uno.pwm(13)!;
+    expect(pwm.duty).toBeGreaterThan(0.22);
+    expect(pwm.duty).toBeLessThan(0.28);
+    expect(pwm.frequency).toBeGreaterThan(20000);
+    expect(uno.pwm(12)).toBeNull(); // a steady pin isn't PWM
+  });
+
+  it('catches an LCD’s microsecond E pulses inside the emulator', () => {
+    // LiquidCrystal lcd(12, 11, 5, 4, 3, 2): RS = D12, E = D11, D4–D7 = D5, D4, D3, D2.
+    // ldi r16,0x18 / out DDRB / ldi r16,0x3C / out DDRD / ldi r16,0x08 / out PORTD / sbi PORTB,4 (RS) /
+    // sbi PORTB,3 / cbi PORTB,3 (E pulse) / ldi r16,0x04 / out PORTD / sbi PORTB,3 / cbi PORTB,3 / rjmp .
+    const program = wordsToIntelHex([
+      0xe108, 0xb904, 0xe30c, 0xb90a, 0xe008, 0xb90b, 0x9a2c, 0x9a2b, 0x982b, 0xe004, 0xb90b, 0x9a2b, 0x982b, 0xcfff,
+    ]);
+    const uno = new UnoBoard(program);
+    uno.setTaps([{ id: 'lcd', strobe: 11, pins: [12, 5, 4, 3, 2] }]);
+    uno.run(1);
+    // [RS, D4, D5, D6, D7]: 'H' = 0x48 as nibbles 0100 then 1000
+    expect(uno.takeTapEvents()).toEqual([
+      { id: 'lcd', levels: [1, 0, 0, 1, 0] },
+      { id: 'lcd', levels: [1, 0, 0, 0, 1] },
+    ]);
+  });
+
+  it('writes the caught nibbles into an LCD wired to the board', async () => {
+    const { lcdLines } = await import('./hd44780');
+    const program = wordsToIntelHex([
+      0xe108, 0xb904, 0xe30c, 0xb90a, 0xe008, 0xb90b, 0x9a2c, 0x9a2b, 0x982b, 0xe004, 0xb90b, 0x9a2b, 0x982b, 0xcfff,
+    ]);
+    const uno = new UnoBoard(program);
+    const board = part('ARDUINO_UNO');
+    // An LCD already set to 4-bit mode with the display on
+    const lcdPart = part('LCD_16X2');
+    const { initialLcd } = await import('./hd44780');
+    const lcd = { ...lcdPart, data: { ...lcdPart.data, icState: { lcd: { ...initialLcd(), eightBit: false, displayOn: true } } } };
+    const pin = (n: number) => `out-${BOARD_PINS_INDEX(n)}`;
+    const edges = [
+      wire(board, lcd, pin(12), 'in-0'), wire(board, lcd, pin(11), 'in-1'),
+      wire(board, lcd, pin(5), 'in-2'), wire(board, lcd, pin(4), 'in-3'), wire(board, lcd, pin(3), 'in-4'), wire(board, lcd, pin(2), 'in-5'),
+    ];
+    const { nodes } = advanceCircuit({ nodes: [board, lcd], edges }, {}, 0, 2, () => uno);
+    expect(lcdLines(dataOf(nodes, lcd.id).icState!.lcd)[0].trimEnd()).toBe('H');
+  });
+});
+
+const BOARD_PINS_INDEX = (pin: number) => pin - 2;

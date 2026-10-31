@@ -34,6 +34,8 @@ import { BoardNode } from '../nodes/BoardNode';
 import { SensorNode } from '../nodes/SensorNode';
 import { ResistorNode } from '../nodes/ResistorNode';
 import { BusNode } from '../nodes/BusNode';
+import { BuzzerNode } from '../nodes/BuzzerNode';
+import { LcdNode } from '../nodes/LcdNode';
 import { SignalEdge } from '../edges/SignalEdge';
 import { GateType, NodeData } from '../../types/circuit';
 import { MenuPanel, MenuEntry } from '../ui/DropdownMenu';
@@ -60,6 +62,8 @@ const nodeTypes = {
   sensorModule: SensorNode,
   resistorNode: ResistorNode,
   busNode: BusNode,
+  buzzerNode: BuzzerNode,
+  lcdNode: LcdNode,
 };
 
 const edgeTypes = {

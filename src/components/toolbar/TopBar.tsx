@@ -20,7 +20,13 @@ import {
   ToggleLeft,
   Monitor,
   Wand2,
+  FileText,
+  ClipboardList,
+  FileCode,
+  Link2,
 } from 'lucide-react';
+import { circuitToVerilog } from '../../utils/verilog';
+import { exportCanvas, ExportFormat } from '../../utils/exportCanvas';
 import { Logo } from '../ui/Logo';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -28,7 +34,6 @@ import { IconButton } from '../ui/IconButton';
 import { DropdownMenu, MenuEntry } from '../ui/DropdownMenu';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Tooltip } from '../ui/Tooltip';
-import { toPng } from 'html-to-image';
 import { resolveCssColor } from '../../theme/signals';
 import { UiDensity } from '../../store/types';
 import { saveCircuitAsJSON } from '../../utils/fileActions';
@@ -39,6 +44,9 @@ interface TopBarProps {
   onOpenSubcircuitLibrary?: () => void;
   onOpenCircuitTruthTable?: () => void;
   onOpenBuildCircuit?: () => void;
+  onOpenPartsList?: () => void;
+  onOpenShare?: () => void;
+  onOpenProjects?: () => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -60,6 +68,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenSubcircuitLibrary,
   onOpenCircuitTruthTable,
   onOpenBuildCircuit,
+  onOpenPartsList,
+  onOpenShare,
+  onOpenProjects,
   canvasRef,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -123,21 +134,25 @@ export const TopBar: React.FC<TopBarProps> = ({
     e.target.value = '';
   };
 
-  const handleExportPNG = async () => {
+  const handleExportVerilog = () => {
+    const { nodes: current, edges, customComponents: library, hierarchyPath, rootCircuitState } = useCircuitStore.getState();
+    const root = hierarchyPath.length > 1 && rootCircuitState ? rootCircuitState : { nodes: current, edges };
+    const text = circuitToVerilog(root.nodes, root.edges, library, 'circuit');
+    const link = document.createElement('a');
+    link.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+    link.download = 'circuit.v';
+    link.click();
+    showToast('Exported as Verilog (circuit.v)');
+  };
+
+  const handleExport = async (format: ExportFormat) => {
     if (!canvasRef.current) return;
     try {
-      const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: resolveCssColor('--canvas-bg', theme === 'dark' ? '#101114' : '#fafbfc'),
-        quality: 0.95,
-      });
-      const link = document.createElement('a');
-      link.download = `circuit-export-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
-      showToast('Canvas exported as PNG');
+      await exportCanvas(canvasRef.current, format, resolveCssColor('--canvas-bg', theme === 'dark' ? '#101114' : '#fafbfc'));
+      showToast(`Canvas exported as ${format.toUpperCase()}`);
     } catch (err) {
-      console.error('Failed to export image:', err);
-      showToast('Failed to export PNG image', 'error');
+      console.error('Failed to export:', err);
+      showToast(`Failed to export ${format.toUpperCase()}`, 'error');
     }
   };
 
@@ -155,12 +170,19 @@ export const TopBar: React.FC<TopBarProps> = ({
   const requestNew = () => (nodes.length === 0 ? clearCanvas() : setPendingConfirm('new'));
 
   const customCount = Object.keys(customComponents || {}).length;
+  const projectName = useCircuitStore((s) => s.projects.find((p) => p.id === s.currentProjectId)?.name ?? 'Untitled');
 
   const fileMenu: MenuEntry[] = [
+    { id: 'projects', label: 'Projects…', icon: <FolderOpen className="w-4 h-4" />, onSelect: () => onOpenProjects?.() },
     { id: 'new', label: 'New circuit', icon: <FilePlus className="w-4 h-4" />, onSelect: requestNew },
     { id: 'open', label: 'Open file…', icon: <Upload className="w-4 h-4" />, onSelect: () => fileInputRef.current?.click() },
     { id: 'save', label: 'Save as JSON', icon: <Download className="w-4 h-4" />, shortcut: 'Ctrl+S', onSelect: handleSaveJSON },
-    { id: 'png', label: 'Export image (PNG)', icon: <ImageIcon className="w-4 h-4" />, onSelect: handleExportPNG },
+    { id: 'png', label: 'Export image (PNG)', icon: <ImageIcon className="w-4 h-4" />, onSelect: () => handleExport('png') },
+    { id: 'svg', label: 'Export image (SVG)', icon: <ImageIcon className="w-4 h-4" />, onSelect: () => handleExport('svg') },
+    { id: 'pdf', label: 'Export PDF', icon: <FileText className="w-4 h-4" />, onSelect: () => handleExport('pdf') },
+    { id: 'verilog', label: 'Export Verilog', icon: <FileCode className="w-4 h-4" />, onSelect: handleExportVerilog },
+    { id: 'bom', label: 'Parts list…', icon: <ClipboardList className="w-4 h-4" />, onSelect: () => onOpenPartsList?.() },
+    { id: 'share', label: 'Share link…', icon: <Link2 className="w-4 h-4" />, onSelect: () => onOpenShare?.() },
     { type: 'separator', id: 'sep1' },
     { id: 'build', label: 'Build from expression…', icon: <Wand2 className="w-4 h-4" />, onSelect: () => onOpenBuildCircuit?.() },
     { id: 'presets', label: `Example circuits (${presets.length})`, icon: <FolderOpen className="w-4 h-4" />, onSelect: onOpenPresets },
@@ -256,6 +278,15 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="hidden sm:flex items-center gap-2 pl-1 pr-2 shrink-0">
         <Logo className="w-7 h-7 shrink-0" />
         <h1 className="hidden md:block text-sm font-semibold text-fg tracking-tight">Logic Studio</h1>
+        <span className="hidden md:block text-fg-subtle" aria-hidden="true">/</span>
+        <button
+          type="button"
+          onClick={() => onOpenProjects?.()}
+          title="Projects"
+          className="max-w-[12rem] truncate rounded-md px-1.5 py-0.5 text-sm text-fg-muted hover:text-fg hover:bg-surface-2 cursor-pointer"
+        >
+          {projectName}
+        </button>
       </div>
 
       <nav aria-label="Main menu" className="flex items-center">

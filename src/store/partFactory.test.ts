@@ -21,7 +21,8 @@ describe('createPart', () => {
       .filter((t) => t !== 'DELAY_ELEMENT')
       .forEach((type) => {
         const node = createPart(type as never, { x: 0, y: 0 }, []);
-        expect(node.type).toBe('icComponent');
+        // The LCD is evaluated like a chip but drawn as a display module
+        expect(node.type).toBe(type === 'LCD_16X2' ? 'lcdNode' : 'icComponent');
         expect(dataOf(node).inputs.map((p) => p.id)).toEqual(getDefaultICPins(type as never).inputs.map((p) => p.id));
       });
   });

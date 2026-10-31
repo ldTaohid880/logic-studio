@@ -106,6 +106,30 @@ const GLYPHS: Partial<Record<GateType, () => React.ReactNode>> = {
         <circle cx={16} cy={27} r={5} fill="currentColor" />
       </>
     ),
+  POTENTIOMETER: () =>
+    module(
+      <>
+        <circle cx={22} cy={20} r={9} {...stroke} strokeWidth={1.75} />
+        <line x1={22} y1={20} x2={16} y2={14} {...stroke} strokeWidth={2} />
+      </>
+    ),
+  BUZZER: () =>
+    frame(
+      <>
+        <line x1={2} y1={20} x2={14} y2={20} {...stroke} />
+        <circle cx={30} cy={20} r={14} {...body} />
+        <circle cx={30} cy={20} r={3} fill="currentColor" />
+        <path d="M49 12 Q55 20 49 28 M54 8 Q62 20 54 32" {...stroke} strokeWidth={1.5} />
+      </>
+    ),
+  LCD_16X2: () =>
+    frame(
+      <>
+        <rect x={3} y={6} width={58} height={28} rx={2} {...body} />
+        <rect x={8} y={11} width={48} height={14} rx={1} {...stroke} strokeWidth={1.5} />
+        <path d="M12 18 H24 M28 18 H40" {...stroke} strokeWidth={2} />
+      </>
+    ),
   SENSOR_MOTION: () =>
     module(
       <>

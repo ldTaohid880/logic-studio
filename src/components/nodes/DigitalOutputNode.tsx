@@ -19,6 +19,9 @@ export const DigitalOutputNode = React.memo(({ data }: NodeProps) => {
   const value = nodeData.inputs?.[0]?.value ?? nodeData.value ?? -1;
   const state = signalState(value);
   const col = outputColor(nodeData.displayColor, 'red');
+  // Driven by PWM (analogWrite), the LED glows in proportion to the duty
+  const pwm = nodeData.inputs?.[0]?.analog;
+  const glow = state === 'high' ? (pwm !== undefined ? Math.max(0.15, pwm) : 1) : 0;
 
   return (
     <div className="lsp-schematic relative" style={{ width: W, height: H }}>
@@ -42,8 +45,8 @@ export const DigitalOutputNode = React.memo(({ data }: NodeProps) => {
           cy={15}
           r={10.5}
           style={{
-            fill: state === 'high' ? col.on : col.off,
-            filter: state === 'high' ? `drop-shadow(0 0 7px ${col.glow})` : undefined,
+            fill: glow > 0 ? `color-mix(in srgb, ${col.on} ${Math.round(glow * 100)}%, ${col.off})` : col.off,
+            filter: glow > 0 ? `drop-shadow(0 0 ${Math.round(7 * glow)}px ${col.glow})` : undefined,
             transition: 'fill 0.12s ease',
           }}
         />

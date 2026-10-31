@@ -62,6 +62,7 @@ export const PARTS: PartInfo[] = [
   { type: 'DEMUX_1TO4', name: '1:4 demultiplexer', description: 'Sends its input to one of 4 outputs', category: 'Combinational', partNumber: '74HC139' },
   { type: 'DEMUX_1TO8', name: '1:8 demultiplexer', description: 'Sends its input to one of 8 outputs', category: 'Combinational', partNumber: '74HC138' },
   { type: 'DECODER_3TO8', name: '3-to-8 decoder', description: 'Sets the one output numbered by 3 input bits', category: 'Combinational', partNumber: '74HC138' },
+  { type: 'DECODER_4TO16_HC', name: '4-to-16 decoder', description: 'Sets the one of 16 outputs numbered by 4 input bits', category: 'Combinational', partNumber: '74HC154' },
   { type: 'DECODER_BCD_TO_7SEG', name: 'BCD to 7-segment', description: 'Drives segments a–g from a 4-bit digit', category: 'Combinational', partNumber: '74HC4511' },
   { type: 'ENCODER_8TO3', name: '8-to-3 encoder', description: 'Outputs the number of the highest active input', category: 'Combinational', partNumber: '74HC148' },
   { type: 'PRIORITY_ENCODER', name: '4-to-2 priority encoder', description: 'Outputs the number of the highest active of 4 inputs', category: 'Combinational' },
@@ -88,6 +89,11 @@ export const PARTS: PartInfo[] = [
   { type: 'T_FLIPFLOP', name: 'T flip-flop', description: 'Toggles on the clock edge while T is 1', category: 'Memory' },
   { type: 'REGISTER_4BIT', name: '4-bit register', description: 'Stores 4 bits on the clock edge', category: 'Memory', partNumber: '74HC173' },
   { type: 'COUNTER_4BIT', name: '4-bit counter', description: 'Counts clock edges up or down', category: 'Memory', partNumber: '74HC193' },
+  { type: 'COUNTER_LOAD_4BIT', name: '4-bit counter with load', description: 'Counts up, or loads D on the clock edge', category: 'Memory', partNumber: '74HC161' },
+  { type: 'DECADE_COUNTER', name: 'Decade counter', description: 'Counts 0 to 9 and starts again', category: 'Memory', partNumber: '74HC160' },
+  { type: 'SHIFT_REG_UNIVERSAL', name: 'Universal shift register', description: 'Holds, shifts left or right, or loads, picked by S1 S0', category: 'Memory', partNumber: '74HC194' },
+  { type: 'REGISTER_8BIT', name: '8-bit register', description: 'Stores 8 bits on the clock edge', category: 'Memory', partNumber: '74HC273' },
+  { type: 'LATCH_8BIT', name: '8-bit latch', description: 'Follows D while LE is 1; outputs float while OE is 0', category: 'Memory', partNumber: '74HC373' },
   { type: 'SHIFT_REG_4BIT', name: '4-bit shift register', description: 'Shifts a serial bit in on each clock edge', category: 'Memory', partNumber: '74HC164' },
   { type: 'RAM_16X4', name: '16 × 4 RAM', description: 'Stores 16 four-bit words, written on the clock edge', category: 'Memory' },
   { type: 'ROM_16X4', name: '16 × 4 ROM', description: 'Reads one of 16 four-bit words you set', category: 'Memory' },
@@ -95,6 +101,8 @@ export const PARTS: PartInfo[] = [
   // Displays
   { type: 'OUTPUT', name: 'LED', description: 'Lights when its input is 1', category: 'Displays' },
   { type: 'LOGIC_PROBE', name: 'Probe', description: 'Shows 1, 0 or floating', category: 'Displays' },
+  { type: 'BUZZER', name: 'Buzzer', description: 'Beeps while its input is 1, at the frequency it is driven at', category: 'Displays' },
+  { type: 'LCD_16X2', name: '16 × 2 LCD', description: 'Character display driven like the Arduino LiquidCrystal library (RS, E, D4–D7)', category: 'Displays', partNumber: 'HD44780' },
   { type: 'SEVEN_SEGMENT', name: '7-segment', description: 'Shows a digit from 4 input bits', category: 'Displays' },
   { type: 'HEX_DISPLAY', name: 'Hex digit', description: 'Shows 0–F from 4 input bits', category: 'Displays' },
   { type: 'BUS_MONITOR', name: 'Bus value', description: 'Shows a 2–8 bit value in hex, decimal or binary', category: 'Displays' },
@@ -103,6 +111,7 @@ export const PARTS: PartInfo[] = [
   { type: 'SENSOR_LIGHT', name: 'Light', description: 'Outputs 1 when brighter than its threshold', category: 'Sensors', partNumber: 'LDR module' },
   { type: 'SENSOR_TEMPERATURE', name: 'Temperature', description: 'Outputs 1 when hotter than its threshold', category: 'Sensors', partNumber: 'Thermistor module' },
   { type: 'SENSOR_OBSTACLE', name: 'Obstacle', description: 'Outputs 1 when something is closer than its threshold', category: 'Sensors', partNumber: 'IR proximity module' },
+  { type: 'POTENTIOMETER', name: 'Potentiometer', description: 'A knob giving 0–5 V on its wiper, for analogRead', category: 'Sensors', partNumber: '10 kΩ' },
   { type: 'SENSOR_MOTION', name: 'Motion', description: 'Outputs 1 while it sees movement', category: 'Sensors', partNumber: 'PIR module' },
 
   // Programmable boards

@@ -2,6 +2,7 @@ import { Node, Edge } from '@xyflow/react';
 import { NodeData, SignalValue } from '../types/circuit';
 import { CustomComponentDefinition } from '../types/customComponent';
 import { propagateSignals } from './engine';
+import { initialLcd, lcdNibble, LcdState } from './hd44780';
 
 /**
  * Simulated time. Circuits without clocks or boards never use this: they settle instantly on every edit.
@@ -57,7 +58,33 @@ export interface BoardLike {
   run(ms: number): void;
   output(pin: number): SignalValue;
   input(pin: number, value: SignalValue): void;
+  /** Voltage on analog input A0–A5. */
+  analog?(channel: number, volts: number): void;
+  /** Duty and frequency of a pin that keeps switching. */
+  pwm?(pin: number): { duty: number; frequency: number } | null;
+  setTaps?(taps: { id: string; strobe: number; pins: number[] }[]): void;
+  takeTapEvents?(): { id: string; levels: SignalValue[] }[];
 }
+
+/**
+ * LCDs wired straight to a board pin for each of RS, E and D4–D7. Their E pulses last about a microsecond,
+ * far shorter than a 1 ms slice, so the board catches them as they happen (see UnoBoard.setTaps).
+ */
+function lcdTaps(boardId: string, nodes: Node[], edges: Edge[]) {
+  return nodes
+    .filter((n) => (n.data as unknown as NodeData).gateType === 'LCD_16X2')
+    .flatMap((lcd) => {
+      const pinFor = (input: number) => {
+        const e = edges.find((w) => w.target === lcd.id && (w.targetHandle || 'in-0') === `in-${input}` && w.source === boardId);
+        const index = e ? Number((e.sourceHandle || 'out-0').replace('out-', '')) : -1;
+        return BOARD_PINS[index];
+      };
+      const pins = [0, 1, 2, 3, 4, 5].map(pinFor);
+      return pins.every((p) => p !== undefined) ? [{ id: lcd.id, strobe: pins[1], pins: [pins[0], ...pins.slice(2)] }] : [];
+    });
+}
+
+const close = (a: number | undefined, b: number | undefined) => (a === undefined || b === undefined ? a === b : Math.abs(a - b) < 0.01 * Math.max(1, Math.abs(b)));
 
 export interface AdvanceResult {
   nodes: Node[];
@@ -102,6 +129,7 @@ export function advanceCircuit(
     .filter((n) => (n.data as unknown as NodeData).gateType === 'ARDUINO_UNO')
     .map((n) => ({ id: n.id, board: boardFor(n) }))
     .filter((b): b is { id: string; board: BoardLike } => b.board !== null);
+  boards.forEach(({ id, board }) => board.setTaps?.(lcdTaps(id, nodes, edges)));
 
   let t = from;
   while (t < to - EPSILON) {
@@ -110,13 +138,20 @@ export function advanceCircuit(
     let next = to;
     if (passDue !== null) next = Math.min(next, Math.max(passDue, t));
     clocks.forEach((c) => (next = Math.min(next, nextClockEdge(t, c.hz))));
+    // LCD writes the boards made during this slice
+    const lcdWrites = new Map<string, SignalValue[][]>();
     if (boards.length > 0) {
       next = Math.min(next, Math.floor(t + EPSILON) + 1);
       const byId = new Map(nodes.map((n) => [n.id, n.data as unknown as NodeData]));
       boards.forEach(({ id, board }) => {
         const inputs = byId.get(id)?.inputs ?? [];
-        BOARD_PINS.forEach((pin, i) => board.input(pin, inputs[i]?.value ?? -1));
+        BOARD_PINS.forEach((pin, i) => {
+          board.input(pin, inputs[i]?.value ?? -1);
+          // A0–A5 also feed analogRead: an analog level if the wire carries one, else 0 V or 5 V
+          if (pin >= 14) board.analog?.(pin - 14, inputs[i]?.analog !== undefined ? inputs[i].analog! * 5 : inputs[i]?.value === 1 ? 5 : 0);
+        });
         board.run(next - t);
+        board.takeTapEvents?.().forEach((e) => lcdWrites.set(e.id, [...(lcdWrites.get(e.id) ?? []), e.levels]));
       });
     }
     t = next;
@@ -132,12 +167,29 @@ export function advanceCircuit(
         dirty = true;
         return { ...node, data: { ...data, value: level } };
       }
+      const writes = lcdWrites.get(node.id);
+      if (writes) {
+        let lcd: LcdState = data.icState?.lcd ?? initialLcd();
+        writes.forEach(([rs, ...d]) => (lcd = lcdNibble(lcd, rs === 1, d.reduce<number>((acc, v, i) => acc | ((v === 1 ? 1 : 0) << i), 0))));
+        dirty = true;
+        return { ...node, data: { ...data, icState: { ...data.icState, lcd, fromBoard: true } } };
+      }
       const board = boardsById.get(node.id);
       if (board) {
-        const levels = BOARD_PINS.map((pin) => board.output(pin));
-        if (levels.some((v, i) => data.outputs[i]?.value !== v)) {
+        // A pin that keeps switching (PWM, tone) shows its duty as an analog level and reads as 1 above 50%
+        const pins = BOARD_PINS.map((pin) => {
+          const pwm = board.pwm?.(pin) ?? null;
+          return pwm
+            ? { value: (pwm.duty >= 0.5 ? 1 : 0) as SignalValue, analog: pwm.duty, freq: pwm.frequency }
+            : { value: board.output(pin), analog: undefined, freq: undefined };
+        });
+        const changed = pins.some((p, i) => {
+          const old = data.outputs[i];
+          return !old || old.value !== p.value || !close(old.analog, p.analog) || !close(old.freq, p.freq);
+        });
+        if (changed) {
           dirty = true;
-          return { ...node, data: { ...data, outputs: data.outputs.map((p, i) => ({ ...p, value: levels[i] ?? -1 })) } };
+          return { ...node, data: { ...data, outputs: data.outputs.map((p, i) => ({ ...p, ...(pins[i] ?? { value: -1 }) })) } };
         }
       }
       return node;

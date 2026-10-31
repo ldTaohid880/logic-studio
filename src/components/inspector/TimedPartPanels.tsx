@@ -4,7 +4,7 @@ import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { CLOCK_RATES_HZ, DEFAULT_CLOCK_HZ } from '../../simulation/timeline';
 import { ALU_OPERATIONS, DEFAULT_ROM_CONTENTS } from '../../simulation/icLogic';
-import { SENSORS, SensorType, formatSensorValue, sensorLevel, sensorThreshold } from '../../simulation/sensors';
+import { SENSORS, SensorSpec, SensorType, formatSensorValue, sensorLevel, sensorThreshold } from '../../simulation/sensors';
 import { loadHexFile } from '../nodes/BoardNode';
 import { InspectorSection } from '../ui/InspectorSection';
 import { PropertyRow } from '../ui/PropertyRow';
@@ -164,8 +164,9 @@ export const BoardProperties: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
         </details>
         <p className="text-xs text-fg-subtle">
           Pins work both ways: drag a wire out of a header pin to drive a part (digitalWrite), or drop a wire on it to read a part
-          (digitalRead). A0–A5 work as digital pins 14–19. pinMode, INPUT_PULLUP, delay, millis and Serial work; analogRead and
-          analogWrite aren't simulated.
+          (digitalRead). A0–A5 work as digital pins 14–19 and as analog inputs: analogRead reads sensor AO pins and potentiometers.
+          pinMode, INPUT_PULLUP, delay, millis, Serial, analogWrite (PWM dims LEDs) and tone (buzzers) work, and a 16 × 2 LCD wired
+          straight to the board's pins works with the LiquidCrystal library.
         </p>
       </InspectorSection>
 
@@ -208,7 +209,7 @@ const Slider: React.FC<{ label: string; min: number; max: number; step: number; 
 
 export const SensorProperties: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
   const type = nodeData.gateType as SensorType;
-  const spec = SENSORS[type];
+  const spec: SensorSpec = SENSORS[type];
   const level = sensorLevel(nodeData);
   const threshold = sensorThreshold(nodeData);
   const out = nodeData.outputs?.[0]?.value;
@@ -229,6 +230,18 @@ export const SensorProperties: React.FC<PanelProps> = ({ nodeId, nodeData }) => 
   }
 
   const rule = spec.rule === 'above' ? 'above' : 'below';
+  const analog = nodeData.outputs?.find((p) => p.name === 'AO' || p.name === 'W')?.analog;
+  if (spec.analogOnly) {
+    return (
+      <InspectorSection title="Knob" icon={<Gauge className="w-4 h-4" />}>
+        <Slider label="Position" min={0} max={100} step={1} value={level} text={`${level}%`} onChange={(v) => setSensorLevel(nodeId, v)} />
+        <p className="text-xs text-fg-subtle">
+          The wiper gives <span className="font-mono text-fg">{((analog ?? 0) * 5).toFixed(2)} V</span>. Wire it to A0–A5 on the board and
+          analogRead gives about {Math.round((analog ?? 0) * 1023)}. Logic inputs read it as 1 above 2.5 V.
+        </p>
+      </InspectorSection>
+    );
+  }
   return (
     <InspectorSection title="Sensor" icon={<Gauge className="w-4 h-4" />}>
       <Slider
@@ -251,7 +264,12 @@ export const SensorProperties: React.FC<PanelProps> = ({ nodeId, nodeData }) => 
       />
       <p className="text-xs text-fg-subtle">
         DO is <span className="font-mono text-fg">{out ?? '?'}</span>: the module outputs 1 ({spec.meaning}) when the reading is {rule} the
-        threshold, which you set on a real module by turning its blue trimmer. Only this digital output is simulated.
+        threshold, which you set on a real module by turning its blue trimmer.
+        {analog !== undefined && (
+          <>
+            {' '}AO gives <span className="font-mono text-fg">{(analog * 5).toFixed(2)} V</span> for analogRead.
+          </>
+        )}
       </p>
     </InspectorSection>
   );

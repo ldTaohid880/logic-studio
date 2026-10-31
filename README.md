@@ -18,9 +18,9 @@
 
 ## What you can do
 
-- **Build circuits** from 64 parts: switches, push buttons, DIP switches and clocks; AND, OR, NOT, NAND, NOR, XOR, XNOR, buffers and tri-state buffers; 2:1, 4:1 and 8:1 multiplexers, decoders, encoders, comparators and parity chips; adders, subtractors and a 4-bit ALU; SR and D latches, D, JK and T flip-flops, a register, a counter, a shift register, RAM and ROM; light, temperature, obstacle and motion sensors; pull-up and pull-down resistors, an open-drain buffer, and bus joiners and splitters; LEDs, probes, 7-segment and hex displays.
+- **Build circuits** from 73 parts: switches, push buttons, DIP switches and clocks; AND, OR, NOT, NAND, NOR, XOR, XNOR, buffers and tri-state buffers; 2:1, 4:1 and 8:1 multiplexers, 3-to-8 and 4-to-16 decoders, encoders, comparators and parity chips; adders, subtractors and a 4-bit ALU; SR and D latches, D, JK and T flip-flops, 4- and 8-bit registers, an 8-bit latch, counters (up/down, with load, decade), shift registers (including a universal one), RAM and ROM; light, temperature, obstacle and motion sensors and a potentiometer; pull-up and pull-down resistors, an open-drain buffer, and bus joiners and splitters; LEDs, probes, a buzzer, 7-segment and hex displays and a 16 × 2 LCD.
 - **Grow into sequential logic.** Add a clock and run controls appear (run, pause, step one edge, speed) with a live timing diagram you can download as a VCD file for GTKWave. Circuits without a clock stay instant and simple.
-- **Program an Uno-compatible board.** Export a sketch from the Arduino IDE as a `.hex` file, drop it on the board and wire its header pins to your gates and sensors (D2–D13 and A0–A5, each usable as input or output). `digitalWrite`, `digitalRead`, `delay`, `millis` and `Serial` work, emulated in the browser with [avr8js](https://github.com/wokwi/avr8js).
+- **Program an Uno-compatible board.** Export a sketch from the Arduino IDE as a `.hex` file, drop it on the board and wire its header pins to your gates and sensors (D2–D13 and A0–A5, each usable as input or output). `digitalWrite`, `digitalRead`, `analogRead`, `analogWrite` (PWM dims LEDs), `tone`, `delay`, `millis`, `Serial` and the LiquidCrystal library work, emulated in the browser with [avr8js](https://github.com/wokwi/avr8js).
 - **See signals live.** Wires and pins show 1, 0 or unknown as you edit. Unknown values are marked with `?`, hollow pins and dashed wires, so the state is readable without relying on colour.
 - **Get the truth table of any circuit**, with the row matching the canvas highlighted. Click a row to set the switches to it. Each output gets a simplified sum-of-products expression, its minterm list and a Karnaugh map with the groups outlined.
 - **Build a circuit from an expression or a truth table.** Type `Y = AB + A'C` or fill in a table (with don't-cares), then build it with AND/OR/NOT, NAND only or NOR only, comparing gate counts and logic levels. The truth table of any circuit can be rebuilt the same way.
@@ -30,9 +30,10 @@
 - **Check your circuit.** Write the expected outputs as expressions and the truth table marks every row that differs. They're saved with the circuit, so teachers can hand out assignments as files.
 - **Learn how each part works.** Select a part to see its expression and truth table in the inspector.
 - **Spot feedback problems.** Circuits that never settle, such as a ring of inverters, are outlined and explained.
+- **Measure your design.** Gate counts, logic levels and the longest path, and a parts list that packs gates into real 74HC chips (with LED resistors and decoupling capacitors).
 - **Make your own chips.** Turn a selection into a reusable component, open it to edit the inside, and nest components inside each other.
 - **Start from examples** covering gates, adders, subtractors, multiplexers, a BCD decoder, latches, flip-flops and a clocked counter.
-- **Keep your work.** It autosaves in the browser. You can also save and open `.json` files (custom components included) and export the canvas as a PNG.
+- **Keep and share your work.** Several projects autosave in the browser. Save and open `.json` files (custom components included), share a circuit as a link, and export the canvas as PNG, SVG or PDF, or the circuit as Verilog for FPGA courses.
 - **Use it your way:** light and dark themes, three interface sizes, and keyboard shortcuts for everything (press `?` in the app).
 
 <table>
@@ -48,7 +49,7 @@
 
 ## What's next
 
-See the [roadmap](ROADMAP.md) for planned features: checking a circuit against a target table, a state machine designer, `analogRead` for sensors, gate delays and buses.
+See the [roadmap](ROADMAP.md) for planned features: datasheets for every part, a state machine designer, per-gate timing and the critical path, and wider bus support.
 
 ## Keyboard shortcuts
 

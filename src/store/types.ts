@@ -10,6 +10,7 @@ import { GateType, SimulationState, CircuitPreset } from '../types/circuit';
 import { EncoderConfig } from '../types/encoder';
 import { SevenSegmentConfig } from '../types/sevenSegment';
 import { Traces } from '../simulation/timeline';
+import { ProjectMeta } from './projectStorage';
 import { CustomComponentDefinition, CustomPinDefinition, HierarchyBreadcrumb } from '../types/customComponent';
 
 export type ThemeMode = 'light' | 'dark';
@@ -131,6 +132,18 @@ export interface CircuitStore {
   toastMessage: string | null;
   toastVariant: ToastVariant;
   showToast: (message: string, variant?: ToastVariant) => void;
+
+  // Saved projects (store/projectStorage.ts); the open one autosaves
+  projects: ProjectMeta[];
+  currentProjectId: string;
+  newProject: () => void;
+  openProject: (id: string) => void;
+  renameProject: (id: string, name: string) => void;
+  duplicateProject: (id: string) => void;
+  /** Deleting the open project opens another (or a new empty one). */
+  deleteProject: (id: string) => void;
+  /** Write the open circuit into its project now. Throws when browser storage is full. */
+  saveCurrentProject: () => void;
 
   // Project management
   presets: CircuitPreset[];
