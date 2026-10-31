@@ -24,6 +24,7 @@ import {
   ClipboardList,
   FileCode,
   Link2,
+  BookOpen,
 } from 'lucide-react';
 import { circuitToVerilog } from '../../utils/verilog';
 import { exportCanvas, ExportFormat } from '../../utils/exportCanvas';
@@ -251,6 +252,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       onSelect: () => onOpenCircuitTruthTable?.(),
     },
     { type: 'separator', id: 'sep-help' },
+    { id: 'datasheets', label: 'Datasheets…', icon: <BookOpen className="w-4 h-4" />, onSelect: () => useCircuitStore.getState().openDatasheet() },
     { id: 'shortcuts', label: 'Keyboard shortcuts', icon: <Keyboard className="w-4 h-4" />, shortcut: '?', onSelect: onOpenShortcuts },
   ];
 

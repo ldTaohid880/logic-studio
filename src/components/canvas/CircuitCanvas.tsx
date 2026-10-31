@@ -40,7 +40,7 @@ import { SignalEdge } from '../edges/SignalEdge';
 import { GateType, NodeData } from '../../types/circuit';
 import { MenuPanel, MenuEntry } from '../ui/DropdownMenu';
 import { registerCanvasCenter } from '../../utils/canvasBridge';
-import { Activity, ExternalLink, Search, PackagePlus, Group, Copy, ClipboardPaste, Trash2 } from 'lucide-react';
+import { Activity, ExternalLink, Search, PackagePlus, Group, Copy, ClipboardPaste, Trash2, BookOpen } from 'lucide-react';
 
 const nodeTypes = {
   logicGate: LogicGateNode,
@@ -97,6 +97,7 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
     edgeId?: string;
     isCustom?: boolean;
     customComponentId?: string;
+    gateType?: GateType;
   } | null>(null);
 
   const {
@@ -130,6 +131,7 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
       nodeId: node.id,
       isCustom: !!data.customComponentId,
       customComponentId: data.customComponentId,
+      gateType: data.gateType,
     });
   }, []);
 
@@ -165,7 +167,7 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
         timer: setTimeout(() => {
           const node = nodeId ? useCircuitStore.getState().nodes.find((n) => n.id === nodeId) : undefined;
           const data = node?.data as unknown as NodeData | undefined;
-          setContextMenu({ x, y, nodeId, isCustom: !!data?.customComponentId, customComponentId: data?.customComponentId });
+          setContextMenu({ x, y, nodeId, isCustom: !!data?.customComponentId, customComponentId: data?.customComponentId, gateType: data?.gateType });
         }, 550),
       };
     },
@@ -355,6 +357,17 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
                     onSelect: () => findCustomComponentInstances(contextMenu.customComponentId!),
                   },
                   { type: 'separator', id: 'sep-custom' },
+                ] as MenuEntry[])
+              : []),
+            ...(contextMenu.gateType && contextMenu.gateType !== 'CUSTOM' && contextMenu.gateType !== 'ENCODER'
+              ? ([
+                  {
+                    id: 'datasheet',
+                    label: 'Datasheet',
+                    icon: <BookOpen className="w-4 h-4" />,
+                    onSelect: () => useCircuitStore.getState().openDatasheet(contextMenu.gateType),
+                  },
+                  { type: 'separator', id: 'sep-datasheet' },
                 ] as MenuEntry[])
               : []),
             ...(selectedNodes.length > 0

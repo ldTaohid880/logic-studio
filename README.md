@@ -29,6 +29,7 @@
 - **See timing like an engineer.** Watch any wire in the timing diagram, and turn on gate delays to see glitches (hazards) and slow paths.
 - **Check your circuit.** Write the expected outputs as expressions and the truth table marks every row that differs. They're saved with the circuit, so teachers can hand out assignments as files.
 - **Learn how each part works.** Select a part to see its expression and truth table in the inspector.
+- **Read a datasheet for every part.** A wide reader with a searchable index: a plain explanation first, then the real pinout (drawn as a DIP package, hover a pin to find it in the table), function table, 74HC electrical figures, timing and how Logic Studio differs from the real chip. Print or save as PDF, or share a `#datasheet=74HC08` link.
 - **Spot feedback problems.** Circuits that never settle, such as a ring of inverters, are outlined and explained.
 - **Measure your design.** Gate counts, logic levels and the longest path, and a parts list that packs gates into real 74HC chips (with LED resistors and decoupling capacitors).
 - **Make your own chips.** Turn a selection into a reusable component, open it to edit the inside, and nest components inside each other.
@@ -49,7 +50,7 @@
 
 ## What's next
 
-See the [roadmap](ROADMAP.md) for planned features: datasheets for every part, a state machine designer, per-gate timing and the critical path, and wider bus support.
+See the [roadmap](ROADMAP.md) for planned features: a state machine designer, per-gate timing and the critical path, and wider bus support.
 
 ## Keyboard shortcuts
 

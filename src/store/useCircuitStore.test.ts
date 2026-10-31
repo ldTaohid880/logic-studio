@@ -375,3 +375,18 @@ describe('projects', () => {
     expect(store().currentProjectId).not.toBe(second);
   });
 });
+
+describe('datasheet reader', () => {
+  it('opens on a part, reopens on the last one viewed, and closes without touching the circuit', () => {
+    const before = store().nodes;
+    expect(store().datasheetType).toBeNull();
+    store().openDatasheet('MUX_2TO1');
+    expect(store().datasheetType).toBe('MUX_2TO1');
+    store().closeDatasheet();
+    expect(store().datasheetType).toBeNull();
+    store().openDatasheet();
+    expect(store().datasheetType).toBe('MUX_2TO1');
+    store().closeDatasheet();
+    expect(store().nodes).toBe(before);
+  });
+});

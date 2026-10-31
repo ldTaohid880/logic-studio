@@ -1,0 +1,145 @@
+import { Datasheet, ModeTable } from './types';
+import { PINOUTS, hexGate, pinsOf } from './pinouts';
+import { DECOUPLE, SIM, TIE_UNUSED, tpd, tt } from './common';
+
+const NOTE_LEGEND = 'H = high, L = low, X = don\'t care, ↓ = falling edge.';
+const ti = (part: string) => `https://www.ti.com/product/${part}`;
+
+const lcdTable: ModeTable = {
+  inputHeaders: ['RS', 'E'], outputHeaders: ['What the display does'],
+  rows: [
+    { inputs: ['L', '↓'], outputs: ['Takes a command nibble from D7–D4'], note: 'Two nibbles make one command byte, high nibble first' },
+    { inputs: ['H', '↓'], outputs: ['Takes a character nibble from D7–D4'], note: 'Two nibbles make one character, high nibble first' },
+    { inputs: ['X', 'H'], outputs: ['Nothing yet'], note: 'Data is read at the falling edge of E' },
+    { inputs: ['X', 'L'], outputs: ['Holds the display'] },
+  ],
+  notes: [NOTE_LEGEND, 'In 4-bit mode only D4–D7 are used; the controller needs a start-up sequence (set 4-bit mode, display on, clear) before it shows text.'],
+};
+
+const sensorSheet = (
+  type: 'SENSOR_LIGHT' | 'SENSOR_TEMPERATURE' | 'SENSOR_OBSTACLE' | 'SENSOR_MOTION',
+  title: string, partNumber: string, summary: string, how: string[],
+  sensor: string, extraPins: boolean, electrical: Datasheet['electrical'], apps: string[], pitfalls: string[]
+): Datasheet => ({
+  type, title, partNumber, summary, howItWorks: how,
+  package: {
+    kind: 'Module',
+    pins: pinsOf([
+      ['VCC', 'power', 'Supply, usually 3.3 V to 5 V'],
+      ['GND', 'power', 'Ground'],
+      ['DO', 'out', 'Digital output: switches when the reading crosses the threshold'],
+      ...(extraPins ? [['AO', 'out', `Analog output: voltage that follows the ${sensor}`] as [string, 'out', string]] : []),
+    ]),
+  },
+  mapping: [{ pin: 'out-0', real: 'DO' }, ...(extraPins ? [{ pin: 'out-1', real: 'AO' }] : [])],
+  electrical, applications: apps, pitfalls,
+  simNotes: [
+    'Click the module on the canvas or use the slider in the properties panel to change the reading. The threshold setting decides where DO flips.',
+    'The module\'s own comparator and trimmer are modelled by the threshold; the exact curve of the real sensor is simplified.',
+    SIM.noPower,
+  ],
+  related: ['POTENTIOMETER', 'ARDUINO_UNO', 'LOGIC_PROBE'],
+});
+
+export const IO_SHEETS: Datasheet[] = [
+  {
+    type: 'LCD_16X2', title: '16 × 2 character LCD', partNumber: 'HD44780',
+    summary: 'A display with two rows of 16 characters, driven by the HD44780 controller. It is the same display the Arduino LiquidCrystal library talks to.',
+    howItWorks: [
+      'The controller inside the module keeps the text and draws the characters. You send it commands and characters over a few wires. In 4-bit mode you need only RS, E and D4–D7: the byte is sent as two nibbles, and each is taken on the falling edge of E.',
+      'RS = 0 means "this is a command" (clear, move the cursor, display on); RS = 1 means "this is a character". The R/W pin is tied to ground because you only write.',
+    ],
+    package: { kind: 'Module', pins: pinsOf(PINOUTS.hd44780) },
+    mapping: [{ pin: 'in-0', real: 'RS' }, { pin: 'in-1', real: 'E' }, { pin: 'in-2', real: 'D4' }, { pin: 'in-3', real: 'D5' }, { pin: 'in-4', real: 'D6' }, { pin: 'in-5', real: 'D7' }],
+    modeTable: lcdTable,
+    electrical: [
+      { param: 'Supply voltage', symbol: 'VDD', value: '4.5 V to 5.5 V', conditions: 'Typical 5 V module' },
+      { param: 'Supply current (no backlight)', symbol: 'IDD', value: 'about 1 mA to 2 mA' },
+      { param: 'Backlight current', symbol: 'IL', value: 'about 20 mA to 30 mA', conditions: 'Through a series resistor' },
+      { param: 'Logic high input', symbol: 'VIH', value: '2.2 V min' },
+      { param: 'Logic low input', symbol: 'VIL', value: '0.6 V max' },
+    ],
+    applications: ['Show readings, menus and messages from a microcontroller.', 'Learn how a state machine drives a peripheral.'],
+    pitfalls: ['Contrast (V0) needs a potentiometer; with the wrong voltage the display looks blank even when working.', 'The controller needs a start-up sequence. Skipping it shows black blocks or nothing.', 'The backlight needs its own current-limiting resistor.'],
+    simNotes: ['The display state is updated on each falling edge of E. A board running a sketch is followed at full speed, even though its E pulses last about a microsecond.', 'R/W, contrast and backlight pins are not part of the Logic Studio part.', SIM.noPower],
+    related: ['ARDUINO_UNO', 'POTENTIOMETER', 'SEVEN_SEGMENT'],
+  },
+  sensorSheet('SENSOR_LIGHT', 'Light sensor module', 'LDR module',
+    'A light-dependent resistor on a small board with a comparator. The digital output flips when the light passes a threshold.',
+    ['A photoresistor (LDR) lowers its resistance in light. The module turns that into a voltage on AO and compares it with a trimmer setting to make the digital signal DO.', 'Turn the trimmer on the real module to move the point where DO flips.'],
+    'light level', true,
+    [{ param: 'Supply voltage', symbol: 'VCC', value: '3.3 V to 5 V', conditions: 'Typical LM393 breakout' }, { param: 'Digital output', symbol: 'DO', value: 'VCC when active, 0 V otherwise' }, { param: 'Analog output', symbol: 'AO', value: '0 V to VCC' }],
+    ['Automatic night lights.', 'Detect a lit or dark room, a laser beam or a paper in a tray.'],
+    ['Ambient light changes slowly and unevenly, so set the threshold with some margin.', 'Many modules give DO low when it is bright. Check which way your module switches.']),
+  sensorSheet('SENSOR_TEMPERATURE', 'Temperature sensor module', 'Thermistor module',
+    'A thermistor on a small board with a comparator. The digital output flips when the temperature passes a threshold.',
+    ['A thermistor changes its resistance with temperature. The module converts it to a voltage (AO) and a comparator makes a clean digital output (DO) at a threshold you set with a trimmer.', 'Use AO and an analog input for actual readings; DO is only an alarm.'],
+    'temperature', true,
+    [{ param: 'Supply voltage', symbol: 'VCC', value: '3.3 V to 5 V', conditions: 'Typical LM393 breakout' }, { param: 'Digital output', symbol: 'DO', value: 'VCC when active, 0 V otherwise' }, { param: 'Analog output', symbol: 'AO', value: '0 V to VCC', conditions: 'Not linear in degrees' }],
+    ['Over-temperature alarms.', 'Switch a fan on when something gets hot.'],
+    ['The analog voltage is not linear in temperature; use a lookup table or the thermistor\'s beta value to convert.', 'Modules give only rough accuracy. Use a calibrated sensor for measurements.']),
+  sensorSheet('SENSOR_OBSTACLE', 'Obstacle sensor module', 'IR proximity module',
+    'An infrared LED and receiver that sees when something is close. The output flips when an object comes nearer than the threshold.',
+    ['The module sends out infrared light and measures how much comes back. A near object reflects more, so the receiver voltage rises; a comparator turns that into DO.', 'The trimmer sets the detection distance, typically a few centimetres to a few tens of centimetres.'],
+    'reflected light', true,
+    [{ param: 'Supply voltage', symbol: 'VCC', value: '3.3 V to 5 V', conditions: 'Typical IR obstacle breakout' }, { param: 'Detection range', symbol: 'd', value: 'about 2 cm to 30 cm', conditions: 'Adjustable; depends on the object' }, { param: 'Digital output', symbol: 'DO', value: 'Usually low when an obstacle is seen' }],
+    ['Line followers and obstacle-avoiding robots.', 'Count objects passing on a belt.'],
+    ['Sunlight and dark or shiny surfaces change the range.', 'Many modules give DO low when an obstacle is detected. Check which way yours switches.']),
+  sensorSheet('SENSOR_MOTION', 'Motion sensor module', 'PIR module',
+    'A passive infrared sensor that notices moving people and animals. The output goes high while it sees movement.',
+    ['A PIR sensor measures changes in infrared radiation across its field of view. When a warm body moves, the module raises its output for a set time.', 'Real modules need up to a minute to warm up and have trimmers for the hold time and sensitivity.'],
+    'movement', false,
+    [{ param: 'Supply voltage', symbol: 'VCC', value: '5 V to 20 V', conditions: 'Common HC-SR501 type module; check yours' }, { param: 'Output level', symbol: 'DO', value: 'about 3.3 V when high' }, { param: 'Detection range', symbol: 'd', value: 'about 3 m to 7 m' }, { param: 'Hold time', symbol: 'th', value: 'about 0.3 s to 5 min', conditions: 'Set by a trimmer' }],
+    ['Motion-activated lights and alarms.', 'Presence detection.'],
+    ['Warm-up time after power on gives false triggers.', 'A PIR sees movement, not presence: a person who stands still is not detected.']),
+  {
+    type: 'POTENTIOMETER', title: 'Potentiometer', partNumber: '10 kΩ',
+    summary: 'A knob with a sliding contact (the wiper) that divides a voltage. Turning it gives any voltage between 0 and 5 V.',
+    howItWorks: ['Two ends of a resistance track are wired to 5 V and ground; the wiper picks a point in between. At the middle you get about 2.5 V.', 'Connect the wiper to an analog input of the board and use analogRead to get a number from 0 to 1023.'],
+    package: { kind: 'Module', pins: pinsOf([['1', 'power', 'End of the track, usually to 5 V'], ['W', 'out', 'Wiper: the voltage you read'], ['3', 'power', 'Other end of the track, usually to ground']]) },
+    mapping: [{ pin: 'out-0', real: 'W' }],
+    electrical: [{ param: 'Total resistance', symbol: 'RT', value: '10 kΩ', conditions: 'Common value; 1 kΩ to 100 kΩ also used' }, { param: 'Tolerance', symbol: '', value: '±20 %' }, { param: 'Power rating', symbol: 'P', value: '0.1 W to 0.5 W' }],
+    applications: ['Adjustable level for analog inputs (volume, speed).', 'LCD contrast adjustment.', 'Set a comparator threshold.'],
+    pitfalls: ['Do not connect the wiper to a low-impedance load: it changes the voltage divider.', 'Real tracks are noisy; filter or average the readings.'],
+    simNotes: ['Only the wiper is a pin in Logic Studio; the two ends are implied (5 V and ground).', 'The logic value is 1 when the wiper is above half; the analog level carries the exact voltage.', SIM.noPower],
+    related: ['ARDUINO_UNO', 'LCD_16X2', 'SENSOR_LIGHT'],
+  },
+  {
+    type: 'PULL_UP', title: 'Pull-up resistor', partNumber: '10 kΩ',
+    summary: 'A resistor to the supply that holds a wire at 1 while nothing else drives it. Any real output overrides it.',
+    howItWorks: ['An open input or a switch that is not pressed would float. A pull-up resistor gently pulls the wire to VCC so it reads a steady 1. When a switch connects the wire to ground, the switch wins and the wire reads 0.', 'The resistor is "weak": it only decides the level when no real output drives the wire.'],
+    package: { kind: 'Module', pins: pinsOf([['1', 'power', 'To VCC'], ['2', 'io', 'To the signal wire']]) },
+    mapping: [{ pin: 'out-0', real: '2' }],
+    electrical: [{ param: 'Typical value', symbol: 'R', value: '4.7 kΩ to 100 kΩ', conditions: '10 kΩ is a common choice' }, { param: 'Current when pulled low', symbol: 'I', value: 'VCC / R', conditions: '0.5 mA at 5 V with 10 kΩ' }],
+    applications: ['Switch and button inputs.', 'Open-drain and I²C buses.', 'Give a 3-state bus a default level.'],
+    pitfalls: ['A pull-up and a pull-down on the same wire leave the level undefined.', 'A smaller resistor is faster but wastes more current when the line is pulled low.'],
+    simNotes: ['A pull-up only sets a wire that nothing else drives; an actual output always wins.', SIM.noPower],
+    related: ['PULL_DOWN', 'OPEN_DRAIN_BUFFER', 'TRI_STATE_BUFFER'],
+  },
+  {
+    type: 'PULL_DOWN', title: 'Pull-down resistor', partNumber: '10 kΩ',
+    summary: 'A resistor to ground that holds a wire at 0 while nothing else drives it. Any real output overrides it.',
+    howItWorks: ['Like a pull-up but towards ground: a button wired to VCC reads 1 when pressed, and the pull-down holds the input at 0 the rest of the time.', 'The resistor is weak, so a real output on the wire always wins.'],
+    package: { kind: 'Module', pins: pinsOf([['1', 'power', 'To GND'], ['2', 'io', 'To the signal wire']]) },
+    mapping: [{ pin: 'out-0', real: '2' }],
+    electrical: [{ param: 'Typical value', symbol: 'R', value: '4.7 kΩ to 100 kΩ', conditions: '10 kΩ is a common choice' }, { param: 'Current when pulled high', symbol: 'I', value: 'VCC / R', conditions: '0.5 mA at 5 V with 10 kΩ' }],
+    applications: ['Buttons wired to VCC.', 'Keep a 3-state bus low when nothing drives it.'],
+    pitfalls: ['A pull-up and a pull-down on the same wire leave the level undefined.'],
+    simNotes: ['A pull-down only sets a wire that nothing else drives; an actual output always wins.', SIM.noPower],
+    related: ['PULL_UP', 'TRI_STATE_BUFFER'],
+  },
+  {
+    type: 'OPEN_DRAIN_BUFFER', title: 'Open-drain buffer', partNumber: '74HC07',
+    summary: 'A buffer that can only pull its output low. For a 1 it lets go, and a pull-up resistor raises the wire. Several can share one wire as a wired AND.',
+    howItWorks: ['An open-drain (open-collector) output has a transistor to ground but none to the supply. Input 0 turns it on and pulls the wire low; input 1 turns it off and the pull-up makes the wire high.', 'With several such outputs on one wire, the wire is high only when all of them let go: a wired AND. Because no output ever drives high, there is no conflict.'],
+    package: { kind: 'DIP-14', pins: pinsOf(hexGate('Buffer')) }, gatesPerPackage: 6,
+    mapping: [{ pin: 'in-0', real: '1A' }, { pin: 'out-0', real: '1Y' }],
+    logicFamily: '74HC', supplyCurrentUa: '2',
+    electrical: [{ param: 'Output voltage when off', symbol: 'VO', value: 'Up to 6 V (set by the pull-up)', conditions: 'The 74HC07 allows a higher pull-up voltage than VCC' }],
+    timing: [tpd('10', '22'), tt()],
+    applications: ['Wired-AND buses and shared interrupt lines.', 'Level shifting up to a higher pull-up voltage.', 'Drive LEDs and relays from the low side.'],
+    pitfalls: ['Without a pull-up the output floats when off. Always add a resistor to the supply.', TIE_UNUSED, DECOUPLE],
+    simNotes: [SIM.oneGate, SIM.zeroDelay, 'Needs a pull-up part on the wire to see a 1.'],
+    related: ['PULL_UP', 'TRI_STATE_BUFFER', 'BUFFER'], vendorUrl: ti('SN74HC07'),
+  },
+];
