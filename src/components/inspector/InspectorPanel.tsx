@@ -72,7 +72,9 @@ const TYPE_PANELS: Partial<Record<GateType, React.FC<PanelProps>>> = {
 
 const MULTI_INPUT_GATES = new Set<GateType>(['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR']);
 
-const SETTINGS_TYPES = new Set<GateType>([...MULTI_INPUT_GATES, 'TUNNEL', 'TEXT_LABEL', 'DIP_SWITCH', 'BUS_MONITOR', 'OUTPUT', 'HEX_DISPLAY']);
+const SETTINGS_TYPES = new Set<GateType>([
+  ...MULTI_INPUT_GATES, 'TUNNEL', 'TEXT_LABEL', 'DIP_SWITCH', 'BUS_MONITOR', 'OUTPUT', 'HEX_DISPLAY', 'BUS_JOIN', 'BUS_SPLIT',
+]);
 
 // Per-part panels built from InspectorSections (no extra padding around them)
 const SECTIONED_PANELS = new Set<GateType>(['SEVEN_SEGMENT', 'CLOCK', 'ROM_16X4', 'RAM_16X4', 'ALU_4BIT_8FN', 'ARDUINO_UNO', 'SENSOR_LIGHT', 'SENSOR_TEMPERATURE', 'SENSOR_OBSTACLE', 'SENSOR_MOTION']);
@@ -128,8 +130,15 @@ const GeneralSettings: React.FC<PanelProps> = ({ nodeId, nodeData }) => {
         </PropertyRow>
       )}
 
-      {(gateType === 'DIP_SWITCH' || gateType === 'BUS_MONITOR') && (
-        <PropertyRow label="Bit width" hint="Changing the width removes wires on pins that no longer exist.">
+      {(gateType === 'DIP_SWITCH' || gateType === 'BUS_MONITOR' || gateType === 'BUS_JOIN' || gateType === 'BUS_SPLIT') && (
+        <PropertyRow
+          label="Bit width"
+          hint={
+            gateType === 'BUS_JOIN' || gateType === 'BUS_SPLIT'
+              ? 'Changing the width removes the bus wire (its other end has the old width) and wires on bits that no longer exist.'
+              : 'Changing the width removes wires on pins that no longer exist.'
+          }
+        >
           <SegmentedControl
             ariaLabel="Bit width"
             options={[

@@ -2,13 +2,14 @@ import { useCircuitStore } from '../store/useCircuitStore';
 
 /** Downloads the current circuit (and custom component definitions) as JSON. */
 export function saveCircuitAsJSON() {
-  const { nodes, edges, customComponents, showToast } = useCircuitStore.getState();
+  const { nodes, edges, customComponents, expected, showToast } = useCircuitStore.getState();
   const circuitData = {
     version: '1.0',
     timestamp: new Date().toISOString(),
     nodes,
     edges,
     customComponents,
+    ...(expected.trim() ? { expected } : {}),
   };
 
   const blob = new Blob([JSON.stringify(circuitData, null, 2)], { type: 'application/json' });

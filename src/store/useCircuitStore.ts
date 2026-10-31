@@ -33,16 +33,16 @@ let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 // Warn once per session: a full localStorage would otherwise fail on every edit without the user knowing
 let autosaveWarned = false;
 useCircuitStore.subscribe((state, prev) => {
-  if (state.nodes === prev.nodes && state.edges === prev.edges && state.hierarchyPath === prev.hierarchyPath) return;
+  if (state.nodes === prev.nodes && state.edges === prev.edges && state.hierarchyPath === prev.hierarchyPath && state.expected === prev.expected) return;
   // Throttle rather than debounce: a running clock changes nodes every tick and would postpone a debounce forever
   if (autosaveTimer) return;
   autosaveTimer = setTimeout(() => {
     autosaveTimer = null;
-    const { nodes, edges, hierarchyPath, rootCircuitState } = useCircuitStore.getState();
+    const { nodes, edges, hierarchyPath, rootCircuitState, expected } = useCircuitStore.getState();
     const root = hierarchyPath.length === 1 ? { nodes, edges } : rootCircuitState;
     if (!root) return;
     try {
-      localStorage.setItem(STORAGE_KEY_CIRCUIT, JSON.stringify(root));
+      localStorage.setItem(STORAGE_KEY_CIRCUIT, JSON.stringify(expected.trim() ? { ...root, expected } : root));
       autosaveWarned = false;
     } catch (e) {
       console.error('Failed to autosave circuit to localStorage', e);

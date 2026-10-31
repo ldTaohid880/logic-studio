@@ -1,3 +1,4 @@
+import { createBusPins } from '../../utils/busPins';
 import { visibleCanvasCenter } from '../../utils/canvasBridge';
 import {
   Edge,
@@ -11,7 +12,7 @@ import { createPart } from '../partFactory';
 import { CircuitStore, StoreSlice } from '../types';
 
 // Parts whose outputs can float, so several of them may share one wire (a bus)
-const BUS_DRIVERS = new Set<string>(['TRI_STATE_BUFFER', 'ARDUINO_UNO']);
+const BUS_DRIVERS = new Set<string>(['TRI_STATE_BUFFER', 'ARDUINO_UNO', 'OPEN_DRAIN_BUFFER', 'PULL_UP', 'PULL_DOWN']);
 
 // Canvas editing: nodes, wires, selection, part properties and labels
 export type EditorSlice = Pick<CircuitStore,
@@ -102,6 +103,25 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
 
     // Prevent connecting to self or same node
     if (connection.source === connection.target) return;
+
+    // A bus wire only joins pins of the same width (a 4-bit bus to a 4-bit bus pin)
+    const pinWidth = (nodeId: string, handle: string | null | undefined, side: 'inputs' | 'outputs') =>
+      ((get().nodes.find((n) => n.id === nodeId)?.data as unknown as NodeData | undefined)?.[side] ?? []).find(
+        (p) => p.id === (handle || (side === 'inputs' ? 'in-0' : 'out-0'))
+      )?.width ?? 1;
+    const bits = (n: number) => `${n === 8 ? 'an' : 'a'} ${n}-bit`;
+    const fromWidth = pinWidth(connection.source, connection.sourceHandle, 'outputs');
+    const toWidth = pinWidth(connection.target, connection.targetHandle, 'inputs');
+    if (fromWidth !== toWidth) {
+      get().showToast(
+        fromWidth > 1 && toWidth > 1
+          ? `Cannot connect ${bits(fromWidth)} bus to ${bits(toWidth)} bus pin`
+          : `Cannot connect: ${bits(Math.max(fromWidth, toWidth))} bus only connects to a bus pin. Use a bus splitter or joiner`,
+        'error'
+      );
+      return;
+    }
+
 
     get().saveHistory();
 
@@ -269,6 +289,9 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
     if (!node) return;
     const data = node.data as unknown as NodeData;
     const isDip = data.gateType === 'DIP_SWITCH';
+    const isBus = data.gateType === 'BUS_JOIN' || data.gateType === 'BUS_SPLIT';
+    // The bus pin of a joiner or splitter: its wire goes too, as the other end no longer has the same width
+    const busHandle = data.gateType === 'BUS_JOIN' ? 'out-0' : data.gateType === 'BUS_SPLIT' ? 'in-0' : null;
     const newPins: PinData[] = Array.from({ length: width }, (_, i) => ({
       id: isDip ? `out-${i}` : `in-${i}`,
       name: isDip ? `SW${i + 1}` : `B${i}`,
@@ -279,6 +302,7 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
     const edges = get().edges.filter((e) => {
       const handle = e.source === nodeId ? e.sourceHandle : e.target === nodeId ? e.targetHandle : null;
       if (!handle) return true;
+      if (handle === busHandle) return false;
       const idx = parseInt(handle.replace(/^(out|in)-/, ''), 10);
       return Number.isNaN(idx) || idx < width;
     });
@@ -291,7 +315,11 @@ export const createEditorSlice: StoreSlice<EditorSlice> = (set, get) => ({
               data: {
                 ...n.data,
                 bitWidth: width,
-                ...(isDip ? { outputs: newPins, dipValues: Array(width).fill(0) } : { inputs: newPins }),
+                ...(isBus
+                  ? createBusPins(data.gateType, width)
+                  : isDip
+                  ? { outputs: newPins, dipValues: Array(width).fill(0) }
+                  : { inputs: newPins }),
               },
             }
           : n

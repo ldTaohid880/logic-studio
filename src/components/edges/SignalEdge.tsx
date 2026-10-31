@@ -4,6 +4,7 @@ import { SignalValue } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { getWireColors } from '../../utils/colorUtils';
 import { signalColor, signalState, wireDashArray, wireStrokeWidth } from '../../theme/signals';
+import { busHex } from '../../utils/busPins';
 
 /** Inline editor shown on the wire while it is being renamed (double-click a wire). */
 const WireLabelEditor: React.FC<{ edgeId: string; initial: string; x: number; y: number }> = ({ edgeId, initial, x, y }) => {
@@ -76,7 +77,10 @@ export const SignalEdge: React.FC<EdgeProps> = ({
 
   // Two drivers disagree on this wire's input (bus conflict): drawn in the danger color with a short dash
   const conflict = data?.conflict === true;
-  let strokeColor: string = conflict ? 'var(--danger)' : signalColor(signalValue);
+  // Bus wires carry several bits: drawn thick in the bus color, with the width and value on a badge
+  const bus = Array.isArray(data?.bus) ? (data.bus as SignalValue[]) : null;
+  const busValue = bus ? busHex(bus) : null;
+  let strokeColor: string = conflict ? 'var(--danger)' : bus ? 'var(--signal-bus)' : signalColor(signalValue);
   let pulseColor = 'color-mix(in srgb, var(--signal-high) 35%, white)';
 
   if (customColor && !conflict) {
@@ -107,8 +111,8 @@ export const SignalEdge: React.FC<EdgeProps> = ({
         interactionWidth={16}
         style={{
           stroke: strokeColor,
-          strokeWidth: conflict ? wireStrokeWidth('high') : wireStrokeWidth(state),
-          strokeDasharray: conflict ? '2 4' : wireDashArray(state),
+          strokeWidth: bus ? wireStrokeWidth('high', 2) : conflict ? wireStrokeWidth('high') : wireStrokeWidth(state),
+          strokeDasharray: conflict ? '2 4' : bus ? undefined : wireDashArray(state),
           strokeLinecap: conflict ? 'round' : undefined,
           strokeLinejoin: 'round',
           transition: 'stroke 0.15s ease',
@@ -116,7 +120,7 @@ export const SignalEdge: React.FC<EdgeProps> = ({
       />
 
       {/* Flowing pulse on HIGH wires (disabled by prefers-reduced-motion) */}
-      {isHigh && (
+      {isHigh && !bus && (
         <path
           d={edgePath}
           fill="none"
@@ -128,6 +132,22 @@ export const SignalEdge: React.FC<EdgeProps> = ({
       )}
 
       <EdgeLabelRenderer>
+        {bus && !isEditing && !(showWireLabels && wireLabel) && (
+          <div
+            className="absolute px-1 rounded border border-line bg-surface-1 text-[10px] font-mono text-fg-muted whitespace-nowrap pointer-events-none"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+          >
+            {bus.length}b {busValue !== null ? `0x${busValue}` : '?'}
+          </div>
+        )}
+        {data?.watched === true && !bus && !isEditing && !(showWireLabels && wireLabel) && (
+          // Probe mark: this wire is in the timing diagram
+          <div
+            className="absolute w-2.5 h-2.5 rounded-full border-2 border-accent bg-surface-1 pointer-events-none"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+            title="Watched in the timing diagram"
+          />
+        )}
         {isEditing ? (
           <WireLabelEditor edgeId={id} initial={wireLabel} x={labelX} y={labelY} />
         ) : (

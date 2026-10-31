@@ -222,3 +222,79 @@ describe('shared bus wires', () => {
     expect(res.conflictNodeIds).toEqual([]);
   });
 });
+
+describe('pull resistors and open-drain outputs', () => {
+  const tri = (data: SignalValue, en: SignalValue, pull: 'PULL_UP' | 'PULL_DOWN') => {
+    const nodes = [
+      makeNode('d', 'INPUT', { value: data }), makeNode('en', 'INPUT', { value: en }),
+      makeNode('t', 'TRI_STATE_BUFFER'), makeNode('r', pull, {}, [], [{ id: 'out-0', name: 'Out', value: pull === 'PULL_UP' ? 1 : 0 }]),
+      makeNode('led', 'OUTPUT'),
+    ];
+    const edges = [wire('d', 't'), wire('en', 't', 'out-0', 'in-1'), wire('t', 'led'), wire('r', 'led')];
+    const res = propagateSignals(nodes, edges);
+    return { level: d(res.nodes, 'led').inputs[0].value, conflicts: res.conflictNodeIds };
+  };
+
+  it('gives an undriven wire the resistor level, and lets a real output win', () => {
+    expect(tri(0, 0, 'PULL_UP')).toEqual({ level: 1, conflicts: [] });
+    expect(tri(0, 1, 'PULL_UP')).toEqual({ level: 0, conflicts: [] });
+    expect(tri(1, 0, 'PULL_DOWN')).toEqual({ level: 0, conflicts: [] });
+    expect(tri(1, 1, 'PULL_DOWN')).toEqual({ level: 1, conflicts: [] });
+  });
+
+  it('makes a wired AND from open-drain outputs and a pull-up', () => {
+    const wiredAnd = (a: SignalValue, b: SignalValue) => {
+      const nodes = [
+        makeNode('a', 'INPUT', { value: a }), makeNode('b', 'INPUT', { value: b }),
+        makeNode('oa', 'OPEN_DRAIN_BUFFER'), makeNode('ob', 'OPEN_DRAIN_BUFFER'),
+        makeNode('r', 'PULL_UP', {}, [], [{ id: 'out-0', name: 'Out', value: 1 }]), makeNode('led', 'OUTPUT'),
+      ];
+      const edges = [wire('a', 'oa'), wire('b', 'ob'), wire('oa', 'led'), wire('ob', 'led'), wire('r', 'led')];
+      const res = propagateSignals(nodes, edges);
+      expect(res.conflictNodeIds).toEqual([]);
+      return d(res.nodes, 'led').inputs[0].value;
+    };
+    expect([wiredAnd(0, 0), wiredAnd(0, 1), wiredAnd(1, 0), wiredAnd(1, 1)]).toEqual([0, 0, 0, 1]);
+  });
+
+  it('leaves a wire unknown when a pull-up and a pull-down fight, without calling it a conflict', () => {
+    const nodes = [
+      makeNode('u', 'PULL_UP', {}, [], [{ id: 'out-0', name: 'Out', value: 1 }]),
+      makeNode('dn', 'PULL_DOWN', {}, [], [{ id: 'out-0', name: 'Out', value: 0 }]),
+      makeNode('led', 'OUTPUT'),
+    ];
+    const res = propagateSignals(nodes, [wire('u', 'led'), wire('dn', 'led')]);
+    expect(d(res.nodes, 'led').inputs[0].value).toBe(-1);
+    expect(res.conflictNodeIds).toEqual([]);
+  });
+});
+
+describe('multi-bit buses', () => {
+  it('carries every bit from a joiner through a bus wire to a splitter', async () => {
+    const { createBusPins, busHex } = await import('../utils/busPins');
+    const join = createBusPins('BUS_JOIN', 4);
+    const split = createBusPins('BUS_SPLIT', 4);
+    const bits: SignalValue[] = [1, 0, 1, 1]; // 0b1101 = D
+    const nodes = [
+      ...bits.map((v, i) => makeNode(`s${i}`, 'INPUT', { value: v })),
+      makeNode('j', 'BUS_JOIN', {}, join.inputs, join.outputs),
+      makeNode('sp', 'BUS_SPLIT', {}, split.inputs, split.outputs),
+      ...bits.map((_, i) => makeNode(`l${i}`, 'OUTPUT')),
+    ];
+    const edges = [
+      ...bits.map((_, i) => wire(`s${i}`, 'j', 'out-0', `in-${i}`)),
+      wire('j', 'sp'),
+      ...bits.map((_, i) => wire('sp', `l${i}`, `out-${i}`)),
+    ];
+    const res = propagateSignals(nodes, edges);
+    expect(bits.map((_, i) => d(res.nodes, `l${i}`).inputs[0].value)).toEqual(bits);
+    const busWire = res.edges.find((e) => e.source === 'j')!;
+    expect(busWire.data?.bus).toEqual(bits);
+    expect(busHex(busWire.data?.bus as SignalValue[])).toBe('D');
+
+    // Unwiring one bit floats it on the bus, and the badge shows an unknown value
+    const res2 = propagateSignals(res.nodes, edges.filter((e) => e.source !== 's2'));
+    expect(res2.edges.find((e) => e.source === 'j')!.data?.bus).toEqual([1, 0, -1, 1]);
+    expect(busHex([1, 0, -1, 1])).toBeNull();
+  });
+});

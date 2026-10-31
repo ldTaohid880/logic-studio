@@ -265,3 +265,82 @@ describe('wiring several outputs to one input', () => {
     expect(store().nodes.find((n) => n.id === 'Y')?.className).toContain('ls-conflict');
   });
 });
+
+describe('watching a wire', () => {
+  it('starts the timing diagram without a clock and records the wire as it changes', () => {
+    loadInverter();
+    store().setTimelineRunning(true);
+    store().advanceTimeline(100);
+    expect(store().timeline.time).toBe(0); // nothing timed yet
+
+    store().setWireWatched('e2', true);
+    expect(store().edges.find((e) => e.id === 'e2')?.data?.watched).toBe(true);
+    store().advanceTimeline(100);
+    expect(store().timeline.time).toBe(100); // time runs while a wire is watched
+    store().toggleInputValue('A');
+    expect(store().timeline.traces['wire:e2']).toEqual([[0, 0], [100, 1]]);
+
+    store().undo();
+    expect(store().edges.find((e) => e.id === 'e2')?.data?.watched).toBeUndefined();
+  });
+});
+
+describe('gate delays in the store', () => {
+  it('steps an edit through the gates one delay at a time, and settles at once when turned off', () => {
+    loadInverter(); // A (1) → NOT → Y
+    store().setWireWatched('e2', true);
+    store().setTimelineRunning(false);
+    store().setGateDelay(10);
+    store().toggleInputValue('A'); // A → 0; the NOT hasn't responded yet
+    expect(data('Y')?.inputs[0].value).toBe(0);
+    expect(store().timeline.passDue).toBe(10);
+    store().stepTimeline(); // one gate delay later the NOT output is 1
+    store().stepTimeline(); // and the LED sees it a pass later
+    expect(data('Y')?.inputs[0].value).toBe(1);
+
+    store().toggleInputValue('A');
+    store().setGateDelay(0);
+    expect(data('Y')?.inputs[0].value).toBe(0);
+    expect(store().timeline.passDue).toBeNull();
+  });
+});
+
+describe('expected outputs', () => {
+  it('are kept with the circuit, written to saved files, and cleared for a new circuit', async () => {
+    const { parseCircuitFile } = await import('../utils/circuitFile');
+    loadInverter();
+    store().setExpected("Y = A'");
+    const file = { nodes: store().nodes, edges: store().edges, expected: store().expected };
+    expect(parseCircuitFile(file, {})).toMatchObject({ ok: true, expected: "Y = A'" });
+
+    store().clearCanvas();
+    expect(store().expected).toBe('');
+    expect(store().openCircuitFile(JSON.stringify(file))).toBe(true);
+    expect(store().expected).toBe("Y = A'");
+  });
+});
+
+describe('bus wiring', () => {
+  it('only joins bus pins of the same width, and resizing drops the bus wire', () => {
+    store().loadCircuit([], []);
+    store().addNode('BUS_JOIN', { x: 0, y: 0 });
+    store().addNode('BUS_SPLIT', { x: 150, y: 0 });
+    store().addNode('OUTPUT', { x: 300, y: 0 });
+    const [join, split, ledId] = store().nodes.map((n) => n.id);
+    const undoSteps = store().historyPast.length;
+
+    store().onConnect({ source: join, sourceHandle: 'out-0', target: ledId, targetHandle: 'in-0' });
+    expect(store().edges).toHaveLength(0);
+    expect(store().toastMessage).toMatch(/only connects to a bus pin/);
+    expect(store().historyPast.length).toBe(undoSteps); // a refused wire is not an undo step
+
+    store().onConnect({ source: join, sourceHandle: 'out-0', target: split, targetHandle: 'in-0' });
+    store().onConnect({ source: split, sourceHandle: 'out-3', target: ledId, targetHandle: 'in-0' });
+    expect(store().edges).toHaveLength(2);
+
+    store().setNodeBitWidth(split, 8);
+    expect(store().edges).toHaveLength(1); // the bus wire went; bit 3 still exists on 8 bits
+    store().onConnect({ source: join, sourceHandle: 'out-0', target: split, targetHandle: 'in-0' });
+    expect(store().toastMessage).toMatch(/a 4-bit bus to an 8-bit bus pin/);
+  });
+});

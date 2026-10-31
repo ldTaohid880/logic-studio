@@ -109,6 +109,11 @@ export const PARTS: PartInfo[] = [
   { type: 'ARDUINO_UNO', name: 'Uno-compatible board', description: 'Runs a compiled Arduino sketch on pins D2–D13 and A0–A5', category: 'Boards', partNumber: 'ATmega328P' },
 
   // Wiring and notes
+  { type: 'BUS_JOIN', name: 'Bus joiner', description: 'Bundles 2, 4 or 8 wires into one bus wire', category: 'Wiring' },
+  { type: 'BUS_SPLIT', name: 'Bus splitter', description: 'Splits a bus wire back into single wires', category: 'Wiring' },
+  { type: 'PULL_UP', name: 'Pull-up resistor', description: 'Holds a wire at 1 while nothing else drives it', category: 'Wiring', partNumber: '10 kΩ' },
+  { type: 'PULL_DOWN', name: 'Pull-down resistor', description: 'Holds a wire at 0 while nothing else drives it', category: 'Wiring', partNumber: '10 kΩ' },
+  { type: 'OPEN_DRAIN_BUFFER', name: 'Open-drain buffer', description: 'Pulls its output to 0, or lets it float on a 1; needs a pull-up', category: 'Wiring', partNumber: '74HC07' },
   { type: 'TUNNEL', name: 'Tunnel', description: 'Connects to every tunnel with the same tag, without a wire', category: 'Wiring' },
   { type: 'DELAY_ELEMENT', name: 'Pass-through', description: 'Copies its input to its output', category: 'Wiring' },
   { type: 'TEXT_LABEL', name: 'Note', description: 'A text note on the canvas', category: 'Wiring' },

@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, Copy, Download, Image as ImageIcon, Info, Table, Wand2 } from 'lucide-react';
 import { exprFromSOP, formatExpr } from '../../utils/expression';
+import { checkCircuit } from '../../utils/circuitCheck';
 import { useShallow } from 'zustand/react/shallow';
 import { ModalFrame } from './Dialog';
 import { ModalHeader } from './ModalHeader';
@@ -75,8 +76,16 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void; onBuildCircuit?: 
   onClose,
   onBuildCircuit,
 }) => {
-  const { nodes, edges, customComponents, setInputLevels } = useCircuitStore(
-    useShallow((s) => ({ nodes: s.nodes, edges: s.edges, customComponents: s.customComponents, setInputLevels: s.setInputLevels }))
+  const { nodes, edges, customComponents, setInputLevels, expected, setExpected, isRoot } = useCircuitStore(
+    useShallow((s) => ({
+      nodes: s.nodes,
+      edges: s.edges,
+      customComponents: s.customComponents,
+      setInputLevels: s.setInputLevels,
+      expected: s.expected,
+      setExpected: s.setExpected,
+      isRoot: s.hierarchyPath.length === 1,
+    }))
   );
   const titleId = useId();
   const tableRef = useRef<HTMLDivElement>(null);
@@ -149,6 +158,21 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void; onBuildCircuit?: 
     });
   }, [rows, model, outputVarNames]);
 
+  // Check my circuit: compare every row with the expected outputs saved with the circuit
+  const check = useMemo(
+    () =>
+      rows && expected.trim() && isRoot
+        ? checkCircuit(
+            expected,
+            model.inputs.map((c, i) => ({ name: varNames[i], label: c.label })),
+            model.outputs.map((c, i) => ({ name: outputVarNames[i], label: c.label })),
+            rows
+          )
+        : null,
+    [rows, expected, isRoot, model, varNames, outputVarNames]
+  );
+  const mismatchAt = new Map((check?.mismatches ?? []).map((m) => [m.index, m.expected]));
+
   const tableRows: TruthTableRow[] = (rows ?? []).map((r) => ({
     key: `r${r.index}`,
     index: r.index,
@@ -156,7 +180,11 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void; onBuildCircuit?: 
     internal: showInternal ? r.internal : undefined,
     outputs: r.outputs,
     isActive: r.index === activeIndex,
-    warning: r.unstable ? "The circuit doesn't settle for this combination" : undefined,
+    warning: r.unstable
+      ? "The circuit doesn't settle for this combination"
+      : mismatchAt.has(r.index)
+      ? `Expected ${mismatchAt.get(r.index)!.map((e) => `${outputVarNames[e.output]} = ${e.value}`).join(', ')}`
+      : undefined,
   }));
   const activeRow = tableRows.find((r) => r.isActive);
 
@@ -348,6 +376,43 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void; onBuildCircuit?: 
                 {model.isSequential && (
                   <p className="mt-3 text-xs text-fg-subtle">With memory, these describe the table as built, not the circuit in every situation.</p>
                 )}
+
+                {isRoot && (
+                  <section aria-label="Check my circuit" className="mt-4 pt-3 border-t border-line space-y-2">
+                    <h3 className="text-xs font-medium text-fg-subtle">Check my circuit</h3>
+                    <textarea
+                      value={expected}
+                      onChange={(e) => setExpected(e.target.value)}
+                      rows={3}
+                      spellCheck={false}
+                      placeholder={`${outputVarNames[0] ?? 'Y'} = …`}
+                      aria-label="Expected outputs, one per line"
+                      className="w-full rounded-lg border border-line bg-surface-0 px-2.5 py-1.5 font-mono text-xs text-fg focus:outline-none focus:border-accent"
+                    />
+                    {!check ? (
+                      <p className="text-xs text-fg-subtle">
+                        Write what each output should be, one per line, and every row is checked. It's saved with the circuit, so a teacher can
+                        hand it out in a file.{' '}
+                        {buildText && (
+                          <button type="button" className="text-accent-fg hover:underline cursor-pointer" onClick={() => setExpected(buildText)}>
+                            Use the current expressions
+                          </button>
+                        )}
+                      </p>
+                    ) : check.error ? (
+                      <p className="text-xs text-danger" role="status">{check.error}</p>
+                    ) : check.mismatches.length === 0 ? (
+                      <p className="text-xs font-medium text-signal-high" role="status">
+                        ✓ All {check.rows} rows match the expected {check.checked.length === 1 ? 'output' : 'outputs'}.
+                      </p>
+                    ) : (
+                      <p className="text-xs font-medium text-danger" role="status">
+                        ✗ {check.mismatches.length} of {check.rows} rows differ: {formatList(check.mismatches.map((m) => `m${m.index}`), 8)}. They're
+                        marked ⚠ in the table.
+                      </p>
+                    )}
+                  </section>
+                )}
               </aside>
             )}
           </div>
@@ -356,7 +421,12 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void; onBuildCircuit?: 
             <span className="text-xs text-fg-subtle mr-auto">
               <span className="font-mono text-fg">1</span> high · <span className="font-mono">0</span> low ·{' '}
               <span className="font-mono text-signal-unknown">?</span> unknown (floating or never set)
-              {tableRows.some((r) => r.warning) && <> · <span className="text-signal-unknown">⚠</span> doesn't settle</>}
+              {tableRows.some((r) => r.warning) && (
+                <>
+                  {' '}· <span className="text-signal-unknown">⚠</span>{' '}
+                  {rows?.some((r) => r.unstable) ? (mismatchAt.size > 0 ? "doesn't settle or differs from expected" : "doesn't settle") : 'differs from expected'}
+                </>
+              )}
             </span>
             <Button size="sm" variant="ghost" disabled={!rows} leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} onClick={handleCopy}>
               {copied ? 'Copied' : 'Copy'}

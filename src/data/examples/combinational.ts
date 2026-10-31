@@ -1,4 +1,26 @@
-import { CircuitPreset } from '../../types/circuit';
+import { CircuitPreset, NodeData } from '../../types/circuit';
+import { parseExpressions } from '../../utils/expression';
+import { buildNetlist, layoutNetlist } from '../../utils/circuitBuilder';
+
+/**
+ * Y = A·B + A'·C with B = C = 1. Y should always be 1, but with gate delays it glitches to 0 when A falls,
+ * because the A' path has one more gate. The A' wire is watched, so the timing diagram opens with it.
+ */
+function staticHazard(): CircuitPreset {
+  const { nodes, edges } = layoutNetlist(buildNetlist(parseExpressions("Y = AB + A'C"), 'basic'));
+  const data = (id: string) => nodes.find((n) => n.id === id)!.data as unknown as NodeData;
+  const notId = nodes.find((n) => data(n.id).gateType === 'NOT')!.id;
+  return {
+    id: 'static-hazard',
+    name: 'Static hazard',
+    category: 'Combinational',
+    description: "Y = AB + A'C should stay 1 while B and C are 1. Set Gate delay in the run bar to 100 ms, flip A to 0 and watch Y glitch in the timing diagram.",
+    nodes: nodes.map((n) =>
+      data(n.id).gateType === 'INPUT' ? { ...n, data: { ...n.data, value: 1, outputs: [{ id: 'out-0', name: 'Out', value: 1 }] } } : n
+    ),
+    edges: edges.map((e) => (e.source === notId ? { ...e, data: { ...e.data, label: "A'", watched: true } } : e)),
+  };
+}
 
 // Combinational circuits: adders, subtractors, multiplexers, decoders
 export const COMBINATIONAL_EXAMPLES: CircuitPreset[] = [
@@ -423,4 +445,5 @@ export const COMBINATIONAL_EXAMPLES: CircuitPreset[] = [
       { id: 'eg', source: 'decoder-ic', sourceHandle: 'out-6', target: 'seg-display', targetHandle: 'in-6', type: 'signalEdge' },
     ],
   },
+  staticHazard(),
 ];

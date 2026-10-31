@@ -9,6 +9,7 @@ import { Input } from '../ui/Input';
 import { IconButton } from '../ui/IconButton';
 import { LevelBadge } from './PinStatusList';
 import { InspectorHeader } from './InspectorHeader';
+import { Switch } from '../ui/Switch';
 
 const PREDEFINED_COLORS = [
   { name: 'Red', hex: '#ef4444' },
@@ -71,6 +72,12 @@ export const WireInspector: React.FC<{ edge: WireEdge }> = ({ edge }) => {
               className="font-mono"
             />
           </PropertyRow>
+          <Switch
+            checked={edge.data?.watched === true}
+            onChange={(watched) => useCircuitStore.getState().setWireWatched(edge.id, watched)}
+            label="Watch in timing diagram"
+            description="Records this wire's level over time, like a logic analyser probe."
+          />
         </InspectorSection>
 
         <InspectorSection title="Color" icon={<Palette className="w-4 h-4" />}>

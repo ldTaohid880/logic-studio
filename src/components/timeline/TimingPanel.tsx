@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, Download, Pause, Play, RotateCcw, StepForward }
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { TIMELINE_SPEEDS } from '../../store/slices/timeline';
 import { NodeData, SignalValue } from '../../types/circuit';
-import { DEFAULT_CLOCK_HZ, hasTimedParts, TracePoint } from '../../simulation/timeline';
+import { DEFAULT_CLOCK_HZ, GATE_DELAYS_MS, isTimelineActive, isWatched, TracePoint, wireTraceKey } from '../../simulation/timeline';
 import { getComponentInfo } from '../../data/components';
 import { signalColor } from '../../theme/signals';
 import { tracesToVcd } from '../../utils/vcd';
@@ -92,18 +92,20 @@ const Wave: React.FC<{ points: TracePoint[]; start: number; end: number }> = ({ 
  * without them keep the instant, timeless behaviour.
  */
 export const TimingPanel: React.FC = () => {
-  const visible = useCircuitStore((s) => hasTimedParts(s.nodes));
+  const visible = useCircuitStore((s) => isTimelineActive(s.nodes, s.edges));
   return visible ? <TimingPanelContent /> : null;
 };
 
 const TimingPanelContent: React.FC = () => {
   const [open, setOpen] = useState(readOpen);
-  const { timeline, nodes, setTimelineRunning, setTimelineSpeed, stepTimeline, restartTimeline } = useCircuitStore(
+  const { timeline, nodes, edges, setTimelineRunning, setTimelineSpeed, setGateDelay, stepTimeline, restartTimeline } = useCircuitStore(
     useShallow((s) => ({
       timeline: s.timeline,
       nodes: s.nodes,
+      edges: s.edges,
       setTimelineRunning: s.setTimelineRunning,
       setTimelineSpeed: s.setTimelineSpeed,
+      setGateDelay: s.setGateDelay,
       stepTimeline: s.stepTimeline,
       restartTimeline: s.restartTimeline,
     }))
@@ -119,9 +121,21 @@ const TimingPanelContent: React.FC = () => {
     }
   };
 
-  const rows = useMemo<Row[]>(
-    () =>
-      nodes
+  const rows = useMemo<Row[]>(() => {
+    const labelOf = (id: string) => {
+      const data = nodes.find((n) => n.id === id)?.data as unknown as NodeData | undefined;
+      return data ? data.label || getComponentInfo(data.gateType).name : '?';
+    };
+    // Watched wires come last, named by their label or by the parts they join
+    const wires: Row[] = edges
+      .filter((e) => isWatched(e) && timeline.traces[wireTraceKey(e.id)])
+      .map((e) => ({
+        id: wireTraceKey(e.id),
+        name: (e.data?.label as string | undefined) || `${labelOf(e.source)} → ${labelOf(e.target)}`,
+        points: timeline.traces[wireTraceKey(e.id)],
+      }));
+    return [
+      ...nodes
         .filter((n) => (n.data as unknown as NodeData).gateType in ROW_ORDER && timeline.traces[n.id])
         .sort((a: Node, b: Node) => {
           const ra = ROW_ORDER[(a.data as unknown as NodeData).gateType];
@@ -132,8 +146,9 @@ const TimingPanelContent: React.FC = () => {
           const data = n.data as unknown as NodeData;
           return { id: n.id, name: data.label || getComponentInfo(data.gateType).name, points: timeline.traces[n.id] };
         }),
-    [nodes, timeline.traces]
-  );
+      ...wires,
+    ];
+  }, [nodes, edges, timeline.traces]);
 
   // Show about ten periods of the fastest clock (two seconds with only boards)
   const fastestHalf = Math.min(
@@ -161,7 +176,12 @@ const TimingPanelContent: React.FC = () => {
           size="sm"
           onClick={() => setTimelineRunning(!timeline.running)}
         />
-        <IconButton icon={<StepForward className="w-4 h-4" />} tooltip="Step to the next clock edge" size="sm" onClick={stepTimeline} />
+        <IconButton
+          icon={<StepForward className="w-4 h-4" />}
+          tooltip={timeline.passDue !== null ? 'Step one gate delay' : 'Step to the next clock edge'}
+          size="sm"
+          onClick={stepTimeline}
+        />
         <IconButton icon={<RotateCcw className="w-4 h-4" />} tooltip="Restart from time 0" size="sm" onClick={restartTimeline} />
         <div className="ml-1 shrink-0">
           <SegmentedControl
@@ -172,6 +192,20 @@ const TimingPanelContent: React.FC = () => {
             onChange={setTimelineSpeed}
           />
         </div>
+        <label className="hidden md:flex items-center gap-1.5 ml-1 text-xs text-fg-muted whitespace-nowrap" title="Each gate takes this long to respond, so glitches and slow paths show in the timing diagram">
+          Gate delay
+          <select
+            value={timeline.gateDelay}
+            onChange={(e) => setGateDelay(Number(e.target.value))}
+            className="h-7 rounded-md border border-line bg-surface-0 px-1.5 text-xs text-fg focus:outline-none focus:border-accent"
+          >
+            {GATE_DELAYS_MS.map((ms) => (
+              <option key={ms} value={ms}>
+                {ms === 0 ? 'Off' : `${ms} ms`}
+              </option>
+            ))}
+          </select>
+        </label>
         <span className="ml-1 sm:ml-2 font-mono text-xs text-fg-muted tabular-nums whitespace-nowrap" aria-live="off">
           <span className="hidden sm:inline">t = </span>
           {formatTime(timeline.time)}

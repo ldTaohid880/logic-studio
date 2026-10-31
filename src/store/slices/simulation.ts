@@ -2,7 +2,7 @@ import { Node } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { propagateSignals } from '../../simulation/engine';
 import { DEFAULT_SIMULATION } from '../helpers';
-import { hasTimedParts, recordTraces } from '../../simulation/timeline';
+import { isTimelineActive, recordTraces } from '../../simulation/timeline';
 import { CircuitStore, StoreSlice } from '../types';
 
 // Classes React Flow puts on a part's wrapper (styled in index.css): it keeps changing, or its input is fought over
@@ -58,7 +58,11 @@ export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => 
 
   tickSimulation: () => {
     const { nodes, edges, customComponents, simulation, timeline } = get();
-    const result = propagateSignals(nodes, edges, customComponents);
+    // With gate delays (and time running), an edit starts a wave of passes instead of settling at once
+    const delayed = timeline.gateDelay > 0 && isTimelineActive(nodes, edges);
+    const result = propagateSignals(nodes, edges, customComponents, delayed ? { maxPasses: 1 } : {});
+    if (delayed) result.unstableNodeIds = [];
+    const passDue = delayed && result.hasChanged ? timeline.passDue ?? timeline.time + timeline.gateDelay : timeline.passDue;
     set({
       nodes: markUnstable(result.nodes, result.unstableNodeIds, result.conflictNodeIds),
       edges: result.edges,
@@ -68,7 +72,9 @@ export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => 
         conflictNodeIds: result.conflictNodeIds,
       },
       // Edits made while time is paused (a switch flipped) still show up in the timing diagram
-      ...(hasTimedParts(result.nodes) ? { timeline: { ...timeline, traces: recordTraces(timeline.traces, result.nodes, timeline.time) } } : {}),
+      ...(isTimelineActive(result.nodes, result.edges)
+        ? { timeline: { ...timeline, passDue, traces: recordTraces(timeline.traces, result.nodes, timeline.time, result.edges) } }
+        : {}),
     });
     // Tell the user once, when the circuit starts oscillating, not on every edit while it does
     if (result.unstableNodeIds.length > 0 && simulation.unstableNodeIds.length === 0) {

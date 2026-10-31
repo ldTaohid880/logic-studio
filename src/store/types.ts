@@ -25,6 +25,10 @@ export interface TimelineState {
   speed: number;
   /** The last frame couldn't keep up with real time. */
   behind: boolean;
+  /** Each gate's delay in ms; 0 = gates switch instantly (the default). */
+  gateDelay: number;
+  /** With gate delays: when the next propagation pass is due, or null once the circuit has settled. */
+  passDue: number | null;
   traces: Traces;
 }
 
@@ -105,12 +109,16 @@ export interface CircuitStore {
   boardSerial: Record<string, string>;
   setTimelineRunning: (running: boolean) => void;
   setTimelineSpeed: (speed: number) => void;
+  /** Gate delay in ms (0 = off): each gate then takes this long to respond, so glitches show. */
+  setGateDelay: (ms: number) => void;
   /** Called every animation frame while running with the real time elapsed. */
   advanceTimeline: (realMs: number) => void;
   /** Pause and move to the next clock edge (or 10 ms without a clock). */
   stepTimeline: () => void;
   /** Back to time 0: clocks low, memory cleared, board programs start over. */
   restartTimeline: () => void;
+  /** Add a wire to (or remove it from) the timing diagram; undoable. */
+  setWireWatched: (edgeId: string, watched: boolean) => void;
   /** Check and load a compiled program (.hex text) onto a board; undoable. Returns success. */
   loadBoardFirmware: (nodeId: string, name: string, hex: string) => boolean;
 
@@ -126,6 +134,9 @@ export interface CircuitStore {
 
   // Project management
   presets: CircuitPreset[];
+  /** Expected outputs of the circuit as expressions, one per line ("check my circuit"); saved with the circuit. */
+  expected: string;
+  setExpected: (text: string) => void;
   loadCircuit: (nodes: Node[], edges: Edge[]) => void;
   /** Open a saved circuit file (JSON text): checks it, adds its custom components, loads it. Returns success. */
   openCircuitFile: (text: string) => boolean;

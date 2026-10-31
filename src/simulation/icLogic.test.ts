@@ -58,6 +58,7 @@ const COMBINATIONAL: Partial<Record<GateType, (i: Bits) => Bits>> = {
   },
   DELAY_ELEMENT: ([x]) => [x],
   MUX_2TO1: ([i0, i1, s, en]) => [en ? (s ? i1 : i0) : 0],
+  OPEN_DRAIN_BUFFER: ([a]) => [a ? -1 : 0],
   ALU_4BIT_8FN: (i) => {
     const a = num(i.slice(0, 4));
     const b = num(i.slice(4, 8));

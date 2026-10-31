@@ -111,20 +111,20 @@ export { makeId } from '../utils/ids';
 export const STORAGE_KEY_CIRCUIT = 'logic_studio_circuit';
 
 // Restore the last open root circuit, falling back to the Half Adder preset
-export const getInitialCircuit = (): { nodes: Node[]; edges: Edge[] } => {
+export const getInitialCircuit = (): { nodes: Node[]; edges: Edge[]; expected: string } => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_CIRCUIT);
     if (stored) {
       const parsed = JSON.parse(stored);
       if (parsed && Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
         const { nodes, edges } = removeUnsupportedParts(parsed.nodes, parsed.edges);
-        return { nodes, edges };
+        return { nodes, edges, expected: typeof parsed.expected === 'string' ? parsed.expected : '' };
       }
     }
   } catch (e) {
     console.error('Failed to load circuit from localStorage', e);
   }
-  return { nodes: CIRCUIT_PRESETS[0].nodes, edges: CIRCUIT_PRESETS[0].edges };
+  return { nodes: CIRCUIT_PRESETS[0].nodes, edges: CIRCUIT_PRESETS[0].edges, expected: '' };
 };
 
 export const initialCircuit = getInitialCircuit();

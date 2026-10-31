@@ -138,3 +138,71 @@ describe('parseIntelHex', () => {
     expect(() => parseIntelHex(':00000001FF')).toThrow(/no program/);
   });
 });
+
+describe('watched wires', () => {
+  it('are traced alongside parts, keyed by wire', () => {
+    const sw = part('INPUT', { value: 1 });
+    const gate = part('NOT');
+    const edge = { ...wire(sw, gate), data: { watched: true, signalValue: 1 } };
+    const traces = recordTraces({}, [sw, gate], 5, [edge, wire(gate, sw)]);
+    expect(traces[`wire:${edge.id}`]).toEqual([[5, 1]]);
+    expect(Object.keys(traces)).toHaveLength(2); // the switch and the watched wire; the other wire isn't watched
+  });
+});
+
+describe('gate delays', () => {
+  // Y = A·B + A'·C with B = C = 1: Y should stay 1, but when A falls the A'·C path is one gate slower
+  const hazard = () => {
+    const a = part('INPUT', { value: 1 });
+    const b = part('INPUT', { value: 1 });
+    const c = part('INPUT', { value: 1 });
+    const not = part('NOT');
+    const and1 = part('AND');
+    const and2 = part('AND');
+    const or = part('OR');
+    const y = part('OUTPUT');
+    const edges = [
+      wire(a, and1), wire(b, and1, 'out-0', 'in-1'),
+      wire(a, not), wire(not, and2), wire(c, and2, 'out-0', 'in-1'),
+      wire(and1, or), wire(and2, or, 'out-0', 'in-1'), wire(or, y),
+    ];
+    return { circuit: propagateSignals([a, b, c, not, and1, and2, or, y], edges, {}), a, y };
+  };
+
+  it('shows the static hazard as a one-delay glitch, which instant gates hide', () => {
+    const { circuit, a, y } = hazard();
+    const fallen = circuit.nodes.map((n) => (n.id === a.id ? { ...n, data: { ...n.data, value: 0 } } : n));
+
+    // Instant gates: Y never leaves 1
+    const instant = propagateSignals(fallen, circuit.edges, {});
+    expect(dataOf(instant.nodes, y.id).inputs[0].value).toBe(1);
+
+    // 10 ms gate delay: the edit's pass at t = 0, then one pass every 10 ms
+    const levels: [number, number][] = [];
+    const first = propagateSignals(fallen, circuit.edges, {}, { maxPasses: 1 });
+    advanceCircuit(first, {}, 0, 100, () => null, {
+      gateDelay: 10,
+      passDue: 10,
+      onSettle: (t, nodes) => levels.push([t, dataOf(nodes, y.id).inputs[0].value as number]),
+    });
+    const changes = levels.filter(([, v], i) => i === 0 || v !== levels[i - 1][1]);
+    expect(changes).toEqual([[10, 1], [20, 0], [30, 1]]); // glitch to 0 for exactly one delay
+  });
+
+  it('lets a ring of three inverters oscillate instead of flagging it', () => {
+    // All-unknown inverters stay unknown, so one starts at a known level
+    const seeded = part('NOT');
+    const n1 = { ...seeded, data: { ...seeded.data, outputs: [{ id: 'out-0', name: 'Out', value: 0 }] } };
+    const [n2, n3] = [part('NOT'), part('NOT')];
+    const ring = { nodes: [n1, n2, n3], edges: [wire(n1, n2), wire(n2, n3), wire(n3, n1)] };
+    const seen = new Set<number>();
+    const result = advanceCircuit(ring, {}, 0, 200, () => null, {
+      gateDelay: 10,
+      passDue: 0,
+      onSettle: (_, nodes) => seen.add(dataOf(nodes, n1.id).outputs[0].value as number),
+    });
+    expect(result.passDue).not.toBeNull(); // still running
+    expect(result.unstableNodeIds).toEqual([]);
+    expect(seen.has(0) && seen.has(1)).toBe(true);
+  });
+});

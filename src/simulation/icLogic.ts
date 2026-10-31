@@ -188,6 +188,12 @@ export function getDefaultICPins(gateType: GateType): ICPins {
         ],
       };
 
+    case 'OPEN_DRAIN_BUFFER':
+      return {
+        inputs: [{ id: 'in-0', name: 'A', value: 0 }],
+        outputs: [{ id: 'out-0', name: 'Y', value: -1 }],
+      };
+
     case 'D_FLIPFLOP':
       return {
         inputs: [
@@ -603,6 +609,11 @@ export function evaluateIC(
       outputs['out-1'] = q === 1 ? 0 : 1;
       break;
     }
+
+    case 'OPEN_DRAIN_BUFFER':
+      // Can only pull the line low; a 1 leaves it floating for a pull-up resistor to raise
+      outputs['out-0'] = inputs[0] === 0 ? 0 : -1;
+      break;
 
     case 'D_FLIPFLOP': {
       const clk = inputs[1] === 1 ? 1 : 0;
