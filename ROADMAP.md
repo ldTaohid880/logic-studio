@@ -20,6 +20,11 @@ Logic Studio is one app for beginners and advanced students alike. There is no b
 - **Pull-up and pull-down resistors** and an open-drain buffer (wired AND).
 - **Check my circuit:** expected outputs as expressions, saved with the circuit; the truth table marks rows that differ.
 - **Multi-bit buses:** bus joiner and splitter (2, 4 or 8 bits), bus wires with their value in hex.
+- **Industry-standard parts:** 74HC161 counter with load, 74HC160 decade counter, 74HC194 universal shift register, 74HC154 4-to-16 decoder, 74HC273 8-bit register, 74HC373 8-bit latch with tri-state outputs.
+- **Circuit statistics:** gates by type, chips, logic levels and the longest path (selectable on the canvas).
+- **Export and projects:** SVG and PDF export, a parts list packed into real chips (CSV), several autosaved projects.
+- **Arduino extras:** analogRead from sensor AO pins and a potentiometer, analogWrite (PWM dims LEDs), tone and a buzzer, a 16 × 2 LCD that works with LiquidCrystal.
+- **Share links and Verilog export.**
 
 ## Next
 
@@ -29,20 +34,11 @@ A datasheet for every part: pinout with real pin numbers, function table, equati
 ### State machine designer
 Draw states and transitions; the app builds the state table, the simplified next-state and output equations (with the existing minimiser) and the flip-flop circuit.
 
-### Analog sensors and `analogRead`
-Feed sensor readings into the board's ADC so sketches can use `analogRead` on A0–A5 and the sensors' real values, not just their thresholded digital output. Possibly a potentiometer part.
-
 ### Timing lessons
 Different delays per gate type and highlighting the critical path (unit gate delays are done).
 
 ### More from buses
 Bus pins on RAM, ROM, registers, the ALU and displays, bus tunnels, and tri-state bus drivers, so wide data paths need fewer splitters. Sequential test vectors for "check my circuit" (clocked steps, not just a truth table).
-
-### Industry-standard parts
-Dual D flip-flop (74HC74 pinout), counters with parallel load (74HC161), universal shift register (74HC194), 4-to-16 decoder, decade counter, 8-bit register and latch.
-
-### Circuit statistics
-Gate count, logic levels and the longest path of any circuit, for comparing designs (the build dialog already shows these for generated circuits).
 
 ## Later
 
@@ -54,18 +50,14 @@ A code editor on the board. Compiling Arduino code needs a server (the compiler 
 - Motion sensor hold time, ultrasonic distance sensor (needs microsecond timing), buzzer, servo and stepper outputs.
 - PWM shown as a duty cycle rather than flicker.
 
-### Export and projects
-SVG and PDF export for reports, a parts list (BOM) with real part numbers, and several saved projects instead of one autosaved circuit.
+### Arduino: testing with real sketches
+The board features are tested with hand-assembled programs; testing with sketches compiled by the Arduino IDE (blink, analogRead, fade, LiquidCrystal, tone) still needs doing, ideally as fixtures in the test suite.
 
-### Arduino extras
-A 16×2 LCD and a buzzer, and testing with sketches compiled by the Arduino IDE.
+### Verilog behaviour for more chips
+Behavioural Verilog for counters, shift registers, registers and the ALU (they export as empty "black box" modules today), and bus pins as vectors.
 
-### Verilog export
-Export a circuit as structural Verilog for FPGA courses.
-
-### Classroom and sharing
-- Share a circuit as a link.
-- Read-only exercise files with instructions and checks for teachers.
+### Classroom
+Read-only exercise files with instructions for teachers (expected outputs and share links are done).
 
 ### Quality and reach
 - End-to-end browser tests in CI, ESLint, and versioned file migrations.

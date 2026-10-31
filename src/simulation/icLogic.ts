@@ -1,5 +1,6 @@
 import { GateType, SignalValue, PinData } from '../types/circuit';
 import { decodeSevenSegment } from '../utils/gateLogic';
+import { initialLcd, lcdNibble, LcdState } from './hd44780';
 
 export interface ICPins {
   inputs: PinData[];
@@ -13,7 +14,7 @@ const bitPins = (prefix: 'in' | 'out', first: number, name: string, count: numbe
 /** Parts whose outputs depend on what happened before (state in data.icState), not just on their inputs now. */
 export const MEMORY_GATE_TYPES = new Set<string>([
   'D_LATCH', 'SR_LATCH', 'D_FLIPFLOP', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'REGISTER_8BIT', 'LATCH_8BIT',
-  'COUNTER_4BIT', 'COUNTER_LOAD_4BIT', 'DECADE_COUNTER', 'SHIFT_REG_4BIT', 'SHIFT_REG_UNIVERSAL', 'RAM_16X4', 'DELAY_ELEMENT',
+  'COUNTER_4BIT', 'COUNTER_LOAD_4BIT', 'DECADE_COUNTER', 'SHIFT_REG_4BIT', 'SHIFT_REG_UNIVERSAL', 'RAM_16X4', 'LCD_16X2', 'DELAY_ELEMENT',
 ]);
 
 /** ALU operations, indexed by S2 S1 S0. */
@@ -192,6 +193,12 @@ export function getDefaultICPins(gateType: GateType): ICPins {
           { id: 'out-0', name: 'Q', value: 0 },
           { id: 'out-1', name: 'Q̄', value: 1 },
         ],
+      };
+
+    case 'LCD_16X2':
+      return {
+        inputs: ['RS', 'E', 'D4', 'D5', 'D6', 'D7'].map((name, i) => ({ id: `in-${i}`, name, value: -1 as SignalValue })),
+        outputs: [],
       };
 
     case 'OPEN_DRAIN_BUFFER':
@@ -667,6 +674,19 @@ export function evaluateIC(
       newState.q = q;
       outputs['out-0'] = q;
       outputs['out-1'] = q === 1 ? 0 : 1;
+      break;
+    }
+
+    case 'LCD_16X2': {
+      // Takes RS and D4–D7 on the falling edge of E. A running board's microsecond E pulses are caught in the
+      // emulator instead (simulation/timeline.ts), which marks the state as fed by the board.
+      const e = inputs[1] === 1 ? 1 : 0;
+      let lcd: LcdState = currentState.lcd ?? initialLcd();
+      if ((currentState.prevE ?? 0) === 1 && e === 0 && !currentState.fromBoard) {
+        lcd = lcdNibble(lcd, inputs[0] === 1, readBits(inputs, 2, 4));
+      }
+      newState.prevE = e;
+      newState.lcd = lcd;
       break;
     }
 

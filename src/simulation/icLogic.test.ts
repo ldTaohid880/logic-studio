@@ -80,7 +80,7 @@ const COMBINATIONAL: Partial<Record<GateType, (i: Bits) => Bits>> = {
   ROM_16X4: (i) => i,
 };
 
-const SEQUENTIAL: GateType[] = ['COUNTER_LOAD_4BIT', 'DECADE_COUNTER', 'SHIFT_REG_UNIVERSAL', 'REGISTER_8BIT', 'LATCH_8BIT', 'SR_LATCH', 'D_FLIPFLOP', 'D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'RAM_16X4'];
+const SEQUENTIAL: GateType[] = ['LCD_16X2', 'COUNTER_LOAD_4BIT', 'DECADE_COUNTER', 'SHIFT_REG_UNIVERSAL', 'REGISTER_8BIT', 'LATCH_8BIT', 'SR_LATCH', 'D_FLIPFLOP', 'D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'RAM_16X4'];
 
 const outputsInPinOrder = (gateType: GateType, outputs: Record<string, SignalValue>) =>
   getDefaultICPins(gateType).outputs.map((p) => outputs[p.id]);
@@ -333,5 +333,30 @@ describe('memory ICs', () => {
     expect(step([...(bitsOf(0x3c, 8) as SignalValue[]), 1, 1])[0]).toBe(0x3c);
     expect(step([...(bitsOf(0xff, 8) as SignalValue[]), 0, -1])[0]).toBe(0x3c); // holds; floating OE enables
     expect(step([...(bitsOf(0xff, 8) as SignalValue[]), 0, 0])[0]).toBe(-1); // outputs float
+  });
+
+  it('16 × 2 LCD takes RS and D4–D7 on falling edges of E', async () => {
+    const { lcdLines } = await import('./hd44780');
+    let state: Record<string, unknown> = {};
+    // [RS, E, D4, D5, D6, D7]; one pulse of E per nibble
+    const pulse = (rs: SignalValue, nibble: number) => {
+      const d = bitsOf(nibble, 4) as SignalValue[];
+      state = evaluateIC('LCD_16X2', [rs, 1, ...d], state).newState;
+      state = evaluateIC('LCD_16X2', [rs, 0, ...d], state).newState;
+    };
+    const byte = (rs: SignalValue, b: number) => {
+      pulse(rs, b >> 4);
+      pulse(rs, b & 15);
+    };
+    pulse(0, 0x2); // function set, 4-bit (sent as one 8-bit-mode pulse)
+    byte(0, 0x28);
+    byte(0, 0x0c); // display on
+    byte(0, 0x01); // clear
+    [...'Hi'].forEach((c) => byte(1, c.charCodeAt(0)));
+    byte(0, 0xc0); // line 2
+    byte(1, 'Z'.charCodeAt(0));
+    const lines = lcdLines((state as { lcd: never }).lcd);
+    expect(lines[0].trimEnd()).toBe('Hi');
+    expect(lines[1].trimEnd()).toBe('Z');
   });
 });

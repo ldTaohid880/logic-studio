@@ -44,6 +44,9 @@ const IO_PARTS: Partial<Record<GateType, [string, string]>> = {
   PULL_UP: ['Resistor 10 kΩ (pull-up)', ''],
   PULL_DOWN: ['Resistor 10 kΩ (pull-down)', ''],
   ARDUINO_UNO: ['Arduino Uno-compatible board', 'ATmega328P'],
+  POTENTIOMETER: ['Potentiometer 10 kΩ', ''],
+  BUZZER: ['Buzzer, 5 V', ''],
+  LCD_16X2: ['16 × 2 character LCD (needs a 10 kΩ contrast potentiometer)', 'HD44780'],
 };
 
 const dataOf = (n: Node) => n.data as unknown as NodeData;

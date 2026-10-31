@@ -46,6 +46,7 @@ interface TopBarProps {
   onOpenBuildCircuit?: () => void;
   onOpenPartsList?: () => void;
   onOpenShare?: () => void;
+  onOpenProjects?: () => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -69,6 +70,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenBuildCircuit,
   onOpenPartsList,
   onOpenShare,
+  onOpenProjects,
   canvasRef,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -168,8 +170,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   const requestNew = () => (nodes.length === 0 ? clearCanvas() : setPendingConfirm('new'));
 
   const customCount = Object.keys(customComponents || {}).length;
+  const projectName = useCircuitStore((s) => s.projects.find((p) => p.id === s.currentProjectId)?.name ?? 'Untitled');
 
   const fileMenu: MenuEntry[] = [
+    { id: 'projects', label: 'Projects…', icon: <FolderOpen className="w-4 h-4" />, onSelect: () => onOpenProjects?.() },
     { id: 'new', label: 'New circuit', icon: <FilePlus className="w-4 h-4" />, onSelect: requestNew },
     { id: 'open', label: 'Open file…', icon: <Upload className="w-4 h-4" />, onSelect: () => fileInputRef.current?.click() },
     { id: 'save', label: 'Save as JSON', icon: <Download className="w-4 h-4" />, shortcut: 'Ctrl+S', onSelect: handleSaveJSON },
@@ -274,6 +278,15 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="hidden sm:flex items-center gap-2 pl-1 pr-2 shrink-0">
         <Logo className="w-7 h-7 shrink-0" />
         <h1 className="hidden md:block text-sm font-semibold text-fg tracking-tight">Logic Studio</h1>
+        <span className="hidden md:block text-fg-subtle" aria-hidden="true">/</span>
+        <button
+          type="button"
+          onClick={() => onOpenProjects?.()}
+          title="Projects"
+          className="max-w-[12rem] truncate rounded-md px-1.5 py-0.5 text-sm text-fg-muted hover:text-fg hover:bg-surface-2 cursor-pointer"
+        >
+          {projectName}
+        </button>
       </div>
 
       <nav aria-label="Main menu" className="flex items-center">

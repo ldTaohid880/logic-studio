@@ -52,6 +52,9 @@ const SHAPES: Partial<Record<GateType, PartShape>> = {
   SENSOR_TEMPERATURE: { nodeType: 'sensorModule', label: 'Temperature', inputCount: 0 },
   SENSOR_OBSTACLE: { nodeType: 'sensorModule', label: 'Obstacle', inputCount: 0 },
   SENSOR_MOTION: { nodeType: 'sensorModule', label: 'Motion', inputCount: 0 },
+  POTENTIOMETER: { nodeType: 'sensorModule', label: 'Pot', inputCount: 0 },
+  BUZZER: { nodeType: 'buzzerNode', label: '', inputCount: 1 },
+  LCD_16X2: { nodeType: 'lcdNode', label: '', inputCount: 6 },
   DIP_SWITCH: { nodeType: 'dipSwitch', label: '', inputCount: 0 },
   CONST_HIGH: { nodeType: 'logicGate', label: 'Constant HIGH', inputCount: 0 },
   CONST_LOW: { nodeType: 'logicGate', label: 'Constant LOW', inputCount: 0 },
@@ -81,7 +84,7 @@ const pins = (prefix: 'in' | 'out', count: number, name: (i: number) => string, 
   Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${i}`, name: name(i), value }));
 
 function defaultPins(gateType: GateType, shape: PartShape): { inputs: PinData[]; outputs: PinData[] } {
-  if (shape.nodeType === 'icComponent') return getDefaultICPins(gateType);
+  if (shape.nodeType === 'icComponent' || gateType === 'LCD_16X2') return getDefaultICPins(gateType);
 
   switch (gateType) {
     case 'ENCODER':
@@ -113,7 +116,13 @@ function defaultPins(gateType: GateType, shape: PartShape): { inputs: PinData[];
       };
   }
 
-  if (isSensor(gateType)) return { inputs: [], outputs: [{ id: 'out-0', name: 'DO', value: -1 }] };
+  if (gateType === 'POTENTIOMETER') return { inputs: [], outputs: [{ id: 'out-0', name: 'W', value: -1 }] };
+  if (isSensor(gateType)) {
+    const outputs: PinData[] = [{ id: 'out-0', name: 'DO', value: -1 }];
+    if (gateType !== 'SENSOR_MOTION') outputs.push({ id: 'out-1', name: 'AO', value: -1 });
+    return { inputs: [], outputs };
+  }
+  if (gateType === 'BUZZER') return { inputs: [{ id: 'in-0', name: '+', value: -1 }], outputs: [] };
 
   const count = shape.inputCount;
   const inputs = pins('in', count, (i) => (count === 1 ? 'In' : `In ${i + 1}`), -1);

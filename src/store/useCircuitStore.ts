@@ -9,6 +9,7 @@ import { createGroupsSlice } from './slices/groups';
 import { createDevicesSlice } from './slices/devices';
 import { createSimulationSlice } from './slices/simulation';
 import { createTimelineSlice } from './slices/timeline';
+import { createProjectsSlice } from './slices/projects';
 import { createProjectSlice } from './slices/project';
 import { createCustomComponentsSlice } from './slices/customComponents';
 
@@ -22,6 +23,7 @@ export const useCircuitStore = create<CircuitStore>((set, get) => ({
   ...createSimulationSlice(set, get),
   ...createTimelineSlice(set, get),
   ...createProjectSlice(set, get),
+  ...createProjectsSlice(set, get),
   ...createCustomComponentsSlice(set, get),
 }));
 
@@ -43,6 +45,8 @@ useCircuitStore.subscribe((state, prev) => {
     if (!root) return;
     try {
       localStorage.setItem(STORAGE_KEY_CIRCUIT, JSON.stringify(expected.trim() ? { ...root, expected } : root));
+      // The same circuit in its project, so the project list has the latest version too
+      useCircuitStore.getState().saveCurrentProject();
       autosaveWarned = false;
     } catch (e) {
       console.error('Failed to autosave circuit to localStorage', e);

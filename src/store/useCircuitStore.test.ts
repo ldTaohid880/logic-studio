@@ -344,3 +344,34 @@ describe('bus wiring', () => {
     expect(store().toastMessage).toMatch(/a 4-bit bus to an 8-bit bus pin/);
   });
 });
+
+describe('projects', () => {
+  it('keeps a circuit per project, switches between them and deletes them', () => {
+    loadInverter();
+    const first = store().currentProjectId;
+    store().setExpected("Y = A'");
+    store().newProject();
+    const second = store().currentProjectId;
+    expect(second).not.toBe(first);
+    expect(store().nodes).toHaveLength(0);
+    expect(store().expected).toBe('');
+    expect(store().historyPast).toHaveLength(0); // undo doesn't reach into the other project
+
+    store().addNode('AND', { x: 0, y: 0 });
+    store().openProject(first);
+    expect(store().nodes.map((n) => n.id).sort()).toEqual(['A', 'Y', 'n']);
+    expect(store().expected).toBe("Y = A'");
+
+    store().openProject(second);
+    expect(store().nodes).toHaveLength(1); // the AND was saved when switching away
+
+    store().renameProject(second, 'Adder');
+    expect(store().projects.find((p) => p.id === second)?.name).toBe('Adder');
+    store().duplicateProject(second);
+    expect(store().projects.some((p) => p.name === 'Adder copy')).toBe(true);
+
+    store().deleteProject(second);
+    expect(store().projects.some((p) => p.id === second)).toBe(false);
+    expect(store().currentProjectId).not.toBe(second);
+  });
+});

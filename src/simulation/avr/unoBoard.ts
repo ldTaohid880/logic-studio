@@ -1,4 +1,6 @@
 import {
+  AVRADC,
+  adcConfig,
   CPU,
   avrInstruction,
   AVRIOPort,
@@ -20,6 +22,25 @@ export const UNO_CLOCK_HZ = 16_000_000;
 const CYCLES_PER_MS = UNO_CLOCK_HZ / 1000;
 /** Serial monitor text kept per board. */
 const SERIAL_LIMIT = 4000;
+/** Run slices averaged for PWM duty and frequency (a 490 Hz PWM period is about 2 ms). */
+const PWM_WINDOW = 4;
+const PIN_COUNT = 20;
+
+/** A part wired to the board whose fast strobe has to be caught inside the emulator (an LCD's E pin). */
+export interface PinTap {
+  id: string;
+  /** Pin whose falling edge takes a reading. */
+  strobe: number;
+  /** Pins read at that moment. */
+  pins: number[];
+}
+
+export interface PwmReading {
+  /** Fraction of the time the pin was high. */
+  duty: number;
+  /** Rising edges per second. */
+  frequency: number;
+}
 
 /**
  * An emulated ATmega328P (Uno/Nano) running a compiled sketch. Only the digital side is modelled:
@@ -30,7 +51,16 @@ export class UnoBoard {
   private readonly portB: AVRIOPort;
   private readonly portC: AVRIOPort;
   private readonly portD: AVRIOPort;
+  private readonly adc: AVRADC;
   serial = '';
+  // PWM measurement: level, when it last changed, high time and rising edges in this slice
+  private readonly level = new Array<boolean>(PIN_COUNT).fill(false);
+  private readonly since = new Array<number>(PIN_COUNT).fill(0);
+  private readonly highCycles = new Array<number>(PIN_COUNT).fill(0);
+  private readonly rises = new Array<number>(PIN_COUNT).fill(0);
+  private history: { cycles: number; high: number[]; rises: number[] }[] = [];
+  private taps: PinTap[] = [];
+  private tapEvents: { id: string; levels: SignalValue[] }[] = [];
 
   constructor(hex: string) {
     const flash = parseIntelHex(hex);
@@ -45,15 +75,64 @@ export class UnoBoard {
     this.portB = new AVRIOPort(this.cpu, portBConfig);
     this.portC = new AVRIOPort(this.cpu, portCConfig);
     this.portD = new AVRIOPort(this.cpu, portDConfig);
+    this.adc = new AVRADC(this.cpu, adcConfig);
+    [this.portD, this.portB, this.portC].forEach((port, p) => port.addListener(() => this.pinsChanged(p === 0 ? 0 : p === 1 ? 8 : 14)));
+  }
+
+  // Called by the emulated chip whenever a port's pins change, at that exact cycle
+  private pinsChanged(first: number) {
+    const now = this.cpu.cycles;
+    const count = first === 8 ? 6 : first === 14 ? 6 : 8;
+    for (let pin = first; pin < first + count; pin++) {
+      const high = this.output(pin) === 1;
+      if (high === this.level[pin]) continue;
+      if (this.level[pin]) this.highCycles[pin] += now - this.since[pin];
+      else this.rises[pin]++;
+      this.level[pin] = high;
+      this.since[pin] = now;
+      // A falling strobe: read the other pins now, before the program changes them
+      if (!high) this.taps.filter((t) => t.strobe === pin).forEach((t) => this.tapEvents.push({ id: t.id, levels: t.pins.map((p) => this.output(p)) }));
+    }
   }
 
   /** Runs the program for `ms` milliseconds of board time. */
   run(ms: number): void {
-    const end = this.cpu.cycles + Math.round(ms * CYCLES_PER_MS);
+    const start = this.cpu.cycles;
+    const end = start + Math.round(ms * CYCLES_PER_MS);
+    this.highCycles.fill(0);
+    this.rises.fill(0);
+    this.since.fill(start);
     while (this.cpu.cycles < end) {
       avrInstruction(this.cpu);
       this.cpu.tick();
     }
+    for (let pin = 0; pin < PIN_COUNT; pin++) if (this.level[pin]) this.highCycles[pin] += this.cpu.cycles - this.since[pin];
+    this.history = [...this.history, { cycles: this.cpu.cycles - start, high: this.highCycles.slice(), rises: this.rises.slice() }].slice(-PWM_WINDOW);
+  }
+
+  /** Duty and frequency of a pin that keeps switching (analogWrite, tone), or null for a steady pin. */
+  pwm(pin: number): PwmReading | null {
+    const cycles = this.history.reduce((a, h) => a + h.cycles, 0);
+    const rises = this.history.reduce((a, h) => a + h.rises[pin], 0);
+    if (cycles === 0 || rises < 2) return null;
+    const duty = this.history.reduce((a, h) => a + h.high[pin], 0) / cycles;
+    return { duty, frequency: (rises * UNO_CLOCK_HZ) / cycles };
+  }
+
+  /** Sets the parts to watch for fast strobes; their readings collect until takeTapEvents. */
+  setTaps(taps: PinTap[]): void {
+    this.taps = taps;
+  }
+
+  takeTapEvents(): { id: string; levels: SignalValue[] }[] {
+    const events = this.tapEvents;
+    this.tapEvents = [];
+    return events;
+  }
+
+  /** Voltage on an analog input A0–A5 (channel 0–5), read by analogRead. */
+  analog(channel: number, volts: number): void {
+    this.adc.channelValues[channel] = volts;
   }
 
   /** Port and bit for Arduino pin numbering: D0–D7 on port D, D8–D13 on port B, A0–A5 (14–19) on port C. */

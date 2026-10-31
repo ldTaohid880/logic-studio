@@ -19,6 +19,8 @@ export interface SensorSpec {
   rule: 'above' | 'below';
   /** What DO = 1 means, e.g. "bright". */
   meaning: string;
+  /** No comparator: the part only has an analog output (a potentiometer's wiper). */
+  analogOnly?: boolean;
 }
 
 export const SENSORS = {
@@ -38,6 +40,10 @@ export const SENSORS = {
     name: 'Motion sensor', module: 'PIR module', unit: '', min: 0, max: 1, step: 1, level: 0, threshold: 0.5,
     rule: 'above', meaning: 'motion',
   },
+  POTENTIOMETER: {
+    name: 'Potentiometer', module: '10 kΩ', unit: '%', min: 0, max: 100, step: 1, level: 50, threshold: 50,
+    rule: 'above', meaning: 'past half way', analogOnly: true,
+  },
 } satisfies Partial<Record<GateType, SensorSpec>>;
 
 export type SensorType = keyof typeof SENSORS;
@@ -53,6 +59,15 @@ export function sensorOutput(data: NodeData): 0 | 1 {
   const level = sensorLevel(data);
   const threshold = sensorThreshold(data);
   return (spec.rule === 'above' ? level > threshold : level < threshold) ? 1 : 0;
+}
+
+/** The module's analog output (AO) as a fraction of 5 V; undefined for the motion sensor, which has none. */
+export function sensorAnalog(data: NodeData): number | undefined {
+  const spec: SensorSpec = SENSORS[data.gateType as SensorType];
+  if (data.gateType === 'SENSOR_MOTION') return undefined;
+  const fraction = (sensorLevel(data) - spec.min) / (spec.max - spec.min);
+  // An IR proximity sensor reflects more light, so a higher voltage, when something is closer
+  return data.gateType === 'SENSOR_OBSTACLE' ? 1 - fraction : fraction;
 }
 
 export const formatSensorValue = (spec: SensorSpec, value: number) => (spec.unit === '%' ? `${value}%` : `${value} ${spec.unit}`);

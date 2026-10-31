@@ -6,7 +6,7 @@ import { evaluateIC } from './icLogic';
 import { DEFAULT_ENCODER_CONFIG } from '../types/encoder';
 import { CustomComponentDefinition } from '../types/customComponent';
 import { evaluateCustomComponentLogic } from './customComponentLogic';
-import { isSensor, sensorOutput } from './sensors';
+import { isSensor, sensorAnalog, sensorOutput } from './sensors';
 
 // Nested custom components deeper than this are treated as unresolvable (guards against recursive definitions)
 export const MAX_SUBCIRCUIT_DEPTH = 16;
@@ -19,7 +19,7 @@ export const IC_GATE_TYPES = new Set<string>([
   'MUX_8TO1', 'DEMUX_1TO8', 'DECODER_3TO8', 'ENCODER_8TO3',
   'PARITY_GENERATOR', 'PARITY_CHECKER',
   'INCREMENTER_4BIT', 'DECREMENTER_4BIT', 'ADDER_SUBTRACTOR_4BIT',
-  'OPEN_DRAIN_BUFFER',
+  'OPEN_DRAIN_BUFFER', 'LCD_16X2',
   'COUNTER_4BIT', 'COUNTER_LOAD_4BIT', 'DECADE_COUNTER', 'SHIFT_REG_UNIVERSAL', 'DECODER_4TO16_HC', 'REGISTER_8BIT', 'LATCH_8BIT',
   'SHIFT_REG_4BIT', 'ALU_4BIT_8FN', 'RAM_16X4', 'ROM_16X4',
   'DELAY_ELEMENT',
@@ -156,6 +156,8 @@ export function propagateSignals(
     // Step A.2: Map output signals from source pins to connected input pins via edges.
     // Several wires may end on one input (a shared bus); their levels are resolved together below.
     const pinDrivers = new Map<string, { strong: SignalValue[]; weak: SignalValue[] }>();
+    // Analog level and frequency carried by single-driver wires (sensor AO, potentiometer, PWM, clocks)
+    const pinExtras = new Map<string, { analog?: number; freq?: number } | null>();
     // Bus inputs: the bus arrays driving them (resolved bit by bit like single wires)
     const busDrivers = new Map<string, SignalValue[][]>();
     inputEdges.forEach((edge) => {
@@ -185,6 +187,11 @@ export function propagateSignals(
         busDrivers.set(key, [...(busDrivers.get(key) ?? []), outPin?.bus ?? floatingBus(inPin.width)]);
       } else if (inPin) {
         const key = `${edge.target}|${inPinHandle}`;
+        const srcPin = sourceData.outputs.find((p) => p.id === (edge.sourceHandle || 'out-0'));
+        // A second driver makes the analog level meaningless; resistors don't carry one
+        if (!WEAK_DRIVERS.has(sourceData.gateType)) {
+          pinExtras.set(key, pinExtras.has(key) ? null : { analog: srcPin?.analog, freq: srcPin?.freq });
+        }
         const drivers = pinDrivers.get(key) ?? { strong: [], weak: [] };
         (WEAK_DRIVERS.has(sourceData.gateType) ? drivers.weak : drivers.strong).push(signalVal);
         pinDrivers.set(key, drivers);
@@ -206,6 +213,14 @@ export function propagateSignals(
       inPin.driven = true;
       if (inPin.value !== value) {
         inPin.value = value;
+        iterChanged = true;
+      }
+      const extras = pinExtras.get(key) ?? null;
+      const analog = extras?.analog;
+      const freq = extras?.freq;
+      if (inPin.analog !== analog || inPin.freq !== freq) {
+        inPin.analog = analog;
+        inPin.freq = freq;
         iterChanged = true;
       }
     });
@@ -268,12 +283,20 @@ export function propagateSignals(
             ? 1
             : data.gateType === 'CONST_LOW' || data.gateType === 'PULL_DOWN'
             ? 0
-            : isSensor(data.gateType)
+            : isSensor(data.gateType) && data.gateType !== 'POTENTIOMETER'
             ? sensorOutput(data)
             : (data.value ?? 0);
+        // Sensor AO and potentiometer wiper: an analog level, read as 1 above half of 5 V
+        const analog = isSensor(data.gateType) ? sensorAnalog(data) : undefined;
+        const freq = data.gateType === 'CLOCK' ? data.clockHz : undefined;
         data.outputs.forEach((outPin) => {
-          if (outPin.value !== val) {
-            outPin.value = val;
+          const analogPin = analog !== undefined && (outPin.name === 'AO' || outPin.name === 'W');
+          const v: SignalValue = analogPin ? (analog! >= 0.5 ? 1 : 0) : val;
+          const a = analogPin ? analog : undefined;
+          if (outPin.value !== v || outPin.analog !== a || outPin.freq !== freq) {
+            outPin.value = v;
+            outPin.analog = a;
+            outPin.freq = freq;
             iterChanged = true;
             changedThisPass.add(node.id);
           }
@@ -293,7 +316,8 @@ export function propagateSignals(
         data.gateType === 'LOGIC_PROBE' ||
         data.gateType === 'SEVEN_SEGMENT' ||
         data.gateType === 'HEX_DISPLAY' ||
-        data.gateType === 'BUS_MONITOR'
+        data.gateType === 'BUS_MONITOR' ||
+        data.gateType === 'BUZZER'
       ) {
         const val = inputs[0] ?? data.value ?? -1;
         if (data.value !== val) {

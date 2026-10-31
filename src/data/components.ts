@@ -101,6 +101,8 @@ export const PARTS: PartInfo[] = [
   // Displays
   { type: 'OUTPUT', name: 'LED', description: 'Lights when its input is 1', category: 'Displays' },
   { type: 'LOGIC_PROBE', name: 'Probe', description: 'Shows 1, 0 or floating', category: 'Displays' },
+  { type: 'BUZZER', name: 'Buzzer', description: 'Beeps while its input is 1, at the frequency it is driven at', category: 'Displays' },
+  { type: 'LCD_16X2', name: '16 × 2 LCD', description: 'Character display driven like the Arduino LiquidCrystal library (RS, E, D4–D7)', category: 'Displays', partNumber: 'HD44780' },
   { type: 'SEVEN_SEGMENT', name: '7-segment', description: 'Shows a digit from 4 input bits', category: 'Displays' },
   { type: 'HEX_DISPLAY', name: 'Hex digit', description: 'Shows 0–F from 4 input bits', category: 'Displays' },
   { type: 'BUS_MONITOR', name: 'Bus value', description: 'Shows a 2–8 bit value in hex, decimal or binary', category: 'Displays' },
@@ -109,6 +111,7 @@ export const PARTS: PartInfo[] = [
   { type: 'SENSOR_LIGHT', name: 'Light', description: 'Outputs 1 when brighter than its threshold', category: 'Sensors', partNumber: 'LDR module' },
   { type: 'SENSOR_TEMPERATURE', name: 'Temperature', description: 'Outputs 1 when hotter than its threshold', category: 'Sensors', partNumber: 'Thermistor module' },
   { type: 'SENSOR_OBSTACLE', name: 'Obstacle', description: 'Outputs 1 when something is closer than its threshold', category: 'Sensors', partNumber: 'IR proximity module' },
+  { type: 'POTENTIOMETER', name: 'Potentiometer', description: 'A knob giving 0–5 V on its wiper, for analogRead', category: 'Sensors', partNumber: '10 kΩ' },
   { type: 'SENSOR_MOTION', name: 'Motion', description: 'Outputs 1 while it sees movement', category: 'Sensors', partNumber: 'PIR module' },
 
   // Programmable boards

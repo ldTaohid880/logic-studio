@@ -25,7 +25,7 @@ export function useTableExport(fileBase: string) {
   const saveImage = useCallback(
     async (element: HTMLElement | null) => {
       if (!element) return;
-      const dataUrl = await toPng(element, { backgroundColor: resolveCssColor('--surface-1', '#ffffff') });
+      const dataUrl = await toPng(element, { backgroundColor: resolveCssColor('--surface-1', '#ffffff'), skipFonts: true });
       const link = document.createElement('a');
       link.download = `${fileBase}.png`;
       link.href = dataUrl;

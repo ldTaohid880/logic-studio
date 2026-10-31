@@ -11,6 +11,7 @@ import { CircuitTruthTableModal } from './components/ui/CircuitTruthTableModal';
 import { BuildCircuitDialog } from './components/ui/BuildCircuitDialog';
 import { PartsListDialog } from './components/ui/PartsListDialog';
 import { ShareDialog } from './components/ui/ShareDialog';
+import { ProjectsDialog } from './components/ui/ProjectsDialog';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { decodeShare } from './utils/shareLink';
 import { CustomComponentWizardModal } from './components/custom/CustomComponentWizardModal';
@@ -43,6 +44,7 @@ export default function App() {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isPartsListOpen, setIsPartsListOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isProjectsOpen, setIsProjectsOpen] = useState(false);
   // A circuit from a share link, waiting for the user to agree to replace the current one
   const [sharedCircuit, setSharedCircuit] = useState<string | null>(null);
   const [buildCircuit, setBuildCircuit] = useState<{ open: boolean; text?: string }>({ open: false });
@@ -142,6 +144,7 @@ export default function App() {
         onOpenBuildCircuit={() => setBuildCircuit({ open: true })}
         onOpenPartsList={() => setIsPartsListOpen(true)}
         onOpenShare={() => setIsShareOpen(true)}
+        onOpenProjects={() => setIsProjectsOpen(true)}
         canvasRef={canvasRef}
       />
 
@@ -224,6 +227,7 @@ export default function App() {
       />
       <PartsListDialog isOpen={isPartsListOpen} onClose={() => setIsPartsListOpen(false)} />
       <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
+      <ProjectsDialog isOpen={isProjectsOpen} onClose={() => setIsProjectsOpen(false)} />
       <ConfirmDialog
         isOpen={sharedCircuit !== null}
         title="Open the shared circuit?"
