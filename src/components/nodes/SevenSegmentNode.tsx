@@ -5,7 +5,7 @@ import { SevenSegmentConfig, DEFAULT_SEVEN_SEGMENT_CONFIG } from '../../types/se
 import { evaluateSevenSegment } from '../../utils/sevenSegmentLogic';
 import { outputColor } from '../../theme/outputColors';
 import { Pin } from './Pin';
-import { DisplayFace, PartLabel, PITCH } from './partKit';
+import { DisplayFace, HW, MODULE_BODY, PartLabel, PITCH } from './partKit';
 import { SegmentDigit } from './SegmentDigit';
 
 /** Short pin name for the package edge: "A (LSB)" → "A", "Seg B" → "b". The full name is in the pin tooltip. */
@@ -42,11 +42,11 @@ export const SevenSegmentNode = React.memo(({ data }: NodeProps) => {
   const W = 120;
 
   return (
-    <div className="relative rounded-md border-[1.5px] border-line-strong bg-surface-1" style={{ width: W, height: H }}>
+    <div className="lsp-hw relative rounded-[4px] border-[1.5px]" style={{ width: W, height: H, background: MODULE_BODY, borderColor: HW.plasticEdge }}>
       <PartLabel text={label} />
       {inputs.map((pin, i) => (
         <div key={pin.id} className="absolute left-0 flex items-center pl-2.5" style={{ top: i * PITCH, height: PITCH }}>
-          <span className="text-[11px] font-mono text-fg-muted" title={aliases[pin.id] ? `${pin.name} (${aliases[pin.id]})` : pin.name}>
+          <span className="text-[11px] font-mono text-[#b4b9c0]" title={aliases[pin.id] ? `${pin.name} (${aliases[pin.id]})` : pin.name}>
             {shortPinName(pin.name, aliases[pin.id])}
           </span>
           <Pin type="target" position={Position.Left} id={pin.id} value={pin.value} label={pin.name} style={{ top: 15 }} />

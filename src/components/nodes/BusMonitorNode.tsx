@@ -3,7 +3,7 @@ import { Position, NodeProps } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
 import { outputColor } from '../../theme/outputColors';
 import { Pin, pinDisplayName } from './Pin';
-import { DisplayFace, PartLabel, PITCH } from './partKit';
+import { DisplayFace, HW, MODULE_BODY, PartLabel, PITCH } from './partKit';
 
 const W = 150;
 
@@ -32,13 +32,13 @@ export const BusMonitorNode: React.FC<NodeProps> = memo(({ data: nodeData }) => 
     : '0x' + num.toString(16).toUpperCase().padStart(Math.ceil(bitWidth / 4), '0');
 
   return (
-    <div className="relative rounded-md border-[1.5px] border-line-strong bg-surface-1" style={{ width: W, height: H }}>
+    <div className="lsp-hw relative rounded-[4px] border-[1.5px]" style={{ width: W, height: H, background: MODULE_BODY, borderColor: HW.plasticEdge }}>
       <PartLabel text={data.label} />
       {bits.map((v, i) => {
         const pin = inputs[i] ?? { id: `in-${i}`, name: `B${i}`, value: -1 as const };
         return (
           <div key={pin.id} className="absolute left-0 flex items-center pl-2.5" style={{ top: i * PITCH, height: PITCH }}>
-            <span className="text-[11px] font-mono text-fg-muted">{pinDisplayName(pin, data.pinAliases, 4)}</span>
+            <span className="text-[11px] font-mono text-[#b4b9c0]">{pinDisplayName(pin, data.pinAliases, 4)}</span>
             <Pin type="target" position={Position.Left} id={pin.id} value={v} label={pin.name} style={{ top: 15 }} />
           </div>
         );
