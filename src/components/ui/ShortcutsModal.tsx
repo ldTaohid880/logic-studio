@@ -20,7 +20,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     <div className="grid gap-6 sm:grid-cols-2">
       {SHORTCUT_GROUPS.map((group) => (
         <section key={group.title}>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-fg-subtle mb-2">{group.title}</h3>
+          <h3 className="text-xs font-semibold text-fg-subtle mb-2">{group.title}</h3>
           <dl className="space-y-1">
             {group.items.map((item) => (
               <div key={item.action} className="flex items-center justify-between gap-3 py-1 text-[13px]">

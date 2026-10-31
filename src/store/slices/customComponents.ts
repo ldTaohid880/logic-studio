@@ -81,7 +81,7 @@ export const createCustomComponentsSlice: StoreSlice<CustomComponentsSlice> = (s
       ? nodes.filter((n) => targetNodeIds.includes(n.id))
       : nodes.filter((n) => n.selected);
     const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
-    const compId = `custom_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+    const compId = makeId(`custom_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`);
 
     const inputs = customPins?.inputs || [];
     const outputs = customPins?.outputs || [];
@@ -91,7 +91,7 @@ export const createCustomComponentsSlice: StoreSlice<CustomComponentsSlice> = (s
       const templateNodes: Node[] = [];
 
       inputs.forEach((p, idx) => {
-        const inNodeId = p.internalNodeId || `in-node-${idx}-${Date.now()}`;
+        const inNodeId = p.internalNodeId || makeId(`in-node-${idx}`);
         p.internalNodeId = inNodeId;
         templateNodes.push({
           id: inNodeId,
@@ -107,7 +107,7 @@ export const createCustomComponentsSlice: StoreSlice<CustomComponentsSlice> = (s
       });
 
       outputs.forEach((p, idx) => {
-        const outNodeId = p.internalNodeId || `out-node-${idx}-${Date.now()}`;
+        const outNodeId = p.internalNodeId || makeId(`out-node-${idx}`);
         p.internalNodeId = outNodeId;
         templateNodes.push({
           id: outNodeId,

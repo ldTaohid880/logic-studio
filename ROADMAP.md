@@ -26,6 +26,7 @@ Logic Studio is one app for beginners and advanced students alike. There is no b
 - **Arduino extras:** analogRead from sensor AO pins and a potentiometer, analogWrite (PWM dims LEDs), tone and a buzzer, a 16 × 2 LCD that works with LiquidCrystal.
 - **Share links and Verilog export.**
 - **Datasheets for every part:** a wide reader with real pinouts, function tables made from the simulation, 74HC electrical and timing figures, print/PDF and `#datasheet=` links.
+- **Agent-friendly project:** lean CLAUDE.md with topic rules loaded by path, runbooks for common tasks, a review agent, and project conventions checked automatically (`npm run lint:conventions`, CI and an edit hook).
 
 ## Next
 

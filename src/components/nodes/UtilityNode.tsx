@@ -17,7 +17,7 @@ export const UtilityNode: React.FC<NodeProps> = memo(({ id, data: nodeData, sele
       >
         <div className="flex items-center gap-1.5 mb-1">
           <Type className="w-3 h-3 text-amber-400 shrink-0" />
-          <span className="text-[10px] font-mono font-bold uppercase text-amber-400 tracking-wider">
+          <span className="text-[10px] font-semibold text-amber-400">
             Annotation
           </span>
         </div>

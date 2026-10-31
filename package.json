@@ -15,8 +15,10 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run lint && npm test && npm run build",
-    "test:watch": "vitest"
+    "check": "npm run lint && npm run lint:conventions && npm test && npm run build",
+    "test:watch": "vitest",
+    "lint:conventions": "node scripts/check-conventions.mjs",
+    "screenshots": "node scripts/agent/screenshots.mjs && node scripts/agent/og-image.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.2",

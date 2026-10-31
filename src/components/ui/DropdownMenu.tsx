@@ -100,7 +100,7 @@ export const MenuPanel: React.FC<MenuPanelProps> = ({ items, anchor, onClose, ar
         }
         if (item.type === 'label') {
           return (
-            <div key={item.id} className="px-3 pt-1.5 pb-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+            <div key={item.id} className="px-3 pt-1.5 pb-1 text-xs font-semibold text-fg-subtle">
               {item.label}
             </div>
           );
