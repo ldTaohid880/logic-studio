@@ -56,6 +56,7 @@ export const PARTS: PartInfo[] = [
   { type: 'TRI_STATE_BUFFER', name: 'Tri-state', description: 'Passes its input while EN is 1, otherwise floats', category: 'Gates', partNumber: '74HC125' },
 
   // Combinational
+  { type: 'MUX_2TO1', name: '2:1 multiplexer', description: 'Picks one of 2 inputs with a select line', category: 'Combinational', partNumber: '74HC157' },
   { type: 'MUX_4TO1', name: '4:1 multiplexer', description: 'Picks one of 4 inputs with 2 select lines', category: 'Combinational', partNumber: '74HC153' },
   { type: 'MUX_8TO1', name: '8:1 multiplexer', description: 'Picks one of 8 inputs with 3 select lines', category: 'Combinational', partNumber: '74HC151' },
   { type: 'DEMUX_1TO4', name: '1:4 demultiplexer', description: 'Sends its input to one of 4 outputs', category: 'Combinational', partNumber: '74HC139' },
@@ -80,7 +81,9 @@ export const PARTS: PartInfo[] = [
   { type: 'DECREMENTER_4BIT', name: '4-bit decrementer', description: 'Subtracts 1 from a 4-bit number', category: 'Arithmetic' },
 
   // Memory
+  { type: 'SR_LATCH', name: 'SR latch', description: 'Set and reset; holds while both are 0', category: 'Memory' },
   { type: 'D_LATCH', name: 'D latch', description: 'Follows D while enabled, holds otherwise', category: 'Memory', partNumber: '74HC75' },
+  { type: 'D_FLIPFLOP', name: 'D flip-flop', description: 'Stores D on the rising clock edge; preset and clear', category: 'Memory', partNumber: '74HC74' },
   { type: 'JK_FLIPFLOP', name: 'JK flip-flop', description: 'Sets, resets or toggles on the clock edge', category: 'Memory', partNumber: '74HC109' },
   { type: 'T_FLIPFLOP', name: 'T flip-flop', description: 'Toggles on the clock edge while T is 1', category: 'Memory' },
   { type: 'REGISTER_4BIT', name: '4-bit register', description: 'Stores 4 bits on the clock edge', category: 'Memory', partNumber: '74HC173' },

@@ -8,6 +8,7 @@ import { TimingPanel } from './components/timeline/TimingPanel';
 import { PresetsModal } from './components/ui/PresetsModal';
 import { ShortcutsModal } from './components/ui/ShortcutsModal';
 import { CircuitTruthTableModal } from './components/ui/CircuitTruthTableModal';
+import { BuildCircuitDialog } from './components/ui/BuildCircuitDialog';
 import { CustomComponentWizardModal } from './components/custom/CustomComponentWizardModal';
 import { CustomComponentLibraryModal } from './components/custom/CustomComponentLibraryModal';
 import { Toast } from './components/ui/Toast';
@@ -36,6 +37,7 @@ export default function App() {
   const [isCircuitTruthTableOpen, setIsCircuitTruthTableOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [buildCircuit, setBuildCircuit] = useState<{ open: boolean; text?: string }>({ open: false });
   const [inspectorWidth, setInspectorWidth] = useState(readInspectorWidth);
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -111,6 +113,7 @@ export default function App() {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onOpenSubcircuitLibrary={() => setIsLibraryOpen(true)}
         onOpenCircuitTruthTable={() => setIsCircuitTruthTableOpen(true)}
+        onOpenBuildCircuit={() => setBuildCircuit({ open: true })}
         canvasRef={canvasRef}
       />
 
@@ -183,7 +186,15 @@ export default function App() {
 
       <PresetsModal isOpen={isPresetsOpen} onClose={() => setIsPresetsOpen(false)} />
       <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
-      <CircuitTruthTableModal isOpen={isCircuitTruthTableOpen} onClose={() => setIsCircuitTruthTableOpen(false)} />
+      <CircuitTruthTableModal
+        isOpen={isCircuitTruthTableOpen}
+        onClose={() => setIsCircuitTruthTableOpen(false)}
+        onBuildCircuit={(text) => {
+          setIsCircuitTruthTableOpen(false);
+          setBuildCircuit({ open: true, text });
+        }}
+      />
+      <BuildCircuitDialog isOpen={buildCircuit.open} initialText={buildCircuit.text} onClose={() => setBuildCircuit({ open: false })} />
       <CustomComponentWizardModal isOpen={isWizardOpen} onClose={() => setIsWizardOpen(false)} />
       <CustomComponentLibraryModal
         isOpen={isLibraryOpen}

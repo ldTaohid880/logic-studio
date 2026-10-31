@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, Copy, Download, Image as ImageIcon, Info, Table } from 'lucide-react';
+import { Check, Copy, Download, Image as ImageIcon, Info, Table, Wand2 } from 'lucide-react';
+import { exprFromSOP, formatExpr } from '../../utils/expression';
 import { useShallow } from 'zustand/react/shallow';
 import { ModalFrame } from './Dialog';
 import { ModalHeader } from './ModalHeader';
@@ -21,15 +22,19 @@ import {
   tableInputsKey,
 } from '../../utils/circuitTruthTableEngine';
 import { Implicant, MAX_MINIMIZE_VARS, formatSOP, minimizeSOP } from '../../utils/booleanMinimizer';
+import { KMAP_MAX_VARS, KMAP_MIN_VARS } from '../../utils/karnaugh';
+import { KarnaughMap } from './KarnaughMap';
 
 interface CircuitTruthTableModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Open the build dialog with these expressions (one output per line). */
+  onBuildCircuit?: (expressions: string) => void;
 }
 
-export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({ isOpen, onClose }) =>
+export const CircuitTruthTableModal: React.FC<CircuitTruthTableModalProps> = ({ isOpen, onClose, onBuildCircuit }) =>
   // Only subscribe to the circuit while the dialog is open
-  isOpen ? <CircuitTruthTableDialog onClose={onClose} /> : null;
+  isOpen ? <CircuitTruthTableDialog onClose={onClose} onBuildCircuit={onBuildCircuit} /> : null;
 
 interface OutputSummary {
   label: string;
@@ -66,7 +71,10 @@ const Expression: React.FC<{ terms: Implicant[]; names: string[] }> = ({ terms, 
 const formatList = (items: (number | string)[], max = 24) =>
   items.length > max ? `${items.slice(0, max).join(', ')}, …` : items.join(', ');
 
-const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const CircuitTruthTableDialog: React.FC<{ onClose: () => void; onBuildCircuit?: (expressions: string) => void }> = ({
+  onClose,
+  onBuildCircuit,
+}) => {
   const { nodes, edges, customComponents, setInputLevels } = useCircuitStore(
     useShallow((s) => ({ nodes: s.nodes, edges: s.edges, customComponents: s.customComponents, setInputLevels: s.setInputLevels }))
   );
@@ -166,6 +174,11 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose })
       .map((s) => `${s.name} = ${formatSOP(s.terms!, varNames)}`);
     copyLines([...lines('\t'), ...(expressions.length ? ['', ...expressions] : [])]);
   };
+
+  // Simplified expressions as text the build dialog reads back (needs every output simplified)
+  const buildText = summaries.length > 0 && summaries.every((s) => s.terms)
+    ? summaries.map((s) => `${/^[A-Za-z][A-Za-z0-9_]*$/.test(s.name) ? s.name : `[${s.name}]`} = ${formatExpr(exprFromSOP(s.terms!, varNames))}`).join('\n')
+    : null;
 
   const rowCount = 2 ** model.inputs.length;
   const description = canBuild
@@ -313,6 +326,14 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose })
                       {!s.terms && s.unknownRows.length === 0 && (
                         <p className="mt-0.5 text-xs text-fg-subtle">Simplified form is shown for up to {MAX_MINIMIZE_VARS} inputs.</p>
                       )}
+                      {model.inputs.length >= KMAP_MIN_VARS && model.inputs.length <= KMAP_MAX_VARS && rows && (
+                        <details className="mt-2" open={summaries.length <= 2}>
+                          <summary className="text-xs text-accent-fg cursor-pointer select-none">Karnaugh map</summary>
+                          <div className="mt-2">
+                            <KarnaughMap names={varNames} minterms={s.minterms} unknownRows={s.unknownRows} terms={s.terms} outputName={s.name} />
+                          </div>
+                        </details>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -346,6 +367,18 @@ const CircuitTruthTableDialog: React.FC<{ onClose: () => void }> = ({ onClose })
             <Button size="sm" variant="secondary" disabled={!rows} leftIcon={<ImageIcon className="w-4 h-4" />} onClick={() => saveImage(tableRef.current)}>
               Save image
             </Button>
+            {onBuildCircuit && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!buildText}
+                title="Build these simplified expressions as a new circuit, for example with NAND gates only"
+                leftIcon={<Wand2 className="w-4 h-4" />}
+                onClick={() => buildText && onBuildCircuit(buildText)}
+              >
+                Build circuit
+              </Button>
+            )}
           </footer>
         </>
       )}

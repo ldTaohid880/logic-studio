@@ -52,6 +52,7 @@ export interface AdvanceResult {
   time: number;
   /** Set when the circuit was re-settled at least once. */
   unstableNodeIds?: string[];
+  conflictNodeIds?: string[];
 }
 
 /**
@@ -68,6 +69,7 @@ export function advanceCircuit(
 ): AdvanceResult {
   let { nodes, edges } = circuit;
   let unstableNodeIds: string[] | undefined;
+  let conflictNodeIds: string[] | undefined;
   const clocks = nodes
     .filter((n) => (n.data as unknown as NodeData).gateType === 'CLOCK')
     .map((n) => ({ id: n.id, hz: clockHz(n.data as unknown as NodeData) }));
@@ -120,11 +122,12 @@ export function advanceCircuit(
       nodes = settled.nodes;
       edges = settled.edges;
       unstableNodeIds = settled.unstableNodeIds;
+      conflictNodeIds = settled.conflictNodeIds;
       options.onSettle?.(t, nodes);
     }
   }
 
-  return { nodes, edges, time: t, unstableNodeIds };
+  return { nodes, edges, time: t, unstableNodeIds, conflictNodeIds };
 }
 
 // Timing diagram traces: one list of [time, level] changes per traced part

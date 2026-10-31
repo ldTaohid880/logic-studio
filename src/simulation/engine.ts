@@ -15,7 +15,7 @@ export const IC_GATE_TYPES = new Set<string>([
   'HALF_ADDER', 'FULL_ADDER', 'ADDER_4BIT',
   'HALF_SUBTRACTOR', 'FULL_SUBTRACTOR', 'MUX_4TO1', 'DEMUX_1TO4',
   'PRIORITY_ENCODER', 'COMPARATOR_4BIT', 'DECODER_BCD_TO_7SEG',
-  'D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT',
+  'D_LATCH', 'SR_LATCH', 'D_FLIPFLOP', 'JK_FLIPFLOP', 'MUX_2TO1', 'T_FLIPFLOP', 'REGISTER_4BIT',
   'MUX_8TO1', 'DEMUX_1TO8', 'DECODER_3TO8', 'ENCODER_8TO3',
   'PARITY_GENERATOR', 'PARITY_CHECKER',
   'INCREMENTER_4BIT', 'DECREMENTER_4BIT', 'ADDER_SUBTRACTOR_4BIT',
@@ -34,6 +34,22 @@ export interface PropagateResult {
   hasChanged: boolean;
   /** Parts still changing when propagation gave up (oscillation, e.g. a ring of inverters). Empty once settled. */
   unstableNodeIds: string[];
+  /** Parts with an input driven to different levels at once (two outputs fighting over one wire), and tunnels whose tag is. */
+  conflictNodeIds: string[];
+}
+
+/**
+ * Level on a wire with several drivers (a shared bus). Floating drivers (disabled tri-state outputs) don't count;
+ * drivers that agree give their level; drivers that disagree are a conflict, which reads as unknown (-1).
+ */
+export function resolveDrivers(values: SignalValue[]): { value: SignalValue; conflict: boolean } {
+  let value: SignalValue = -1;
+  for (const v of values) {
+    if (v === -1) continue;
+    if (value !== -1 && v !== value) return { value: -1, conflict: true };
+    value = v;
+  }
+  return { value, conflict: false };
 }
 
 export function propagateSignals(
@@ -85,21 +101,30 @@ export function propagateSignals(
   // Custom component instances whose own subcircuit doesn't settle
   const unstableInside = new Set<string>();
   let settled = false;
+  // Inputs (node|pin) and tunnel tags driven to different levels in the latest pass
+  let conflicts = new Set<string>();
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     let iterChanged = false;
     changedThisPass = new Set<string>();
+    conflicts = new Set<string>();
 
     // Step A.1: Tunnel wireless signal propagation pass
     // Only tunnels with a wire on their input drive the label; conflicting drivers resolve to floating
-    const tunnelMap = new Map<string, SignalValue>();
+    // A tag works like a shared bus: floating drivers don't count, disagreeing ones conflict
+    const tunnelDrivers = new Map<string, SignalValue[]>();
     nodesMap.forEach((n) => {
       const d = n.data as unknown as NodeData;
       if (d.gateType === 'TUNNEL' && d.tunnelLabel && d.inputs.length > 0 && connectedInputs.has(`${n.id}|${d.inputs[0].id}`)) {
         const key = d.tunnelLabel.toUpperCase();
-        const val = d.inputs[0].value;
-        tunnelMap.set(key, tunnelMap.has(key) && tunnelMap.get(key) !== val ? -1 : val);
+        tunnelDrivers.set(key, [...(tunnelDrivers.get(key) ?? []), d.inputs[0].value]);
       }
+    });
+    const tunnelMap = new Map<string, SignalValue>();
+    tunnelDrivers.forEach((values, key) => {
+      const { value, conflict } = resolveDrivers(values);
+      tunnelMap.set(key, value);
+      if (conflict) conflicts.add(`tag|${key}`);
     });
 
     nodesMap.forEach((n) => {
@@ -114,7 +139,9 @@ export function propagateSignals(
       }
     });
 
-    // Step A.2: Map output signals from source pins to connected input pins via edges
+    // Step A.2: Map output signals from source pins to connected input pins via edges.
+    // Several wires may end on one input (a shared bus); their levels are resolved together below.
+    const pinDrivers = new Map<string, SignalValue[]>();
     inputEdges.forEach((edge) => {
       const sourceNode = nodesMap.get(edge.source);
       const targetNode = nodesMap.get(edge.target);
@@ -134,20 +161,28 @@ export function propagateSignals(
         signalVal = outPin ? outPin.value : (sourceData.outputs[0]?.value ?? -1);
       }
 
-      // Update target pin value
       const inPinHandle = edge.targetHandle || 'in-0';
       const inPin = targetData.inputs.find((p) => p.id === inPinHandle);
       if (inPin) {
-        inPin.driven = true;
-        if (inPin.value !== signalVal) {
-          inPin.value = signalVal;
-          iterChanged = true;
-        }
+        const key = `${edge.target}|${inPinHandle}`;
+        pinDrivers.set(key, [...(pinDrivers.get(key) ?? []), signalVal]);
       } else if (targetData.gateType === 'OUTPUT') {
         if (targetData.value !== signalVal) {
           targetData.value = signalVal;
           iterChanged = true;
         }
+      }
+    });
+
+    pinDrivers.forEach((values, key) => {
+      const [nodeId, pinId] = key.split('|');
+      const inPin = (nodesMap.get(nodeId)!.data as unknown as NodeData).inputs.find((p) => p.id === pinId)!;
+      const { value, conflict } = resolveDrivers(values);
+      if (conflict) conflicts.add(key);
+      inPin.driven = true;
+      if (inPin.value !== value) {
+        inPin.value = value;
+        iterChanged = true;
       }
     });
 
@@ -279,6 +314,18 @@ export function propagateSignals(
 
   const unstableNodeIds = new Set<string>([...(settled ? [] : changedThisPass), ...unstableInside]);
 
+  // Parts with a conflicting input, and the tunnels sharing a conflicting tag
+  const conflictNodeIds = new Set<string>();
+  conflicts.forEach((key) => {
+    const [first, second] = key.split('|');
+    if (first !== 'tag') conflictNodeIds.add(first);
+    else
+      nodesMap.forEach((n) => {
+        const d = n.data as unknown as NodeData;
+        if (d.gateType === 'TUNNEL' && d.tunnelLabel?.toUpperCase() === second) conflictNodeIds.add(n.id);
+      });
+  });
+
   // Step C: Update wire edge data with current signal value for animated rendering
   const updatedEdges = inputEdges.map((edge) => {
     const sourceNode = nodesMap.get(edge.source);
@@ -295,11 +342,14 @@ export function propagateSignals(
       signalVal = outPin ? outPin.value : (sourceData.outputs[0]?.value ?? -1);
     }
 
+    const conflict = conflicts.has(`${edge.target}|${edge.targetHandle || 'in-0'}`);
     return {
       ...edge,
       data: {
         ...edge.data,
         signalValue: signalVal,
+        // Drawn as a conflict: this wire's driver disagrees with another driver on the same input
+        conflict: conflict || undefined,
       },
     };
   });
@@ -309,5 +359,6 @@ export function propagateSignals(
     edges: updatedEdges,
     hasChanged: overallChanged,
     unstableNodeIds: Array.from(unstableNodeIds),
+    conflictNodeIds: Array.from(conflictNodeIds),
   };
 }

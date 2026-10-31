@@ -236,3 +236,32 @@ describe('sensors', () => {
     expect(store().historyPast.length).toBe(undoSteps);
   });
 });
+
+describe('wiring several outputs to one input', () => {
+  const connect = (source: string, target: string) =>
+    store().onConnect({ source, sourceHandle: 'out-0', target, targetHandle: 'in-0' });
+  const intoY = () => store().edges.filter((e) => e.target === 'Y').map((e) => e.source).sort();
+
+  it('replaces the old wire for ordinary outputs, as before', () => {
+    store().loadCircuit([sw('A', 1), sw('B', 0), led('Y')], []);
+    connect('A', 'Y');
+    connect('B', 'Y');
+    expect(intoY()).toEqual(['B']);
+  });
+
+  it('keeps both wires when tri-state outputs share the input, and reports a conflict', () => {
+    store().loadCircuit([], []);
+    store().addNode('TRI_STATE_BUFFER', { x: 0, y: 0 });
+    store().addNode('TRI_STATE_BUFFER', { x: 0, y: 90 });
+    const [t1, t2] = store().nodes.map((n) => n.id);
+    store().loadCircuit([...store().nodes, sw('A', 1), sw('B', 0), led('Y')], []);
+    connect('A', t1);
+    connect('B', t2);
+    connect(t1, 'Y');
+    connect(t2, 'Y');
+    expect(intoY()).toEqual([t1, t2].sort());
+    // Both buffers are enabled (EN floats to enabled) and disagree
+    expect(store().simulation.conflictNodeIds).toEqual(['Y']);
+    expect(store().nodes.find((n) => n.id === 'Y')?.className).toContain('ls-conflict');
+  });
+});

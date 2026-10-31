@@ -19,6 +19,7 @@ import {
   Table2,
   ToggleLeft,
   Monitor,
+  Wand2,
 } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { useCircuitStore } from '../../store/useCircuitStore';
@@ -37,6 +38,7 @@ interface TopBarProps {
   onOpenShortcuts: () => void;
   onOpenSubcircuitLibrary?: () => void;
   onOpenCircuitTruthTable?: () => void;
+  onOpenBuildCircuit?: () => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -57,6 +59,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenShortcuts,
   onOpenSubcircuitLibrary,
   onOpenCircuitTruthTable,
+  onOpenBuildCircuit,
   canvasRef,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -159,6 +162,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     { id: 'save', label: 'Save as JSON', icon: <Download className="w-4 h-4" />, shortcut: 'Ctrl+S', onSelect: handleSaveJSON },
     { id: 'png', label: 'Export image (PNG)', icon: <ImageIcon className="w-4 h-4" />, onSelect: handleExportPNG },
     { type: 'separator', id: 'sep1' },
+    { id: 'build', label: 'Build from expression…', icon: <Wand2 className="w-4 h-4" />, onSelect: () => onOpenBuildCircuit?.() },
     { id: 'presets', label: `Example circuits (${presets.length})`, icon: <FolderOpen className="w-4 h-4" />, onSelect: onOpenPresets },
     {
       id: 'library',

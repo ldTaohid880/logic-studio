@@ -52,6 +52,8 @@ src/
   config/       shortcuts.ts (list shown in the Shortcuts dialog — keep in sync with useGlobalShortcuts)
   types/        circuit.ts (GateType, NodeData, PinData, SignalValue) + encoder/sevenSegment/customComponent
   utils/        pin factories, truth tables (gateTruthTable, circuitTruthTableEngine, booleanMinimizer),
+                karnaugh (K-map layout and groups), expression (parser/printer for Boolean expressions),
+                circuitBuilder (expression → gates in AND/OR/NOT, NAND or NOR style, laid out by level),
                 canvasBridge (visible canvas center for click-to-add), fileActions, import/export
 ```
 
@@ -67,7 +69,8 @@ src/
 - Memory parts keep state in `data.icState`: the D latch follows D while enabled; flip-flops, the register, counter, shift register and RAM act on the rising CLK edge (from a clock, push button or switch). ROM contents live in `data.romContents` (settings, not state), passed to `evaluateIC` as its 4th argument.
 - `PinData.driven` marks pins fed by a wire; when the wire disappears the engine floats the pin to -1. Pins without the flag (e.g. encoder inputs toggled in the UI) keep manual values. When removing edges in the store, call `markRemovedWireTargets` (helpers.ts) first.
 - Unconnected control inputs use `floatingAs(value, default)` (icLogic.ts) — never `inputs[n] ?? 1`, because floating is -1, not undefined.
-- TUNNEL: only tunnels with a wired input drive their label (case-insensitive); conflicting drivers give -1. Tunnels are not evaluated as ICs.
+- Shared wires: an input may have several wires. `resolveDrivers` (engine.ts) ignores floating drivers, takes the level they agree on, and reports a conflict (value -1) when they disagree; the result lists `conflictNodeIds`, conflicting wires get `data.conflict` (drawn red and dashed) and parts get the `ls-conflict` class via `markUnstable`. In the editor, a new wire on a used input replaces the old one unless every driver is in `BUS_DRIVERS` (tri-state buffer, board) — beginners keep the replace behaviour.
+- TUNNEL: only tunnels with a wired input drive their label (case-insensitive); drivers on a tag are resolved like a shared wire. Tunnels are not evaluated as ICs.
 - Custom components: an instance caches internal state in `data.subcircuitNodeStates` tagged with `defVersion = def.updatedAt`; bump `updatedAt` whenever a definition changes so instances rebuild. Nesting is capped at `MAX_SUBCIRCUIT_DEPTH`; check `detectComponentRecursion` before inserting, pasting or importing components.
 - Removed parts (the old clock node type `clockNode`, oscilloscope, configurable `CFG_*`, multi-input bus, bus splitter/joiner/tap, LED matrix, RGB LED, equation generator, the old counters/shift registers/ALU and similar) are listed in `helpers.ts`. Their replacements use new type names (CLOCK on node type `clockSource`, COUNTER_4BIT, SHIFT_REG_4BIT, ALU_4BIT_8FN) so old saved data never meets new pin layouts. `removeUnsupportedParts` drops them from the autosaved circuit, opened files and loaded examples; `loadCircuit` tells the user how many were left out. Don't reintroduce those gate types without restoring their logic.
 

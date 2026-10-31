@@ -5,16 +5,20 @@ import { DEFAULT_SIMULATION } from '../helpers';
 import { hasTimedParts, recordTraces } from '../../simulation/timeline';
 import { CircuitStore, StoreSlice } from '../types';
 
-// Class React Flow puts on a part's wrapper while it keeps changing (styled in index.css)
+// Classes React Flow puts on a part's wrapper (styled in index.css): it keeps changing, or its input is fought over
 const UNSTABLE_CLASS = 'ls-unstable';
+const CONFLICT_CLASS = 'ls-conflict';
 
-export const markUnstable = (nodes: Node[], unstableIds: string[]): Node[] => {
-  const ids = new Set(unstableIds);
+/** Adds or removes the warning outlines so they match the latest propagation. */
+export const markUnstable = (nodes: Node[], unstableIds: string[], conflictIds: string[] = []): Node[] => {
+  const unstable = new Set(unstableIds);
+  const conflict = new Set(conflictIds);
   return nodes.map((node) => {
     const classes = (node.className ?? '').split(' ').filter(Boolean);
-    const has = classes.includes(UNSTABLE_CLASS);
-    if (has === ids.has(node.id)) return node;
-    const next = has ? classes.filter((c) => c !== UNSTABLE_CLASS) : [...classes, UNSTABLE_CLASS];
+    const wanted = [UNSTABLE_CLASS, CONFLICT_CLASS].filter((c) => (c === UNSTABLE_CLASS ? unstable : conflict).has(node.id));
+    const current = classes.filter((c) => c === UNSTABLE_CLASS || c === CONFLICT_CLASS);
+    if (wanted.join() === current.join()) return node;
+    const next = [...classes.filter((c) => c !== UNSTABLE_CLASS && c !== CONFLICT_CLASS), ...wanted];
     return { ...node, className: next.length > 0 ? next.join(' ') : undefined };
   });
 };
@@ -48,7 +52,7 @@ export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => 
       data: { ...edge.data, signalValue: -1 },
     }));
 
-    set({ nodes, edges, simulation: { stepCount: 0, unstableNodeIds: [] } });
+    set({ nodes, edges, simulation: { stepCount: 0, unstableNodeIds: [], conflictNodeIds: [] } });
     get().tickSimulation();
   },
 
@@ -56,15 +60,22 @@ export const createSimulationSlice: StoreSlice<SimulationSlice> = (set, get) => 
     const { nodes, edges, customComponents, simulation, timeline } = get();
     const result = propagateSignals(nodes, edges, customComponents);
     set({
-      nodes: markUnstable(result.nodes, result.unstableNodeIds),
+      nodes: markUnstable(result.nodes, result.unstableNodeIds, result.conflictNodeIds),
       edges: result.edges,
-      simulation: { stepCount: simulation.stepCount + 1, unstableNodeIds: result.unstableNodeIds },
+      simulation: {
+        stepCount: simulation.stepCount + 1,
+        unstableNodeIds: result.unstableNodeIds,
+        conflictNodeIds: result.conflictNodeIds,
+      },
       // Edits made while time is paused (a switch flipped) still show up in the timing diagram
       ...(hasTimedParts(result.nodes) ? { timeline: { ...timeline, traces: recordTraces(timeline.traces, result.nodes, timeline.time) } } : {}),
     });
     // Tell the user once, when the circuit starts oscillating, not on every edit while it does
     if (result.unstableNodeIds.length > 0 && simulation.unstableNodeIds.length === 0) {
       get().showToast("The circuit doesn't settle: the parts outlined in amber keep changing", 'info');
+    }
+    if (result.conflictNodeIds.length > 0 && simulation.conflictNodeIds.length === 0) {
+      get().showToast('Two outputs drive the same wire to different levels: the red wires conflict. Enable only one tri-state output at a time', 'info');
     }
   },
 });

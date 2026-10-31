@@ -57,9 +57,11 @@ export const createTimelineSlice: StoreSlice<TimelineSlice> = (set, get) => {
       onSettle: (t, settled) => (traces = recordTraces(traces, settled, t)),
     });
     set({
-      nodes: result.unstableNodeIds ? markUnstable(result.nodes, result.unstableNodeIds) : result.nodes,
+      nodes: result.unstableNodeIds ? markUnstable(result.nodes, result.unstableNodeIds, result.conflictNodeIds) : result.nodes,
       edges: result.edges,
-      simulation: result.unstableNodeIds ? { ...simulation, unstableNodeIds: result.unstableNodeIds } : simulation,
+      simulation: result.unstableNodeIds
+        ? { ...simulation, unstableNodeIds: result.unstableNodeIds, conflictNodeIds: result.conflictNodeIds ?? [] }
+        : simulation,
       timeline: { ...timeline, time: result.time, traces, behind: result.time < target },
       boardSerial: collectSerial(result.nodes, get().boardSerial),
     });

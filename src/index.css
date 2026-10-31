@@ -424,6 +424,13 @@
   border-radius: 4px;
 }
 
+/* An input driven to different levels by two outputs (bus conflict): red frame, set by tickSimulation */
+.react-flow__node.ls-conflict > div {
+  outline: 2px solid var(--danger);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 /* Handles: neutral by default; nodes color them by signal state. */
 .react-flow__handle {
   width: 8px !important;

@@ -188,6 +188,43 @@ export function getDefaultICPins(gateType: GateType): ICPins {
         ],
       };
 
+    case 'D_FLIPFLOP':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'D', value: 0 },
+          { id: 'in-1', name: 'CLK', value: 0 },
+          { id: 'in-2', name: 'PRE', value: 0 },
+          { id: 'in-3', name: 'CLR', value: 0 },
+        ],
+        outputs: [
+          { id: 'out-0', name: 'Q', value: 0 },
+          { id: 'out-1', name: 'Q̄', value: 1 },
+        ],
+      };
+
+    case 'SR_LATCH':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'S', value: 0 },
+          { id: 'in-1', name: 'R', value: 0 },
+        ],
+        outputs: [
+          { id: 'out-0', name: 'Q', value: 0 },
+          { id: 'out-1', name: 'Q̄', value: 1 },
+        ],
+      };
+
+    case 'MUX_2TO1':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'I0', value: 0 },
+          { id: 'in-1', name: 'I1', value: 0 },
+          { id: 'in-2', name: 'S', value: 0 },
+          { id: 'in-3', name: 'EN', value: 1 },
+        ],
+        outputs: [{ id: 'out-0', name: 'Y', value: 0 }],
+      };
+
     case 'JK_FLIPFLOP':
       return {
         inputs: [
@@ -564,6 +601,41 @@ export function evaluateIC(
       newState.q = q;
       outputs['out-0'] = q;
       outputs['out-1'] = q === 1 ? 0 : 1;
+      break;
+    }
+
+    case 'D_FLIPFLOP': {
+      const clk = inputs[1] === 1 ? 1 : 0;
+      const pre = inputs[2] === 1;
+      const clr = inputs[3] === 1;
+      let q: SignalValue = currentState.q ?? 0;
+      // Preset and clear act at once, without the clock; both at once is not allowed and drives Q and Q̄ high
+      if (pre && !clr) q = 1;
+      else if (clr && !pre) q = 0;
+      else if (!pre && !clr && (currentState.prevClk ?? 0) === 0 && clk === 1) q = inputs[0] === 1 ? 1 : 0;
+      newState.prevClk = clk;
+      newState.q = q;
+      outputs['out-0'] = pre && clr ? 1 : q;
+      outputs['out-1'] = pre && clr ? 1 : q === 1 ? 0 : 1;
+      break;
+    }
+
+    case 'SR_LATCH': {
+      const s = inputs[0] === 1;
+      const r = inputs[1] === 1;
+      let q: SignalValue = currentState.q ?? 0;
+      if (s && !r) q = 1;
+      else if (r && !s) q = 0;
+      newState.q = q;
+      // S = R = 1 is the forbidden input: like the NOR-gate latch, both outputs go to 0
+      outputs['out-0'] = s && r ? 0 : q;
+      outputs['out-1'] = s && r ? 0 : q === 1 ? 0 : 1;
+      break;
+    }
+
+    case 'MUX_2TO1': {
+      const en = floatingAs(inputs[3], 1);
+      outputs['out-0'] = en === 1 && (inputs[2] === 1 ? inputs[1] : inputs[0]) === 1 ? 1 : 0;
       break;
     }
 

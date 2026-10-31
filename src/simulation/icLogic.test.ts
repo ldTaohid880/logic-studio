@@ -57,6 +57,7 @@ const COMBINATIONAL: Partial<Record<GateType, (i: Bits) => Bits>> = {
       : bitsOf(a + b, 5);
   },
   DELAY_ELEMENT: ([x]) => [x],
+  MUX_2TO1: ([i0, i1, s, en]) => [en ? (s ? i1 : i0) : 0],
   ALU_4BIT_8FN: (i) => {
     const a = num(i.slice(0, 4));
     const b = num(i.slice(4, 8));
@@ -77,7 +78,7 @@ const COMBINATIONAL: Partial<Record<GateType, (i: Bits) => Bits>> = {
   ROM_16X4: (i) => i,
 };
 
-const SEQUENTIAL: GateType[] = ['D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'RAM_16X4'];
+const SEQUENTIAL: GateType[] = ['SR_LATCH', 'D_FLIPFLOP', 'D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'RAM_16X4'];
 
 const outputsInPinOrder = (gateType: GateType, outputs: Record<string, SignalValue>) =>
   getDefaultICPins(gateType).outputs.map((p) => outputs[p.id]);
@@ -133,6 +134,36 @@ describe('memory ICs', () => {
   it('D latch always gives complementary outputs', () => {
     const { outputs } = evaluateIC('D_LATCH', [1, 1, 0]);
     expect([outputs['out-0'], outputs['out-1']]).toEqual([1, 0]);
+  });
+
+  it('SR latch sets, resets and holds; S = R = 1 drives both outputs low', () => {
+    // [S, R] → [Q, Q̄]
+    let state: Record<string, unknown> = {};
+    const step = (s: SignalValue, r: SignalValue) => {
+      const res = evaluateIC('SR_LATCH', [s, r], state);
+      state = res.newState;
+      return [res.outputs['out-0'], res.outputs['out-1']];
+    };
+    expect(step(1, 0)).toEqual([1, 0]);
+    expect(step(0, 0)).toEqual([1, 0]); // holds
+    expect(step(0, 1)).toEqual([0, 1]);
+    expect(step(0, 0)).toEqual([0, 1]);
+    expect(step(1, 1)).toEqual([0, 0]); // forbidden
+  });
+
+  it('D flip-flop takes D on rising edges only; preset and clear act at once', () => {
+    // [D, CLK, PRE, CLR]
+    const q = run('D_FLIPFLOP', [
+      [1, 0, 0, 0], [1, 1, 0, 0], // rising edge stores 1
+      [0, 1, 0, 0],               // CLK held high: no change
+      [0, 0, 0, 0], [0, 1, 0, 0], // stores 0
+      [0, 0, 1, 0],               // preset without a clock
+      [1, 0, 0, 1],               // clear without a clock
+      [1, 0, -1, -1], [1, 1, -1, -1], // floating PRE and CLR are inactive
+    ]);
+    expect(q).toEqual([0, 1, 1, 1, 0, 1, 0, 0, 1]);
+    const both = evaluateIC('D_FLIPFLOP', [0, 0, 1, 1]).outputs;
+    expect([both['out-0'], both['out-1']]).toEqual([1, 1]);
   });
 
   it('JK flip-flop holds, sets, resets and toggles on rising edges only', () => {
