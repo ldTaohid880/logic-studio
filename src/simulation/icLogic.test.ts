@@ -59,6 +59,7 @@ const COMBINATIONAL: Partial<Record<GateType, (i: Bits) => Bits>> = {
   DELAY_ELEMENT: ([x]) => [x],
   MUX_2TO1: ([i0, i1, s, en]) => [en ? (s ? i1 : i0) : 0],
   OPEN_DRAIN_BUFFER: ([a]) => [a ? -1 : 0],
+  DECODER_4TO16_HC: (i) => bitsOf(i[4] ? 1 << num(i.slice(0, 4)) : 0, 16),
   ALU_4BIT_8FN: (i) => {
     const a = num(i.slice(0, 4));
     const b = num(i.slice(4, 8));
@@ -79,12 +80,17 @@ const COMBINATIONAL: Partial<Record<GateType, (i: Bits) => Bits>> = {
   ROM_16X4: (i) => i,
 };
 
-const SEQUENTIAL: GateType[] = ['SR_LATCH', 'D_FLIPFLOP', 'D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'RAM_16X4'];
+const SEQUENTIAL: GateType[] = ['COUNTER_LOAD_4BIT', 'DECADE_COUNTER', 'SHIFT_REG_UNIVERSAL', 'REGISTER_8BIT', 'LATCH_8BIT', 'SR_LATCH', 'D_FLIPFLOP', 'D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'RAM_16X4'];
 
 const outputsInPinOrder = (gateType: GateType, outputs: Record<string, SignalValue>) =>
   getDefaultICPins(gateType).outputs.map((p) => outputs[p.id]);
 
 describe('fixed ICs', () => {
+  it('lists every chip with a sequence test as memory, and no other', async () => {
+    const { MEMORY_GATE_TYPES } = await import('./icLogic');
+    expect([...MEMORY_GATE_TYPES].filter((t) => t !== 'DELAY_ELEMENT').sort()).toEqual([...SEQUENTIAL].sort());
+  });
+
   it('has a test for every IC the engine evaluates', () => {
     const covered = new Set<string>([...Object.keys(COMBINATIONAL), ...SEQUENTIAL]);
     expect([...IC_GATE_TYPES].filter((t) => !covered.has(t))).toEqual([]);
@@ -263,5 +269,69 @@ describe('memory ICs', () => {
     const contents = Array.from({ length: 16 }, (_, i) => 15 - i);
     const { outputs } = evaluateIC('ROM_16X4', bitsOf(2, 4) as SignalValue[], {}, { romContents: contents });
     expect(num([0, 1, 2, 3].map((i) => outputs[`out-${i}`] as number))).toBe(13);
+  });
+
+  /** Steps a chip, carrying its state, and returns the number on out-0..out-(width-1) plus the extra output after it. */
+  const counter = (type: GateType, width = 4) => {
+    let state: Record<string, unknown> = {};
+    return (inputs: SignalValue[]) => {
+      const res = evaluateIC(type, inputs, state);
+      state = res.newState;
+      const bits = Array.from({ length: width }, (_, i) => res.outputs[`out-${i}`]);
+      return [bits.some((b) => b === -1) ? -1 : num(bits as number[]), res.outputs[`out-${width}`]];
+    };
+  };
+  const pulse = (step: (i: SignalValue[]) => (number | SignalValue | undefined)[], low: SignalValue[], high: SignalValue[]) => {
+    step(low);
+    return step(high);
+  };
+
+  it('counter with load counts, loads D synchronously, and clears at once', () => {
+    // [CLK, EN, LOAD, CLR, D0..D3]
+    const step = counter('COUNTER_LOAD_4BIT');
+    expect(pulse(step, [0, 1, 0, 0, 0, 0, 0, 0], [1, 1, 0, 0, 0, 0, 0, 0])).toEqual([1, 0]);
+    expect(step([0, 1, 1, 0, 0, 1, 1, 1])).toEqual([1, 0]); // LOAD waits for the clock edge
+    expect(step([1, 1, 1, 0, 0, 1, 1, 1])).toEqual([14, 0]); // loads 1110
+    expect(pulse(step, [0, 1, 0, 0, 0, 0, 0, 0], [1, 1, 0, 0, 0, 0, 0, 0])).toEqual([15, 1]); // RCO at 15
+    expect(pulse(step, [0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0, 0, 0])).toEqual([15, 0]); // disabled holds
+    expect(step([1, 1, 0, 1, 0, 0, 0, 0])).toEqual([0, 0]); // CLR without a clock edge
+  });
+
+  it('decade counter goes 0 to 9 and starts again, with TC at 9', () => {
+    const step = counter('DECADE_COUNTER');
+    const seen: (number | SignalValue | undefined)[][] = [];
+    for (let i = 0; i < 10; i++) seen.push(pulse(step, [0, 1, 0], [1, 1, 0]));
+    expect(seen.map((s) => s[0])).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+    expect(seen[8][1]).toBe(1);
+    expect(step([1, 1, 1])[0]).toBe(0);
+  });
+
+  it('universal shift register holds, shifts both ways and loads', () => {
+    // [CLK, CLR, S0, S1, SR, SL, D0..D3]
+    const step = counter('SHIFT_REG_UNIVERSAL');
+    const at = (s0: SignalValue, s1: SignalValue, sr: SignalValue, sl: SignalValue, d: number) =>
+      pulse(step, [0, 0, s0, s1, sr, sl, ...(bitsOf(d, 4) as SignalValue[])], [1, 0, s0, s1, sr, sl, ...(bitsOf(d, 4) as SignalValue[])])[0];
+    expect(at(1, 1, 0, 0, 0b1001)).toBe(0b1001); // load
+    expect(at(0, 0, 1, 1, 0)).toBe(0b1001); // hold
+    expect(at(1, 0, 1, 0, 0)).toBe(0b0011); // shift right: SR enters Q0
+    expect(at(0, 1, 0, 1, 0)).toBe(0b1001); // shift left: SL enters Q3
+    expect(step([1, 1, 1, 1, 0, 0, 1, 1, 1, 1])[0]).toBe(0); // CLR
+  });
+
+  it('8-bit register loads on a rising edge when enabled', () => {
+    // [D0..D7, CLK, EN, CLR]
+    const step = counter('REGISTER_8BIT', 8);
+    const d = bitsOf(0xa5, 8) as SignalValue[];
+    expect(pulse(step, [...d, 0, 1, 0], [...d, 1, 1, 0])[0]).toBe(0xa5);
+    expect(pulse(step, [...(bitsOf(0x0f, 8) as SignalValue[]), 0, 0, 0], [...(bitsOf(0x0f, 8) as SignalValue[]), 1, 0, 0])[0]).toBe(0xa5);
+    expect(step([...d, 1, 1, 1])[0]).toBe(0);
+  });
+
+  it('8-bit latch follows D while LE is 1, holds after, and floats its outputs while OE is 0', () => {
+    // [D0..D7, LE, OE]
+    const step = counter('LATCH_8BIT', 8);
+    expect(step([...(bitsOf(0x3c, 8) as SignalValue[]), 1, 1])[0]).toBe(0x3c);
+    expect(step([...(bitsOf(0xff, 8) as SignalValue[]), 0, -1])[0]).toBe(0x3c); // holds; floating OE enables
+    expect(step([...(bitsOf(0xff, 8) as SignalValue[]), 0, 0])[0]).toBe(-1); // outputs float
   });
 });

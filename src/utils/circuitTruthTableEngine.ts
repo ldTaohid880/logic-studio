@@ -1,3 +1,4 @@
+import { MEMORY_GATE_TYPES } from '../simulation/icLogic';
 import { Node, Edge } from '@xyflow/react';
 import { NodeData, SignalValue } from '../types/circuit';
 import { propagateSignals } from '../simulation/engine';
@@ -48,7 +49,7 @@ export interface CircuitTableRow {
 export type MemoryStart = 'reset' | 'canvas';
 
 const SOURCE_TYPES = new Set(['INPUT', 'PUSH_BUTTON', 'DIP_SWITCH', 'CONST_HIGH', 'CONST_LOW']);
-const MEMORY_TYPES = new Set(['D_LATCH', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'DELAY_ELEMENT']);
+const MEMORY_TYPES = MEMORY_GATE_TYPES;
 const LED_TYPES = new Set(['OUTPUT', 'LOGIC_PROBE']);
 const HEX_TYPES = new Set(['HEX_DISPLAY', 'BUS_MONITOR']);
 

@@ -47,6 +47,12 @@ export type GateType =
   // Sequential
   | 'T_FLIPFLOP'
   | 'COUNTER_4BIT'
+  | 'COUNTER_LOAD_4BIT'
+  | 'DECADE_COUNTER'
+  | 'SHIFT_REG_UNIVERSAL'
+  | 'DECODER_4TO16_HC'
+  | 'REGISTER_8BIT'
+  | 'LATCH_8BIT'
   | 'SHIFT_REG_4BIT'
   | 'RAM_16X4'
   | 'ROM_16X4'

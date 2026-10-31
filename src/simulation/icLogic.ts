@@ -10,6 +10,12 @@ export interface ICPins {
 const bitPins = (prefix: 'in' | 'out', first: number, name: string, count: number): PinData[] =>
   Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${first + i}`, name: `${name}${i}`, value: 0 as SignalValue }));
 
+/** Parts whose outputs depend on what happened before (state in data.icState), not just on their inputs now. */
+export const MEMORY_GATE_TYPES = new Set<string>([
+  'D_LATCH', 'SR_LATCH', 'D_FLIPFLOP', 'JK_FLIPFLOP', 'T_FLIPFLOP', 'REGISTER_4BIT', 'REGISTER_8BIT', 'LATCH_8BIT',
+  'COUNTER_4BIT', 'COUNTER_LOAD_4BIT', 'DECADE_COUNTER', 'SHIFT_REG_4BIT', 'SHIFT_REG_UNIVERSAL', 'RAM_16X4', 'DELAY_ELEMENT',
+]);
+
 /** ALU operations, indexed by S2 S1 S0. */
 export const ALU_OPERATIONS = ['A + B', 'A − B', 'A AND B', 'A OR B', 'A XOR B', 'NOT A', 'A + 1', 'A − 1'] as const;
 
@@ -376,6 +382,60 @@ export function getDefaultICPins(gateType: GateType): ICPins {
           { id: 'in-3', name: 'CLR', value: 0 },
         ],
         outputs: [...bitPins('out', 0, 'Q', 4), { id: 'out-4', name: 'TC', value: 0 }],
+      };
+
+    case 'COUNTER_LOAD_4BIT':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'CLK', value: 0 },
+          { id: 'in-1', name: 'EN', value: 1 },
+          { id: 'in-2', name: 'LOAD', value: 0 },
+          { id: 'in-3', name: 'CLR', value: 0 },
+          ...bitPins('in', 4, 'D', 4),
+        ],
+        outputs: [...bitPins('out', 0, 'Q', 4), { id: 'out-4', name: 'RCO', value: 0 }],
+      };
+
+    case 'DECADE_COUNTER':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'CLK', value: 0 },
+          { id: 'in-1', name: 'EN', value: 1 },
+          { id: 'in-2', name: 'CLR', value: 0 },
+        ],
+        outputs: [...bitPins('out', 0, 'Q', 4), { id: 'out-4', name: 'TC', value: 0 }],
+      };
+
+    case 'SHIFT_REG_UNIVERSAL':
+      return {
+        inputs: [
+          { id: 'in-0', name: 'CLK', value: 0 },
+          { id: 'in-1', name: 'CLR', value: 0 },
+          { id: 'in-2', name: 'S0', value: 0 },
+          { id: 'in-3', name: 'S1', value: 0 },
+          { id: 'in-4', name: 'SR', value: 0 },
+          { id: 'in-5', name: 'SL', value: 0 },
+          ...bitPins('in', 6, 'D', 4),
+        ],
+        outputs: bitPins('out', 0, 'Q', 4),
+      };
+
+    case 'DECODER_4TO16_HC':
+      return {
+        inputs: [...bitPins('in', 0, 'A', 4), { id: 'in-4', name: 'EN', value: 1 }],
+        outputs: bitPins('out', 0, 'Y', 16),
+      };
+
+    case 'REGISTER_8BIT':
+      return {
+        inputs: [...bitPins('in', 0, 'D', 8), { id: 'in-8', name: 'CLK', value: 0 }, { id: 'in-9', name: 'EN', value: 1 }, { id: 'in-10', name: 'CLR', value: 0 }],
+        outputs: bitPins('out', 0, 'Q', 8),
+      };
+
+    case 'LATCH_8BIT':
+      return {
+        inputs: [...bitPins('in', 0, 'D', 8), { id: 'in-8', name: 'LE', value: 0 }, { id: 'in-9', name: 'OE', value: 1 }],
+        outputs: bitPins('out', 0, 'Q', 8),
       };
 
     case 'SHIFT_REG_4BIT':
@@ -852,6 +912,80 @@ export function evaluateIC(
       newState.count = count;
       writeBits(outputs, 0, count, 4);
       outputs['out-4'] = en === 1 && count === (up === 1 ? 15 : 0) ? 1 : 0;
+      break;
+    }
+
+    case 'COUNTER_LOAD_4BIT': {
+      // 74HC161 style: synchronous load, asynchronous clear (active high here)
+      const clk = inputs[0] === 1 ? 1 : 0;
+      const en = floatingAs(inputs[1], 1);
+      let count: number = currentState.count ?? 0;
+      if (inputs[3] === 1) count = 0;
+      else if ((currentState.prevClk ?? 0) === 0 && clk === 1) {
+        if (inputs[2] === 1) count = readBits(inputs, 4, 4);
+        else if (en === 1) count = (count + 1) % 16;
+      }
+      newState.prevClk = clk;
+      newState.count = count;
+      writeBits(outputs, 0, count, 4);
+      outputs['out-4'] = en === 1 && count === 15 ? 1 : 0;
+      break;
+    }
+
+    case 'DECADE_COUNTER': {
+      const clk = inputs[0] === 1 ? 1 : 0;
+      const en = floatingAs(inputs[1], 1);
+      let count: number = currentState.count ?? 0;
+      if (inputs[2] === 1) count = 0;
+      else if ((currentState.prevClk ?? 0) === 0 && clk === 1 && en === 1) count = (count + 1) % 10;
+      newState.prevClk = clk;
+      newState.count = count;
+      writeBits(outputs, 0, count, 4);
+      outputs['out-4'] = en === 1 && count === 9 ? 1 : 0;
+      break;
+    }
+
+    case 'SHIFT_REG_UNIVERSAL': {
+      // 74HC194 style; S1 S0: 00 hold, 01 shift right (SR enters Q0), 10 shift left (SL enters Q3), 11 load D
+      const clk = inputs[0] === 1 ? 1 : 0;
+      let q: number = currentState.qVal ?? 0;
+      if (inputs[1] === 1) q = 0;
+      else if ((currentState.prevClk ?? 0) === 0 && clk === 1) {
+        const mode = readBits(inputs, 2, 2);
+        if (mode === 1) q = ((q << 1) | (inputs[4] === 1 ? 1 : 0)) & 15;
+        else if (mode === 2) q = (q >> 1) | (inputs[5] === 1 ? 8 : 0);
+        else if (mode === 3) q = readBits(inputs, 6, 4);
+      }
+      newState.prevClk = clk;
+      newState.qVal = q;
+      writeBits(outputs, 0, q, 4);
+      break;
+    }
+
+    case 'DECODER_4TO16_HC': {
+      const en = floatingAs(inputs[4], 1);
+      writeBits(outputs, 0, en === 1 ? 1 << readBits(inputs, 0, 4) : 0, 16);
+      break;
+    }
+
+    case 'REGISTER_8BIT': {
+      const clk = inputs[8] === 1 ? 1 : 0;
+      let q: number = currentState.qVal ?? 0;
+      if (inputs[10] === 1) q = 0;
+      else if ((currentState.prevClk ?? 0) === 0 && clk === 1 && floatingAs(inputs[9], 1) === 1) q = readBits(inputs, 0, 8);
+      newState.prevClk = clk;
+      newState.qVal = q;
+      writeBits(outputs, 0, q, 8);
+      break;
+    }
+
+    case 'LATCH_8BIT': {
+      // 74HC373 style: transparent while LE is 1, holds otherwise; outputs float while OE is 0 (OE active high here)
+      let q: number = currentState.qVal ?? 0;
+      if (inputs[8] === 1) q = readBits(inputs, 0, 8);
+      newState.qVal = q;
+      if (floatingAs(inputs[9], 1) === 1) writeBits(outputs, 0, q, 8);
+      else for (let i = 0; i < 8; i++) outputs[`out-${i}`] = -1;
       break;
     }
 

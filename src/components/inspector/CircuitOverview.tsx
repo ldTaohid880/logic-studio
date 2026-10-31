@@ -1,7 +1,8 @@
 import React from 'react';
 import { Node } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
-import { ToggleLeft, Lightbulb, Table, Cpu } from 'lucide-react';
+import { ToggleLeft, Lightbulb, Table, Cpu, BarChart3 } from 'lucide-react';
+import { circuitStats } from '../../utils/circuitStats';
 import { NodeData } from '../../types/circuit';
 import { useCircuitStore } from '../../store/useCircuitStore';
 import { getComponentInfo } from '../../data/components';
@@ -51,7 +52,11 @@ const Row: React.FC<{ node: Node; children: React.ReactNode }> = ({ node, childr
  * live, so the circuit can be exercised from one place.
  */
 export const CircuitOverview: React.FC<{ onOpenCircuitTruthTable?: () => void }> = ({ onOpenCircuitTruthTable }) => {
-  const { nodes, edgeCount } = useCircuitStore(useShallow((s) => ({ nodes: s.nodes, edgeCount: s.edges.length })));
+  const { nodes, edges } = useCircuitStore(useShallow((s) => ({ nodes: s.nodes, edges: s.edges })));
+  const edgeCount = edges.length;
+  // Structure only changes with parts and wires, not with signal levels
+  const structure = nodes.map((n) => `${n.id}:${(n.data as unknown as NodeData).gateType}`).join() + '|' + edges.map((e) => `${e.source}>${e.target}`).join();
+  const stats = React.useMemo(() => circuitStats(nodes, edges), [structure]);
   const toggleInputValue = useCircuitStore((s) => s.toggleInputValue);
   const setButtonPressed = useCircuitStore((s) => s.setButtonPressed);
 
@@ -178,6 +183,57 @@ export const CircuitOverview: React.FC<{ onOpenCircuitTruthTable?: () => void }>
             </Button>
             <p className="text-xs text-fg-subtle text-center">Lists every input combination and what the outputs show.</p>
           </div>
+        )}
+
+        {stats.gates + stats.chips + stats.memoryParts > 0 && (
+          <InspectorSection title="Statistics" icon={<BarChart3 className="w-4 h-4" />} defaultExpanded={false}>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+              <dt className="text-fg-muted">Gates</dt>
+              <dd className="text-fg tabular-nums">
+                {stats.gates}
+                {stats.gates > 0 && (
+                  <span className="text-fg-subtle">
+                    {' '}
+                    ({Object.entries(stats.gatesByType)
+                      .map(([t, n]) => `${n} ${getComponentInfo(t as NodeData['gateType']).name}`)
+                      .join(', ')})
+                  </span>
+                )}
+              </dd>
+              <dt className="text-fg-muted">Chips</dt>
+              <dd className="text-fg tabular-nums">{stats.chips}</dd>
+              <dt className="text-fg-muted">Memory parts</dt>
+              <dd className="text-fg tabular-nums">{stats.memoryParts}</dd>
+              <dt className="text-fg-muted">Logic levels</dt>
+              <dd className="text-fg tabular-nums">{stats.levels}</dd>
+            </dl>
+            {stats.longestPath.length > 1 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-fg-subtle">Longest path (each gate or chip adds one gate delay):</p>
+                <p className="text-xs font-mono text-fg break-words">
+                  {stats.longestPath
+                    .map((id) => {
+                      const node = nodes.find((n) => n.id === id);
+                      return node ? displayName(node.data as unknown as NodeData) : '?';
+                    })
+                    .join(' → ')}
+                </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const path = new Set(stats.longestPath);
+                    useCircuitStore.setState({ nodes: useCircuitStore.getState().nodes.map((n) => ({ ...n, selected: path.has(n.id) })) });
+                  }}
+                >
+                  Select it on the canvas
+                </Button>
+              </div>
+            )}
+            {stats.hasLoop && (
+              <p className="text-xs text-signal-unknown">The logic has a feedback loop, so paths are only measured up to it.</p>
+            )}
+          </InspectorSection>
         )}
 
         {parts.length > 0 && (

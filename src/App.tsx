@@ -9,6 +9,10 @@ import { PresetsModal } from './components/ui/PresetsModal';
 import { ShortcutsModal } from './components/ui/ShortcutsModal';
 import { CircuitTruthTableModal } from './components/ui/CircuitTruthTableModal';
 import { BuildCircuitDialog } from './components/ui/BuildCircuitDialog';
+import { PartsListDialog } from './components/ui/PartsListDialog';
+import { ShareDialog } from './components/ui/ShareDialog';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
+import { decodeShare } from './utils/shareLink';
 import { CustomComponentWizardModal } from './components/custom/CustomComponentWizardModal';
 import { CustomComponentLibraryModal } from './components/custom/CustomComponentLibraryModal';
 import { Toast } from './components/ui/Toast';
@@ -37,6 +41,10 @@ export default function App() {
   const [isCircuitTruthTableOpen, setIsCircuitTruthTableOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isPartsListOpen, setIsPartsListOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  // A circuit from a share link, waiting for the user to agree to replace the current one
+  const [sharedCircuit, setSharedCircuit] = useState<string | null>(null);
   const [buildCircuit, setBuildCircuit] = useState<{ open: boolean; text?: string }>({ open: false });
   const [inspectorWidth, setInspectorWidth] = useState(readInspectorWidth);
 
@@ -69,6 +77,24 @@ export default function App() {
       setShowInspector(false);
     }
   }, [isNarrow, setShowToolbox, setShowInspector]);
+
+  // Share links put the circuit after #circuit= in the URL
+  useEffect(() => {
+    const check = () => {
+      if (!window.location.hash) return;
+      decodeShare(window.location.hash).then((text) => {
+        if (text) setSharedCircuit(text);
+        else if (window.location.hash.startsWith('#circuit=')) useCircuitStore.getState().showToast('Invalid share link: it may have been cut short');
+      });
+    };
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+  }, []);
+  const closeSharedCircuit = () => {
+    setSharedCircuit(null);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  };
 
   useGlobalShortcuts({ onOpenShortcuts: () => setIsShortcutsOpen(true) });
 
@@ -114,6 +140,8 @@ export default function App() {
         onOpenSubcircuitLibrary={() => setIsLibraryOpen(true)}
         onOpenCircuitTruthTable={() => setIsCircuitTruthTableOpen(true)}
         onOpenBuildCircuit={() => setBuildCircuit({ open: true })}
+        onOpenPartsList={() => setIsPartsListOpen(true)}
+        onOpenShare={() => setIsShareOpen(true)}
         canvasRef={canvasRef}
       />
 
@@ -193,6 +221,20 @@ export default function App() {
           setIsCircuitTruthTableOpen(false);
           setBuildCircuit({ open: true, text });
         }}
+      />
+      <PartsListDialog isOpen={isPartsListOpen} onClose={() => setIsPartsListOpen(false)} />
+      <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
+      <ConfirmDialog
+        isOpen={sharedCircuit !== null}
+        title="Open the shared circuit?"
+        message="It replaces the circuit on the canvas. Ctrl+Z brings yours back."
+        confirmLabel="Open it"
+        cancelLabel="Keep mine"
+        onConfirm={() => {
+          if (sharedCircuit) useCircuitStore.getState().openCircuitFile(sharedCircuit);
+          closeSharedCircuit();
+        }}
+        onCancel={closeSharedCircuit}
       />
       <BuildCircuitDialog isOpen={buildCircuit.open} initialText={buildCircuit.text} onClose={() => setBuildCircuit({ open: false })} />
       <CustomComponentWizardModal isOpen={isWizardOpen} onClose={() => setIsWizardOpen(false)} />
