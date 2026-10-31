@@ -7,6 +7,7 @@ import {
   useReactFlow,
   ReactFlowProvider,
   Node,
+  Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -31,11 +32,12 @@ import { EmptyCanvas } from './EmptyCanvas';
 import { ClockNode } from '../nodes/ClockNode';
 import { BoardNode } from '../nodes/BoardNode';
 import { SensorNode } from '../nodes/SensorNode';
+import { ResistorNode } from '../nodes/ResistorNode';
 import { SignalEdge } from '../edges/SignalEdge';
 import { GateType, NodeData } from '../../types/circuit';
 import { MenuPanel, MenuEntry } from '../ui/DropdownMenu';
 import { registerCanvasCenter } from '../../utils/canvasBridge';
-import { ExternalLink, Search, PackagePlus, Group, Copy, ClipboardPaste, Trash2 } from 'lucide-react';
+import { Activity, ExternalLink, Search, PackagePlus, Group, Copy, ClipboardPaste, Trash2 } from 'lucide-react';
 
 const nodeTypes = {
   logicGate: LogicGateNode,
@@ -55,6 +57,7 @@ const nodeTypes = {
   clockSource: ClockNode,
   boardNode: BoardNode,
   sensorModule: SensorNode,
+  resistorNode: ResistorNode,
 };
 
 const edgeTypes = {
@@ -85,6 +88,7 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
     x: number;
     y: number;
     nodeId?: string;
+    edgeId?: string;
     isCustom?: boolean;
     customComponentId?: string;
   } | null>(null);
@@ -131,7 +135,13 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
     });
   }, []);
 
+  const handleEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY, edgeId: edge.id });
+  }, []);
+
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const menuEdge = contextMenu?.edgeId ? edges.find((e) => e.id === contextMenu.edgeId) : undefined;
 
   // Touch devices have no right-click: a 550ms press without moving opens the same menu
   const longPress = useRef<{ timer?: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
@@ -240,6 +250,7 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
           onEdgeDoubleClick={handleEdgeDoubleClick}
           onNodeContextMenu={handleNodeContextMenu}
           onPaneContextMenu={handlePaneContextMenu}
+          onEdgeContextMenu={handleEdgeContextMenu}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           // Deletion goes through the global shortcut handler (deleteSelected) so it is undoable and re-propagates
@@ -287,8 +298,37 @@ const CircuitCanvasContent: React.FC<CircuitCanvasContentProps> = ({
         </ReactFlow>
       </div>
 
+      {/* Wire right-click menu */}
+      {contextMenu && menuEdge && (
+        <MenuPanel
+          ariaLabel="Wire actions"
+          anchor={{ x: contextMenu.x, y: contextMenu.y }}
+          onClose={closeContextMenu}
+          items={[
+            {
+              id: 'watch',
+              label: menuEdge.data?.watched ? 'Stop watching in timing diagram' : 'Watch in timing diagram',
+              icon: <Activity className="w-4 h-4" />,
+              onSelect: () => useCircuitStore.getState().setWireWatched(menuEdge.id, !menuEdge.data?.watched),
+            },
+            { type: 'separator', id: 'sep-wire' },
+            {
+              id: 'delete-wire',
+              label: 'Delete wire',
+              icon: <Trash2 className="w-4 h-4" />,
+              shortcut: 'Del',
+              destructive: true,
+              onSelect: () => {
+                useCircuitStore.setState({ selectedEdgeId: menuEdge.id, selectedNodeId: null });
+                deleteSelected();
+              },
+            },
+          ]}
+        />
+      )}
+
       {/* Canvas / Node Right Click Context Menu */}
-      {contextMenu && (
+      {contextMenu && !contextMenu.edgeId && (
         <MenuPanel
           ariaLabel="Canvas actions"
           anchor={{ x: contextMenu.x, y: contextMenu.y }}

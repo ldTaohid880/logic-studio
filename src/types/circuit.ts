@@ -69,6 +69,9 @@ export type GateType =
   // Utility
   | 'DELAY_ELEMENT'
   | 'TUNNEL'
+  | 'PULL_UP'
+  | 'PULL_DOWN'
+  | 'OPEN_DRAIN_BUFFER'
   | 'TEXT_LABEL'
   // Custom Component / Subcircuit
   | 'CUSTOM';

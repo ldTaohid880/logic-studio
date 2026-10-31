@@ -11,7 +11,7 @@ import { createPart } from '../partFactory';
 import { CircuitStore, StoreSlice } from '../types';
 
 // Parts whose outputs can float, so several of them may share one wire (a bus)
-const BUS_DRIVERS = new Set<string>(['TRI_STATE_BUFFER', 'ARDUINO_UNO']);
+const BUS_DRIVERS = new Set<string>(['TRI_STATE_BUFFER', 'ARDUINO_UNO', 'OPEN_DRAIN_BUFFER', 'PULL_UP', 'PULL_DOWN']);
 
 // Canvas editing: nodes, wires, selection, part properties and labels
 export type EditorSlice = Pick<CircuitStore,

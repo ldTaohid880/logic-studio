@@ -19,6 +19,7 @@ export const IC_GATE_TYPES = new Set<string>([
   'MUX_8TO1', 'DEMUX_1TO8', 'DECODER_3TO8', 'ENCODER_8TO3',
   'PARITY_GENERATOR', 'PARITY_CHECKER',
   'INCREMENTER_4BIT', 'DECREMENTER_4BIT', 'ADDER_SUBTRACTOR_4BIT',
+  'OPEN_DRAIN_BUFFER',
   'COUNTER_4BIT', 'SHIFT_REG_4BIT', 'ALU_4BIT_8FN', 'RAM_16X4', 'ROM_16X4',
   'DELAY_ELEMENT',
 ]);
@@ -26,6 +27,11 @@ export const IC_GATE_TYPES = new Set<string>([
 export interface PropagateOptions {
   // Current subcircuit nesting depth (internal)
   depth?: number;
+  /**
+   * Passes to run before returning. One pass = one gate delay: every part reacts to the levels its inputs had
+   * after the previous pass (used for gate delays). By default the circuit runs until it settles.
+   */
+  maxPasses?: number;
 }
 
 export interface PropagateResult {
@@ -42,6 +48,9 @@ export interface PropagateResult {
  * Level on a wire with several drivers (a shared bus). Floating drivers (disabled tri-state outputs) don't count;
  * drivers that agree give their level; drivers that disagree are a conflict, which reads as unknown (-1).
  */
+/** Pull-up and pull-down resistors: weak drivers that only set a wire's level when nothing else drives it. */
+export const WEAK_DRIVERS = new Set<string>(['PULL_UP', 'PULL_DOWN']);
+
 export function resolveDrivers(values: SignalValue[]): { value: SignalValue; conflict: boolean } {
   let value: SignalValue = -1;
   for (const v of values) {
@@ -95,7 +104,7 @@ export function propagateSignals(
   // Last input pattern each custom instance was evaluated with during this call
   const customEvalCache = new Map<string, string>();
   // A signal moves one part per pass, so long chains need more passes than small circuits
-  const MAX_ITERATIONS = Math.min(Math.max(12, inputNodes.length + 4), 256);
+  const MAX_ITERATIONS = options.maxPasses ?? Math.min(Math.max(12, inputNodes.length + 4), 256);
   // Parts whose outputs changed in the latest pass; if passes run out these are the ones that never settled
   let changedThisPass = new Set<string>();
   // Custom component instances whose own subcircuit doesn't settle
@@ -141,7 +150,7 @@ export function propagateSignals(
 
     // Step A.2: Map output signals from source pins to connected input pins via edges.
     // Several wires may end on one input (a shared bus); their levels are resolved together below.
-    const pinDrivers = new Map<string, SignalValue[]>();
+    const pinDrivers = new Map<string, { strong: SignalValue[]; weak: SignalValue[] }>();
     inputEdges.forEach((edge) => {
       const sourceNode = nodesMap.get(edge.source);
       const targetNode = nodesMap.get(edge.target);
@@ -165,7 +174,9 @@ export function propagateSignals(
       const inPin = targetData.inputs.find((p) => p.id === inPinHandle);
       if (inPin) {
         const key = `${edge.target}|${inPinHandle}`;
-        pinDrivers.set(key, [...(pinDrivers.get(key) ?? []), signalVal]);
+        const drivers = pinDrivers.get(key) ?? { strong: [], weak: [] };
+        (WEAK_DRIVERS.has(sourceData.gateType) ? drivers.weak : drivers.strong).push(signalVal);
+        pinDrivers.set(key, drivers);
       } else if (targetData.gateType === 'OUTPUT') {
         if (targetData.value !== signalVal) {
           targetData.value = signalVal;
@@ -174,10 +185,12 @@ export function propagateSignals(
       }
     });
 
-    pinDrivers.forEach((values, key) => {
+    pinDrivers.forEach((drivers, key) => {
       const [nodeId, pinId] = key.split('|');
       const inPin = (nodesMap.get(nodeId)!.data as unknown as NodeData).inputs.find((p) => p.id === pinId)!;
-      const { value, conflict } = resolveDrivers(values);
+      // Real outputs win; resistors only decide a wire nothing else drives (a pull-up and pull-down together leave it unknown)
+      const strong = resolveDrivers(drivers.strong);
+      const { value, conflict } = strong.value !== -1 || strong.conflict ? strong : { value: resolveDrivers(drivers.weak).value, conflict: false };
       if (conflict) conflicts.add(key);
       inPin.driven = true;
       if (inPin.value !== value) {
@@ -201,9 +214,18 @@ export function propagateSignals(
         data.gateType === 'CLOCK' ||
         data.gateType === 'CONST_HIGH' ||
         data.gateType === 'CONST_LOW' ||
+        data.gateType === 'PULL_UP' ||
+        data.gateType === 'PULL_DOWN' ||
         isSensor(data.gateType)
       ) {
-        const val = data.gateType === 'CONST_HIGH' ? 1 : data.gateType === 'CONST_LOW' ? 0 : isSensor(data.gateType) ? sensorOutput(data) : (data.value ?? 0);
+        const val =
+          data.gateType === 'CONST_HIGH' || data.gateType === 'PULL_UP'
+            ? 1
+            : data.gateType === 'CONST_LOW' || data.gateType === 'PULL_DOWN'
+            ? 0
+            : isSensor(data.gateType)
+            ? sensorOutput(data)
+            : (data.value ?? 0);
         data.outputs.forEach((outPin) => {
           if (outPin.value !== val) {
             outPin.value = val;

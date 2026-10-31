@@ -29,6 +29,20 @@ export const nextClockEdge = (t: number, hz: number) => (Math.floor(t / halfPeri
 /** Whether the circuit has parts that need simulated time (and so the run controls and timing diagram). */
 export const hasTimedParts = (nodes: Node[]) => nodes.some((n) => TIMED_TYPES.has((n.data as unknown as NodeData)?.gateType));
 
+/** Wires the student added to the timing diagram. */
+export const isWatched = (edge: Edge) => edge.data?.watched === true;
+
+/**
+ * Whether time runs and the timing diagram shows: with a clock or board, or once a wire is watched
+ * (then time runs like a logic analyser's, and edits are recorded when they happen).
+ */
+export const isTimelineActive = (nodes: Node[], edges: Edge[]) => hasTimedParts(nodes) || edges.some(isWatched);
+
+/** Trace key of a watched wire (part traces use the part's id). */
+export const wireTraceKey = (edgeId: string) => `wire:${edgeId}`;
+
+export const GATE_DELAYS_MS = [0, 1, 10, 100];
+
 /** Time of the next clock edge after t, or undefined without clocks. */
 export function nextEdgeTime(nodes: Node[], t: number): number | undefined {
   const edges = nodes
@@ -50,6 +64,8 @@ export interface AdvanceResult {
   edges: Edge[];
   /** Time reached; earlier than requested when the deadline cut the step short. */
   time: number;
+  /** With gate delays: when the next propagation pass is due, or null once the circuit has settled. */
+  passDue: number | null;
   /** Set when the circuit was re-settled at least once. */
   unstableNodeIds?: string[];
   conflictNodeIds?: string[];
@@ -65,9 +81,18 @@ export function advanceCircuit(
   from: number,
   to: number,
   boardFor: (node: Node) => BoardLike | null,
-  options: { deadline?: number; onSettle?: (t: number, nodes: Node[]) => void } = {}
+  options: {
+    deadline?: number;
+    onSettle?: (t: number, nodes: Node[], edges: Edge[]) => void;
+    /** Gate delay in ms; 0 settles instantly. */
+    gateDelay?: number;
+    /** With gate delays: when the next pass is due (carried between calls), null when settled. */
+    passDue?: number | null;
+  } = {}
 ): AdvanceResult {
   let { nodes, edges } = circuit;
+  const delay = options.gateDelay ?? 0;
+  let passDue = delay > 0 ? options.passDue ?? null : null;
   let unstableNodeIds: string[] | undefined;
   let conflictNodeIds: string[] | undefined;
   const clocks = nodes
@@ -83,6 +108,7 @@ export function advanceCircuit(
     if (options.deadline !== undefined && performance.now() > options.deadline) break;
 
     let next = to;
+    if (passDue !== null) next = Math.min(next, Math.max(passDue, t));
     clocks.forEach((c) => (next = Math.min(next, nextClockEdge(t, c.hz))));
     if (boards.length > 0) {
       next = Math.min(next, Math.floor(t + EPSILON) + 1);
@@ -117,17 +143,27 @@ export function advanceCircuit(
       return node;
     });
 
-    if (dirty) {
+    const passNow = delay > 0 && (dirty || (passDue !== null && passDue <= t + EPSILON));
+    if (passNow) {
+      // Gate delays: one pass per delay; a source that just changed starts a new wave of passes
+      const pass = propagateSignals(nodes, edges, customComponents, { maxPasses: 1 });
+      nodes = pass.nodes;
+      edges = pass.edges;
+      unstableNodeIds = []; // a circuit that keeps changing is expected here (a ring oscillator runs)
+      conflictNodeIds = pass.conflictNodeIds;
+      passDue = pass.hasChanged ? (passDue !== null && passDue > t + EPSILON ? passDue : t + delay) : null;
+      options.onSettle?.(t, nodes, edges);
+    } else if (dirty && delay === 0) {
       const settled = propagateSignals(nodes, edges, customComponents);
       nodes = settled.nodes;
       edges = settled.edges;
       unstableNodeIds = settled.unstableNodeIds;
       conflictNodeIds = settled.conflictNodeIds;
-      options.onSettle?.(t, nodes);
+      options.onSettle?.(t, nodes, edges);
     }
   }
 
-  return { nodes, edges, time: t, unstableNodeIds, conflictNodeIds };
+  return { nodes, edges, time: t, passDue, unstableNodeIds, conflictNodeIds };
 }
 
 // Timing diagram traces: one list of [time, level] changes per traced part
@@ -148,19 +184,27 @@ export function tracedValue(data: NodeData): SignalValue | undefined {
   return data.value ?? 0;
 }
 
-/** Adds a point for every traced part whose level differs from its last point. Returns the same object when nothing changed. */
-export function recordTraces(traces: Traces, nodes: Node[], t: number): Traces {
+/**
+ * Adds a point for every traced part and watched wire whose level differs from its last point.
+ * Returns the same object when nothing changed.
+ */
+export function recordTraces(traces: Traces, nodes: Node[], t: number, edges: Edge[] = []): Traces {
   let next = traces;
-  nodes.forEach((node) => {
-    const value = tracedValue(node.data as unknown as NodeData);
-    if (value === undefined) return;
-    const points = traces[node.id] ?? [];
+  const levels: [string, SignalValue][] = [
+    ...nodes.flatMap((node): [string, SignalValue][] => {
+      const value = tracedValue(node.data as unknown as NodeData);
+      return value === undefined ? [] : [[node.id, value]];
+    }),
+    ...edges.filter(isWatched).map((e): [string, SignalValue] => [wireTraceKey(e.id), (e.data?.signalValue as SignalValue) ?? -1]),
+  ];
+  levels.forEach(([key, value]) => {
+    const points = traces[key] ?? [];
     const last = points[points.length - 1];
     if (last && last[1] === value) return;
     if (next === traces) next = { ...traces };
     // A second change at the same moment replaces the first (the circuit settled through it)
     const kept = last && Math.abs(last[0] - t) < EPSILON ? points.slice(0, -1) : points.slice(-(MAX_TRACE_POINTS - 1));
-    next[node.id] = [...kept, [t, value]];
+    next[key] = [...kept, [t, value]];
   });
   return next;
 }

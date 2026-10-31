@@ -265,3 +265,42 @@ describe('wiring several outputs to one input', () => {
     expect(store().nodes.find((n) => n.id === 'Y')?.className).toContain('ls-conflict');
   });
 });
+
+describe('watching a wire', () => {
+  it('starts the timing diagram without a clock and records the wire as it changes', () => {
+    loadInverter();
+    store().setTimelineRunning(true);
+    store().advanceTimeline(100);
+    expect(store().timeline.time).toBe(0); // nothing timed yet
+
+    store().setWireWatched('e2', true);
+    expect(store().edges.find((e) => e.id === 'e2')?.data?.watched).toBe(true);
+    store().advanceTimeline(100);
+    expect(store().timeline.time).toBe(100); // time runs while a wire is watched
+    store().toggleInputValue('A');
+    expect(store().timeline.traces['wire:e2']).toEqual([[0, 0], [100, 1]]);
+
+    store().undo();
+    expect(store().edges.find((e) => e.id === 'e2')?.data?.watched).toBeUndefined();
+  });
+});
+
+describe('gate delays in the store', () => {
+  it('steps an edit through the gates one delay at a time, and settles at once when turned off', () => {
+    loadInverter(); // A (1) → NOT → Y
+    store().setWireWatched('e2', true);
+    store().setTimelineRunning(false);
+    store().setGateDelay(10);
+    store().toggleInputValue('A'); // A → 0; the NOT hasn't responded yet
+    expect(data('Y')?.inputs[0].value).toBe(0);
+    expect(store().timeline.passDue).toBe(10);
+    store().stepTimeline(); // one gate delay later the NOT output is 1
+    store().stepTimeline(); // and the LED sees it a pass later
+    expect(data('Y')?.inputs[0].value).toBe(1);
+
+    store().toggleInputValue('A');
+    store().setGateDelay(0);
+    expect(data('Y')?.inputs[0].value).toBe(0);
+    expect(store().timeline.passDue).toBeNull();
+  });
+});

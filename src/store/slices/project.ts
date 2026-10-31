@@ -30,7 +30,7 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
       edges,
       selectedNodeId: null,
       selectedEdgeId: null,
-      timeline: { ...get().timeline, time: 0, traces: {}, behind: false },
+      timeline: { ...get().timeline, time: 0, traces: {}, behind: false, passDue: null },
       boardSerial: {},
     });
     get().tickSimulation();
@@ -137,7 +137,7 @@ export const createProjectSlice: StoreSlice<ProjectSlice> = (set, get) => ({
       edges: [],
       selectedNodeId: null,
       selectedEdgeId: null,
-      timeline: { ...get().timeline, time: 0, traces: {}, behind: false },
+      timeline: { ...get().timeline, time: 0, traces: {}, behind: false, passDue: null },
       boardSerial: {},
     });
   },

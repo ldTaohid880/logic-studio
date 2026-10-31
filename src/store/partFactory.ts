@@ -43,6 +43,8 @@ const SHAPES: Partial<Record<GateType, PartShape>> = {
   PUSH_BUTTON: { nodeType: 'pushButton', inputCount: 0 },
   CLOCK: { nodeType: 'clockSource', label: 'CLK', inputCount: 0 },
   ARDUINO_UNO: { nodeType: 'boardNode', label: 'Uno', inputCount: 0 },
+  PULL_UP: { nodeType: 'resistorNode', label: '', inputCount: 0 },
+  PULL_DOWN: { nodeType: 'resistorNode', label: '', inputCount: 0 },
   SENSOR_LIGHT: { nodeType: 'sensorModule', label: 'Light', inputCount: 0 },
   SENSOR_TEMPERATURE: { nodeType: 'sensorModule', label: 'Temperature', inputCount: 0 },
   SENSOR_OBSTACLE: { nodeType: 'sensorModule', label: 'Obstacle', inputCount: 0 },
@@ -110,7 +112,12 @@ function defaultPins(gateType: GateType, shape: PartShape): { inputs: PinData[];
   const count = shape.inputCount;
   const inputs = pins('in', count, (i) => (count === 1 ? 'In' : `In ${i + 1}`), -1);
   if (gateType === 'OUTPUT' || gateType === 'LOGIC_PROBE') return { inputs, outputs: [] };
-  const outValue = gateType === 'INPUT' || gateType === 'CLOCK' || gateType === 'CONST_LOW' ? 0 : gateType === 'CONST_HIGH' ? 1 : -1;
+  const outValue =
+    gateType === 'INPUT' || gateType === 'CLOCK' || gateType === 'CONST_LOW' || gateType === 'PULL_DOWN'
+      ? 0
+      : gateType === 'CONST_HIGH' || gateType === 'PULL_UP'
+      ? 1
+      : -1;
   return { inputs, outputs: [{ id: 'out-0', name: 'Out', value: outValue }] };
 }
 

@@ -128,6 +128,14 @@ export const SignalEdge: React.FC<EdgeProps> = ({
       )}
 
       <EdgeLabelRenderer>
+        {data?.watched === true && !isEditing && !(showWireLabels && wireLabel) && (
+          // Probe mark: this wire is in the timing diagram
+          <div
+            className="absolute w-2.5 h-2.5 rounded-full border-2 border-accent bg-surface-1 pointer-events-none"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+            title="Watched in the timing diagram"
+          />
+        )}
         {isEditing ? (
           <WireLabelEditor edgeId={id} initial={wireLabel} x={labelX} y={labelY} />
         ) : (

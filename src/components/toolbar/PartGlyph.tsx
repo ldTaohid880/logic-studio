@@ -53,6 +53,18 @@ const GLYPHS: Partial<Record<GateType, () => React.ReactNode>> = {
         <line x1={40} y1={20} x2={62} y2={20} {...stroke} />
       </>
     ),
+  PULL_UP: () =>
+    frame(
+      <>
+        <path d="M14 5 H34 M24 5 V10 L30 13 L18 18 L30 23 L18 28 L24 31 V34 H58" {...stroke} strokeWidth={1.75} />
+      </>
+    ),
+  PULL_DOWN: () =>
+    frame(
+      <>
+        <path d="M58 6 H24 V9 L30 12 L18 17 L30 22 L18 27 L24 30 V33 M14 33 H34 M18 36 H30 M22 39 H26" {...stroke} strokeWidth={1.75} />
+      </>
+    ),
   SENSOR_LIGHT: () =>
     module(
       <>

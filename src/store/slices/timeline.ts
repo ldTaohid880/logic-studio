@@ -1,6 +1,6 @@
 import { Node } from '@xyflow/react';
 import { NodeData } from '../../types/circuit';
-import { advanceCircuit, hasTimedParts, nextEdgeTime, recordTraces, Traces } from '../../simulation/timeline';
+import { advanceCircuit, isTimelineActive, nextEdgeTime, recordTraces, Traces } from '../../simulation/timeline';
 import { boardFor, boardSerial, loadEmulator, restartBoards } from '../../simulation/avr/boards';
 import { parseIntelHex } from '../../simulation/avr/intelHex';
 import { makeId } from '../../utils/ids';
@@ -16,7 +16,7 @@ const STEP_WITHOUT_CLOCK_MS = 10;
 
 export const TIMELINE_SPEEDS = [0.25, 1, 4];
 
-export const DEFAULT_TIMELINE = { running: true, time: 0, speed: 1, behind: false, traces: {} as Traces };
+export const DEFAULT_TIMELINE = { running: true, time: 0, speed: 1, behind: false, gateDelay: 0, passDue: null, traces: {} as Traces };
 
 const lookupBoard = (node: Node) => {
   const data = node.data as unknown as NodeData;
@@ -42,10 +42,12 @@ export type TimelineSlice = Pick<
   | 'boardSerial'
   | 'setTimelineRunning'
   | 'setTimelineSpeed'
+  | 'setGateDelay'
   | 'advanceTimeline'
   | 'stepTimeline'
   | 'restartTimeline'
   | 'loadBoardFirmware'
+  | 'setWireWatched'
 >;
 
 export const createTimelineSlice: StoreSlice<TimelineSlice> = (set, get) => {
@@ -54,7 +56,9 @@ export const createTimelineSlice: StoreSlice<TimelineSlice> = (set, get) => {
     let traces = timeline.traces;
     const result = advanceCircuit({ nodes, edges }, customComponents, timeline.time, target, lookupBoard, {
       deadline,
-      onSettle: (t, settled) => (traces = recordTraces(traces, settled, t)),
+      gateDelay: timeline.gateDelay,
+      passDue: timeline.passDue,
+      onSettle: (t, settled, settledEdges) => (traces = recordTraces(traces, settled, t, settledEdges)),
     });
     set({
       nodes: result.unstableNodeIds ? markUnstable(result.nodes, result.unstableNodeIds, result.conflictNodeIds) : result.nodes,
@@ -62,7 +66,7 @@ export const createTimelineSlice: StoreSlice<TimelineSlice> = (set, get) => {
       simulation: result.unstableNodeIds
         ? { ...simulation, unstableNodeIds: result.unstableNodeIds, conflictNodeIds: result.conflictNodeIds ?? [] }
         : simulation,
-      timeline: { ...timeline, time: result.time, traces, behind: result.time < target },
+      timeline: { ...timeline, time: result.time, traces, behind: result.time < target, passDue: result.passDue },
       boardSerial: collectSerial(result.nodes, get().boardSerial),
     });
   };
@@ -75,16 +79,23 @@ export const createTimelineSlice: StoreSlice<TimelineSlice> = (set, get) => {
 
     setTimelineSpeed: (speed) => set({ timeline: { ...get().timeline, speed } }),
 
+    setGateDelay: (gateDelay) => {
+      set({ timeline: { ...get().timeline, gateDelay, passDue: null } });
+      // Back to instant gates: settle whatever was still on its way
+      if (gateDelay === 0) get().tickSimulation();
+    },
+
     advanceTimeline: (realMs) => {
-      const { timeline, nodes } = get();
-      if (!timeline.running || !hasTimedParts(nodes)) return;
+      const { timeline, nodes, edges } = get();
+      if (!timeline.running || !isTimelineActive(nodes, edges)) return;
       advanceTo(timeline.time + Math.min(realMs, MAX_FRAME_MS) * timeline.speed, performance.now() + FRAME_BUDGET_MS);
     },
 
     stepTimeline: () => {
       const { timeline, nodes } = get();
       set({ timeline: { ...timeline, running: false, behind: false } });
-      advanceTo(nextEdgeTime(nodes, timeline.time) ?? timeline.time + STEP_WITHOUT_CLOCK_MS);
+      // With gate delays a step is one pass (one gate delay) while signals are still travelling
+      advanceTo(timeline.passDue ?? nextEdgeTime(nodes, timeline.time) ?? timeline.time + STEP_WITHOUT_CLOCK_MS);
     },
 
     restartTimeline: () => {
@@ -97,8 +108,16 @@ export const createTimelineSlice: StoreSlice<TimelineSlice> = (set, get) => {
         if (data.icState) return { ...node, data: { ...data, icState: undefined } };
         return node;
       });
-      set({ nodes, timeline: { ...get().timeline, time: 0, traces: {}, behind: false }, boardSerial: {} });
+      set({ nodes, timeline: { ...get().timeline, time: 0, traces: {}, behind: false, passDue: null }, boardSerial: {} });
       get().tickSimulation();
+    },
+
+    setWireWatched: (edgeId, watched) => {
+      get().saveHistory();
+      const edges = get().edges.map((e) => (e.id === edgeId ? { ...e, data: { ...e.data, watched: watched || undefined } } : e));
+      const { timeline, nodes } = get();
+      // Start the trace at once, so the wire shows in the timing diagram before anything changes
+      set({ edges, timeline: { ...timeline, traces: recordTraces(timeline.traces, nodes, timeline.time, edges) } });
     },
 
     loadBoardFirmware: (nodeId, name, hex) => {
